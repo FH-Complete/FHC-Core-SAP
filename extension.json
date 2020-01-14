@@ -1,0 +1,8 @@
+{
+	"name": "FHC-Core-SAP",
+	"description": "SAP Extension",
+	"version": "1",
+	"license": "GPLv3",
+	"url": "https://github.com/FH-Complete/FHC-Core-SAP",
+	"core_version": "3.3"
+}
