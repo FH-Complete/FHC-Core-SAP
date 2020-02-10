@@ -12,19 +12,19 @@ class Test extends API_Controller
 	 */
 	public function __construct()
 	{
-		parent::__construct(array('ActivationCode' => 'basis/benutzer:rw'));
+		parent::__construct(array('Test' => 'basis/person:rw'));
 
-		// Loads the SAPLib library
-		$this->load->library('extensions/FHC-Core-SAP/SAPLib');
+		// Loads SAPClientModel
+		$this->load->model('extensions/FHC-Core-SAP/SAPClient_model', 'SAPClientModel');
 	}
 
 	/**
-	 * Returns the activation code for the provided uid
+	 *
 	 */
-	public function ()
+	public function getTest()
 	{
-		$ = $this->input->get('');
+		$result = $this->SAPClientModel->findByElementsByFamilyName('Mustermann');
 
-		$this->response($this->saplib->($), REST_Controller::HTTP_OK);
+		var_dump($result);
 	}
 }

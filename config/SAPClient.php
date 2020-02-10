@@ -1,19 +1,14 @@
 <?php
 
-$config['fhc_sap_default_ldap_password'] = 'guessit';
-
 $config['fhc_sap_active_connection'] = 'DEFAULT'; // the used configuration set of the chosen connection
-
-$config['fhc_sap_apikey_name'] = 'IDM-API-KEY'; // the used configuration set of the chosen connection
 
 // Example of a configuration set. All parameters are required!
 $config['fhc_sap_connections'] = array(
 	'DEFAULT' => array(
-		'protocol' => 'https', // ssl by default... better!
-	    'host' => 'foster.technikum-wien.at', // FHC-SAP server name
-	    'path' => '', // usually this is the path for REST API
-		'username' => 'system', // basic HTTP authentication username
-		'password' => '123456', // basic HTTP authentication password
-		'apikey' => '123456'
+		'wsdl' => 'https://my350522.sapbydesign.com/sap/bc/srt/wsdl/srvc_00163E9CE8031EEA92C19602BE6B1093/wsdl11/allinone/standard/document', // URI to the WSDL
+		'options' => array(
+			'login' => '_FHCOMPLETE', // basic HTTP authentication username
+			'password' => 'RcaJpMD69PaYNomESwFi2WF2VPKRD' // basic HTTP authentication password
+		)
 	)
 );

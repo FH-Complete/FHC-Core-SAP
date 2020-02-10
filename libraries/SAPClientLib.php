@@ -3,63 +3,33 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- *
+ * To perform SOAP calls to SAP Business ByDesign
  */
 class SAPClientLib
 {
-	const APIKEY_NAME = 'IDM-API-KEY'; // name of the api key
+	// Blocking errors
+	const ERROR = 						'ERR0001';
+	const SOAP_ERROR =		 			'ERR0002';
 
-    const HTTP_GET_METHOD = 'GET'; // http get method name
-    const HTTP_POST_METHOD = 'POST'; // http post method name
-	const HTTP_PUT_METHOD = 'PUT'; // http post method name
-	const URI_TEMPLATE = '%s://%s/%s/%s'; // URI format
+	const ERROR_STR = '%s: %s'; //
+
+	// Non blocking errors
+	const USER_ALREADY_EXISTS_WARNING =	'WAR0001';
 
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'fhc_sap_active_connection';
 	const CONNECTIONS = 'fhc_sap_connections';
 
-	const HTTP_OK = 200; // HTTP success code
-
-	// HTTP error codes
-	const HTTP_FORBIDDEN = 403;
-	const HTTP_NOT_FOUND = 404;
-	const HTTP_NOT_ALLOWED_METHOD = 405;
-	const HTTP_RESOURCE_NOT_AVAILABLE = 409;
-	const HTTP_WRONG_PARAMETERS = 422;
-	const HTTP_INTERNAL_SERVER_ERROR = 500;
-
-	// Blocking errors
-	const ERROR = 						'ERR0001';
-	const CONNECTION_ERROR = 			'ERR0002';
-	const JSON_PARSE_ERROR = 			'ERR0003';
-	const UNAUTHORIZED = 				'ERR0004';
-	const MISSING_REQUIRED_PARAMETERS = 'ERR0005';
-	const WRONG_WS_PARAMETERS = 		'ERR0006';
-	const INVALID_WS = 					'ERR0007';
-	const WS_NOT_READY =				'ERR0008';
-	const HTTP_WRONG_METHOD =			'ERR0009';
-	const RS_ERROR =					'ERR0010';
-
-	// Non blocking errors
-	const USER_ALREADY_EXISTS_WARNING =	'WAR0001';
-
-	// Name of the web service to get incidents
-	const WS_INCIDENT = 'incident/get';
-
 	// Connection parameters names
-	const PROTOCOL = 'protocol';
-	const HOST = 'host';
-	const PATH = 'path';
-	const USERNAME = 'username';
-	const PASSWORD = 'password';
-	const APIKEY = 'apikey';
+	const WSDL = 'wsdl';
+	const OPTIONS = 'options';
 
-	private $_connectionArray;		// contains the connection parameters configuration array
+	private $_soapOptionsArray;		// contains the connection option parameters
+	private $_wsdl;					// contains the WSDL URI
 
-	private $_wsFunction;			// path to the webservice
+	private $_wsFunction;			// name of the SOAP call
 
-	private $_httpMethod;			// http method used to call this server
-	private $_callParametersArray;	// contains the parameters to give to the remote web service
+	private $_callParametersArray;	// contains the parameters to give to the remote SOAP web service
 
 	private $_error;				// true if an error occurred
 	private $_errorMessage;			// contains the error message
@@ -72,7 +42,7 @@ class SAPClientLib
     /**
      * Object initialization
      */
-    public function __construct($credentials = null)
+    public function __construct()
     {
 		$this->_ci =& get_instance(); // get code igniter instance
 
@@ -80,39 +50,28 @@ class SAPClientLib
 
 		$this->_setPropertiesDefault(); // properties initialization
 
-        $this->_setConnection($credentials); // loads the configurations
+        $this->_setConnection(); // sets the connection parameters
     }
 
     // --------------------------------------------------------------------------------------------
     // Public methods
 
     /**
-     * Performs a call to a remote web service
+     * Performs a call to a remote SOAP web service
      */
-    public function call($wsFunction, $httpMethod = self::HTTP_GET_METHOD, $callParametersArray = array())
+    public function call($wsSoapFunction, $callParametersArray = array())
     {
-		// Checks if the webservice name is provided and it is valid
-		if ($wsFunction != null && trim($wsFunction) != '')
+		// Checks if the SOAP webservice name is provided and it is valid
+		if ($wsSoapFunction != null && trim($wsSoapFunction) != '')
 		{
-			$this->_wsFunction = $wsFunction;
+			$this->_wsFunction = $wsSoapFunction;
 		}
 		else
 		{
 			$this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot something?');
 		}
 
-		// Checks that the HTTP method required is valid
-		if ($httpMethod != null
-			&& ($httpMethod == self::HTTP_GET_METHOD || $httpMethod == self::HTTP_POST_METHOD || $httpMethod == self::HTTP_PUT_METHOD))
-		{
-			$this->_httpMethod = $httpMethod;
-		}
-		else
-		{
-			$this->_error(self::WRONG_WS_PARAMETERS, 'Have you ever herd about HTTP methods?');
-		}
-
-		// Checks that the webservice parameters are present in an array
+		// Checks that the SOAP webservice parameters are present in an array
 		if (is_array($callParametersArray))
 		{
 			$this->_callParametersArray = $callParametersArray;
@@ -124,7 +83,7 @@ class SAPClientLib
 
 		if ($this->isError()) return null; // If an error was raised then return a null value
 
-        return $this->_callRemoteWS($this->_generateURI()); // perform a remote ws call with the given uri
+        return $this->_callRemoteSOAP($wsSoapFunction, $callParametersArray); // perform a remote SOAP call with the given uri
     }
 
 	/**
@@ -173,7 +132,6 @@ class SAPClientLib
 	public function resetToDefault()
 	{
 		$this->_wsFunction = null;
-		$this->_httpMethod = null;
 		$this->_callParametersArray = array();
 		$this->_error = false;
 		$this->_errorMessage = '';
@@ -193,8 +151,6 @@ class SAPClientLib
 
 		$this->_wsFunction = null;
 
-		$this->_httpMethod = null;
-
 		$this->_callParametersArray = array();
 
 		$this->_error = false;
@@ -209,171 +165,48 @@ class SAPClientLib
     /**
      * Sets the connection
      */
-    private function _setConnection($credentials)
+    private function _setConnection()
     {
 		$activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(self::CONNECTIONS);
 
-		$this->_connectionArray = $connectionsArray[$activeConnectionName];
+		$connectionArray = $connectionsArray[$activeConnectionName];
 
-		if (!isEmptyArray($credentials)
-			&& isset($credentials[self::USERNAME]) && isset($credentials[self::PASSWORD])
-			&& !isEmptyString($credentials[self::USERNAME]) && !isEmptyString($credentials[self::PASSWORD]))
-		{
-			$this->_connectionArray[self::USERNAME] = $credentials[self::USERNAME];
-			$this->_connectionArray[self::PASSWORD] = $credentials[self::PASSWORD];
-		}
-    }
-
-    /**
-     * Returns true if the HTTP method used to call this server is GET
-     */
-    private function _isGET()
-    {
-        return $this->_httpMethod == self::HTTP_GET_METHOD;
-    }
-
-    /**
-     * Returns true if the HTTP method used to call this server is POST
-     */
-    private function _isPOST()
-    {
-        return $this->_httpMethod == self::HTTP_POST_METHOD;
+		$this->_wsdl = $connectionArray[self::WSDL];
+		$this->_soapOptionsArray = $connectionArray[self::OPTIONS];
     }
 
 	/**
-     * Returns true if the HTTP method used to call this server is POST
-     */
-    private function _isPUT()
-    {
-        return $this->_httpMethod == self::HTTP_PUT_METHOD;
-    }
-
-    /**
-     * Generate the URI to call the remote web service
-     */
-    private function _generateURI()
-    {
-        $uri = sprintf(
-            self::URI_TEMPLATE,
-            $this->_connectionArray[self::PROTOCOL],
-            $this->_connectionArray[self::HOST],
-            $this->_connectionArray[self::PATH],
-			$this->_wsFunction
-        );
-
-		// If the call was performed using a HTTP GET then append the query string to the URI
-        if ($this->_isGET())
-        {
-			$queryString = '';
-			$firstParam = true;
-
-			// Create the query string
-			foreach ($this->_callParametersArray as $name => $value)
-			{
-				if (is_array($value)) // if is an array
-				{
-					foreach ($value as $key => $val)
-					{
-						$queryString .= ($firstParam == true ? '?' : '&').$name.'[]='.$val;
-					}
-				}
-				else // otherwise
-				{
-					$queryString .= ($firstParam == true ? '?' : '&').$name.'='.$value;
-				}
-
-				$firstParam = false;
-			}
-
-            $uri .= $queryString;
-        }
-
-        return $uri;
-    }
-
-	/**
-	 * Performs a remote web service call with the given uri and returns the result after having checked it
+	 * Performs a remote SOAP web service call with the given name and parameters
 	 */
-	private function _callRemoteWS($uri)
+	private function _callRemoteSOAP($wsSoapFunction, $callParametersArray)
 	{
 		$response = null;
 
 		try
 		{
-			if ($this->_isGET()) // if the call was performed using a HTTP GET...
-			{
-				$response = $this->_callGET($uri); // ...calls the remote web service with the HTTP GET method
-			}
-			elseif ($this->_isPOST()) // else if the call was performed using a HTTP POST...
-			{
-				$response = $this->_callPOST($uri); // ...calls the remote web service with the HTTP POST method
-			}
-			elseif ($this->_isPUT()) // else if the call was performed using a HTTP PUT...
-			{
-				$response = $this->_callPUT($uri); // ...calls the remote web service with the HTTP PUT method
-			}
+			$soapClient = new SoapClient($this->_wsdl, $this->_soapOptionsArray);
 
-			// Checks the response of the remote web service and handles possible errors
+			$response = $soapClient->{$wsSoapFunction}($callParametersArray);
+
+			// Checks the response of the remote SOAP web service and handles possible errors
 			// Eventually here is also called a hook, so the data could have been manipulated
 			$response = $this->_checkResponse($response);
 		}
-		catch (\Httpful\Exception\ConnectionErrorException $cee) // connection error
+		catch (SoapFault $sf) // SOAP errors
 		{
-			$this->_error(self::CONNECTION_ERROR, 'A connection error occurred while calling the remote server');
+			$this->_error(self::SOAP_ERROR, sprintf(self::ERROR_STR, $sf->getCode(), $sf->getMessage()));
 		}
-		// Otherwise another error has occurred, most likely the result of the
-		// remote web service is not json so a parse error is raised
+		// Otherwise another error has occurred
 		catch (Exception $e)
 		{
-			$this->_error(self::JSON_PARSE_ERROR, 'The remote server answerd with a not valid json');
+			$this->_error(self::ERROR, sprintf(self::ERROR_STR, $e->getCode(), $e->getMessage()));
 		}
 
 		if ($this->isError()) return null; // If an error was raised then return a null value
 
 		return $response;
 	}
-
-    /**
-     * Performs a remote call using the GET HTTP method
-	 * NOTE: parameters in a HTTP GET call are placed into the URI by _generateURI
-     */
-    private function _callGET($uri)
-    {
-        return \Httpful\Request::get($uri)
-            ->expectsJson() // parse from json
-			->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
-			->addHeader(self::APIKEY_NAME, $this->_connectionArray[self::APIKEY])
-            ->send();
-    }
-
-    /**
-     * Performs a remote call using the POST HTTP method
-     */
-    private function _callPOST($uri)
-    {
-        return \Httpful\Request::post($uri)
-            ->expectsJson() // parse response as json
-            ->body(http_build_query($this->_callParametersArray)) // post parameters
-			->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
-			->addHeader(self::APIKEY_NAME, $this->_connectionArray[self::APIKEY])
-			->sendsType(\Httpful\Mime::FORM)
-            ->send();
-    }
-
-	/**
-     * Performs a remote call using the PUT HTTP method
-     */
-    private function _callPUT($uri)
-    {
-        return \Httpful\Request::put($uri)
-            ->expectsJson() // parse response as json
-			->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
-			->addHeader(self::APIKEY_NAME, $this->_connectionArray[self::APIKEY])
-			->body(json_encode($this->_callParametersArray)) // post parameters
-            ->sendsJson() // Content-Type JSON
-			->send();
-    }
 
     /**
      * Checks the response from the remote web service
@@ -383,118 +216,23 @@ class SAPClientLib
 		$checkResponse = null;
 
 		// If NOT an empty response
-        if (is_object($response) && isset($response->code) && isset($response->body))
+        if (is_object($response) || is_array($response) || is_string($response) || is_numeric($response))
         {
-			// Checks the HTTP response code
-            if ($response->code == self::HTTP_OK)
+			// If no data are present
+            if ((is_string($response->body) && trim($response->body) == '')
+				|| (is_array($response->body) && count($response->body) == 0)
+                || (is_object($response->body) && count((array)$response->body) == 0))
             {
-				// Checks for errors that do not match the given HTTP code
-				if ((isset($response->body->error) && $response->body->error != 0) || isset($response->body->errors))
-				{
-					// If the called webservice is not the one to get the incident (to avoid loops)
-					// and a change id is present then...
-					if ($this->_wsFunction != self::WS_INCIDENT && isset($response->body->change_id))
-					{
-						// ...try to retrieve the incident
-						$incident = $this->call(
-							self::WS_INCIDENT,
-							self::HTTP_GET_METHOD,
-							array(
-								'change_id' => $response->body->change_id
-							)
-						);
-						// If the incident is successfully retrieved and it contains useful data
-						if (isset($incident->result) && is_object($incident->result) && isset($incident->result->success))
-						{
-							// Returns the given error
-							$this->_error(
-								self::ERROR,
-								'HTTP code is success, but an error was given within the json response: '.$incident->result->success
-							);
-						}
-						else // otherwise
-						{
-							$this->_error(
-								self::ERROR,
-								'HTTP code is success, but an error was given within the json response and it is not possible to retrieve the incident error'
-							);
-						}
-					}
-					else // otherwise
-					{
-						$this->_error(
-							self::ERROR,
-							'HTTP code is success, but an error was given within the json response: '.$response->raw_body
-						);
-					}
-				}
-				else // otherwise everything is fine
-				{
-					// If no data are present
-	                if ((is_string($response->body) && trim($response->body) == '')
-						|| (is_array($response->body) && count($response->body) == 0)
-	                    || (is_object($response->body) && count((array)$response->body) == 0))
-	                {
-						$this->_hasData = false; // set property _hasData to false
-	                }
-	                else
-	                {
-						$this->_hasData = true; // set property _hasData to true
-	                }
-				}
-
-				$checkResponse = $response->body; // returns a success
+				$this->_hasData = false; // set property _hasData to false
             }
-			else // otherwise checks what error occurred
-			{
-				// Unauthorized call (wrong username, password, apikey, etc...)
-				if ($response->code == self::HTTP_FORBIDDEN)
-				{
-					$this->_error(self::UNAUTHORIZED, 'The authentication credentials provided are not valid');
-				}
-				// At the called URL does not answer any webservice
-				elseif ($response->code == self::HTTP_NOT_FOUND)
-				{
-					$this->_error(self::INVALID_WS, 'Does not exist a webservice that answer to this URL');
-				}
-				// Not supported HTTP method
-				elseif ($response->code == self::HTTP_NOT_ALLOWED_METHOD)
-				{
-					$this->_error(self::HTTP_WRONG_METHOD, 'The used HTTP method is not supported by this webservice');
-				}
-				// This resource is not currently available
-				elseif ($response->code == self::HTTP_RESOURCE_NOT_AVAILABLE)
-				{
-					$this->_error(self::WS_NOT_READY, 'The called resource is not currently available');
-				}
-				// Name, value type, quantity of one or more parameters are not valid
-				elseif ($response->code == self::HTTP_WRONG_PARAMETERS)
-				{
-					$this->_error(
-						self::WRONG_WS_PARAMETERS,
-						'The parameters needed by this webservice are not provided or their value is not valid'
-					);
-				}
-				// Internal server error
-				elseif ($response->code == self::HTTP_INTERNAL_SERVER_ERROR)
-				{
-					$this->_error(self::RS_ERROR, 'A fatal error occurred on the remote server, contact the maintainer');
-				}
-				else // Every other not contemplated possible error
-				{
-					// If some info is present
-					if (isset($this->raw_body))
-					{
-						$this->_error(self::ERROR, 'Generic error occurred: '.$this->raw_body);
-					}
-					else // Otherwise return the entire response
-					{
-						$this->_error(self::ERROR, 'Generic error occurred: '.json_encode($response));
-					}
-				}
-			}
+            else
+            {
+				$this->_hasData = true; // set property _hasData to true
+            }
+
+			$checkResponse = $response; // returns a success
         }
-		else // if the response has no body
+		else // if the response is empty
 		{
 			$this->_emptyResponse = true; // set property _hasData to false
 		}
