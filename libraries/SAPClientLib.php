@@ -3,15 +3,17 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * To perform SOAP calls to SAP Business ByDesign
+ *
  */
 class SAPClientLib
 {
 	// Blocking errors
-	const ERROR = 						'ERR0001';
-	const SOAP_ERROR =		 			'ERR0002';
+	const ERROR = 		'ERR0001';
+	const SOAP_ERROR =	'ERR0002';
 
-	const ERROR_STR = '%s: %s'; //
+	const ERROR_STR = '%s: %s'; // Error message format
+
+	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/%s/%s.wsdl'; // Full name to the WSDL
 
 	// Non blocking errors
 	const USER_ALREADY_EXISTS_WARNING =	'WAR0001';
@@ -20,16 +22,7 @@ class SAPClientLib
 	const ACTIVE_CONNECTION = 'fhc_sap_active_connection';
 	const CONNECTIONS = 'fhc_sap_connections';
 
-	// Connection parameters names
-	const WSDL = 'wsdl';
-	const OPTIONS = 'options';
-
-	private $_soapOptionsArray;		// contains the connection option parameters
-	private $_wsdl;					// contains the WSDL URI
-
-	private $_wsFunction;			// name of the SOAP call
-
-	private $_callParametersArray;	// contains the parameters to give to the remote SOAP web service
+	private $_connectionsArray;		// connections array
 
 	private $_error;				// true if an error occurred
 	private $_errorMessage;			// contains the error message
@@ -59,31 +52,23 @@ class SAPClientLib
     /**
      * Performs a call to a remote SOAP web service
      */
-    public function call($wsSoapFunction, $callParametersArray = array())
+    public function call($apiSetName, $serviceName, $soapFunction, $callParametersArray = array())
     {
-		// Checks if the SOAP webservice name is provided and it is valid
-		if ($wsSoapFunction != null && trim($wsSoapFunction) != '')
-		{
-			$this->_wsFunction = $wsSoapFunction;
-		}
-		else
-		{
-			$this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot something?');
-		}
+		// Checks if the api set name is valid
+		if ($apiSetName == null || trim($apiSetName) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot API set name?');
+
+		// Checks if the service name is valid
+		if ($serviceName == null || trim($serviceName) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot SAP service name?');
+
+		// Checks if the SOAP function name is valid
+		if ($soapFunction == null || trim($soapFunction) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot SOAP function name?');
 
 		// Checks that the SOAP webservice parameters are present in an array
-		if (is_array($callParametersArray))
-		{
-			$this->_callParametersArray = $callParametersArray;
-		}
-		else
-		{
-			$this->_error(self::WRONG_WS_PARAMETERS, 'Are those parameters?');
-		}
+		if (!is_array($callParametersArray)) $this->_error(self::WRONG_WS_PARAMETERS, 'Are those parameters?');
 
 		if ($this->isError()) return null; // If an error was raised then return a null value
 
-        return $this->_callRemoteSOAP($wsSoapFunction, $callParametersArray); // perform a remote SOAP call with the given uri
+        return $this->_callRemoteSOAP($apiSetName, $serviceName, $soapFunction, $callParametersArray); // perform a remote SOAP call with the given uri
     }
 
 	/**
@@ -131,8 +116,6 @@ class SAPClientLib
 	 */
 	public function resetToDefault()
 	{
-		$this->_wsFunction = null;
-		$this->_callParametersArray = array();
 		$this->_error = false;
 		$this->_errorMessage = '';
 		$this->_hasData = false;
@@ -147,18 +130,10 @@ class SAPClientLib
      */
 	private function _setPropertiesDefault()
 	{
-		$this->_connectionArray = null;
-
-		$this->_wsFunction = null;
-
-		$this->_callParametersArray = array();
-
+		$this->_connectionsArray = null;
 		$this->_error = false;
-
 		$this->_errorMessage = '';
-
 		$this->_hasData = false;
-
 		$this->_emptyResponse = false;
 	}
 
@@ -170,24 +145,25 @@ class SAPClientLib
 		$activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(self::CONNECTIONS);
 
-		$connectionArray = $connectionsArray[$activeConnectionName];
-
-		$this->_wsdl = $connectionArray[self::WSDL];
-		$this->_soapOptionsArray = $connectionArray[self::OPTIONS];
+		$this->_connectionsArray = $connectionsArray[$activeConnectionName];
     }
 
 	/**
 	 * Performs a remote SOAP web service call with the given name and parameters
 	 */
-	private function _callRemoteSOAP($wsSoapFunction, $callParametersArray)
+	private function _callRemoteSOAP($apiSetName, $serviceName, $soapFunction, $callParametersArray)
 	{
 		$response = null;
 
 		try
 		{
-			$soapClient = new SoapClient($this->_wsdl, $this->_soapOptionsArray);
+			// Call the SoapClient giving the path in the file system to the WSDL file and the options needed to connect
+			$soapClient = new SoapClient(
+				sprintf(self::WSDL_FULL_NAME, $apiSetName, $serviceName),
+				$this->_connectionsArray[$apiSetName]
+			);
 
-			$response = $soapClient->{$wsSoapFunction}($callParametersArray);
+			$response = $soapClient->{$soapFunction}($callParametersArray);
 
 			// Checks the response of the remote SOAP web service and handles possible errors
 			// Eventually here is also called a hook, so the data could have been manipulated
@@ -216,19 +192,11 @@ class SAPClientLib
 		$checkResponse = null;
 
 		// If NOT an empty response
-        if (is_object($response) || is_array($response) || is_string($response) || is_numeric($response))
+        if (is_object($response))
         {
+			$this->_hasData = true; // set property _hasData to true
 			// If no data are present
-            if ((is_string($response->body) && trim($response->body) == '')
-				|| (is_array($response->body) && count($response->body) == 0)
-                || (is_object($response->body) && count((array)$response->body) == 0))
-            {
-				$this->_hasData = false; // set property _hasData to false
-            }
-            else
-            {
-				$this->_hasData = true; // set property _hasData to true
-            }
+            if (count((array)$response) == 0) $this->_hasData = false; // set property _hasData to false
 
 			$checkResponse = $response; // returns a success
         }
