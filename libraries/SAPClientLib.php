@@ -3,20 +3,19 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- *
+ * This library is used to call SAP Business by Design SOAP web services
  */
 class SAPClientLib
 {
 	// Blocking errors
-	const ERROR = 		'ERR0001';
-	const SOAP_ERROR =	'ERR0002';
+	const ERROR = 				'ERR0001';
+	const SOAP_ERROR =			'ERR0002';
+	const MISSING_REQUIRED_PARAMETERS = 	'ERR0003';
+	const WRONG_WS_PARAMETERS = 		'ERR0004';
 
 	const ERROR_STR = '%s: %s'; // Error message format
 
 	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/%s/%s.wsdl'; // Full name to the WSDL
-
-	// Non blocking errors
-	const USER_ALREADY_EXISTS_WARNING =	'WAR0001';
 
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'fhc_sap_active_connection';
@@ -32,44 +31,44 @@ class SAPClientLib
 
 	private $_ci; // Code igniter instance
 
-    /**
-     * Object initialization
-     */
-    public function __construct()
-    {
+	/**
+	 * Object initialization
+	 */
+	public function __construct()
+	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		$this->_ci->config->load('extensions/FHC-Core-SAP/SAPClient'); // Loads FHC-SAP configuration
 
 		$this->_setPropertiesDefault(); // properties initialization
 
-        $this->_setConnection(); // sets the connection parameters
-    }
+		$this->_setConnection(); // sets the connection parameters
+	}
 
-    // --------------------------------------------------------------------------------------------
-    // Public methods
-
-    /**
-     * Performs a call to a remote SOAP web service
-     */
-    public function call($apiSetName, $serviceName, $soapFunction, $callParametersArray = array())
-    {
+	// --------------------------------------------------------------------------------------------
+	// Public methods
+	
+	/**
+	 * Performs a call to a remote SOAP web service
+	 */
+	public function call($apiSetName, $serviceName, $soapFunction, $callParametersArray = array())
+	{
 		// Checks if the api set name is valid
 		if ($apiSetName == null || trim($apiSetName) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot API set name?');
-
+		
 		// Checks if the service name is valid
 		if ($serviceName == null || trim($serviceName) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot SAP service name?');
-
+		
 		// Checks if the SOAP function name is valid
 		if ($soapFunction == null || trim($soapFunction) == '') $this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot SOAP function name?');
-
+		
 		// Checks that the SOAP webservice parameters are present in an array
 		if (!is_array($callParametersArray)) $this->_error(self::WRONG_WS_PARAMETERS, 'Are those parameters?');
-
+		
 		if ($this->isError()) return null; // If an error was raised then return a null value
-
-        return $this->_callRemoteSOAP($apiSetName, $serviceName, $soapFunction, $callParametersArray); // perform a remote SOAP call with the given uri
-    }
+		
+		return $this->_callRemoteSOAP($apiSetName, $serviceName, $soapFunction, $callParametersArray); // perform a remote SOAP call with the given uri
+	}
 
 	/**
 	 * Returns the error message stored in property _errorMessage
@@ -122,12 +121,12 @@ class SAPClientLib
 		$this->_emptyResponse = false;
 	}
 
-    // --------------------------------------------------------------------------------------------
-    // Private methods
-
+	// --------------------------------------------------------------------------------------------
+	// Private methods
+	
 	/**
-     * Initialization of the properties of this object
-     */
+	* Initialization of the properties of this object
+	*/
 	private function _setPropertiesDefault()
 	{
 		$this->_connectionsArray = null;
@@ -137,16 +136,16 @@ class SAPClientLib
 		$this->_emptyResponse = false;
 	}
 
-    /**
-     * Sets the connection
-     */
-    private function _setConnection()
-    {
+	/**
+	 * Sets the connection
+	 */
+	private function _setConnection()
+	{
 		$activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(self::CONNECTIONS);
-
+		
 		$this->_connectionsArray = $connectionsArray[$activeConnectionName];
-    }
+	}
 
 	/**
 	 * Performs a remote SOAP web service call with the given name and parameters
@@ -184,29 +183,29 @@ class SAPClientLib
 		return $response;
 	}
 
-    /**
-     * Checks the response from the remote web service
-     */
-    private function _checkResponse($response)
-    {
+	/**
+	 * Checks the response from the remote web service
+	 */
+	private function _checkResponse($response)
+	{
 		$checkResponse = null;
-
+	
 		// If NOT an empty response
-        if (is_object($response))
-        {
+		if (is_object($response))
+		{
 			$this->_hasData = true; // set property _hasData to true
 			// If no data are present
-            if (count((array)$response) == 0) $this->_hasData = false; // set property _hasData to false
-
+			if (count((array)$response) == 0) $this->_hasData = false; // set property _hasData to false
+		
 			$checkResponse = $response; // returns a success
-        }
-		else // if the response is empty
-		{
-			$this->_emptyResponse = true; // set property _hasData to false
 		}
-
+	    	else // if the response is empty
+	    	{
+	    		$this->_emptyResponse = true; // set property _hasData to false
+	    	}
+	
 		return $checkResponse;
-    }
+	}
 
 	/**
 	 * Sets property _error to true and stores an error message in property _errorMessage

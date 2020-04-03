@@ -12,10 +12,14 @@ class Example extends API_Controller
 	 */
 	public function __construct()
 	{
-		parent::__construct(array('Example' => 'basis/person:rw'));
+		parent::__construct(
+			array(
+				'Example' => 'basis/person:rw'
+			)
+		);
 
-		// Loads QueryAccountsModel
-		$this->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryAccounts_model', 'QueryAccountsModel');
+		// Loads QueryCustomerInModel
+		$this->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryCustomerIn_model', 'QueryCustomerInModel');
 	}
 
 	/**
@@ -24,8 +28,22 @@ class Example extends API_Controller
 	public function getExample()
 	{
 		$this->response(
-			$this->QueryAccountsModel->findByElementsByFamilyName('Mustermann'),
-			REST_Controller::HTTP_OK
+			$this->QueryCustomerInModel->findByCommunicationData(
+				array(
+					'CustomerSelectionByCommunicationData' => array(
+						'SelectionByEmailURI' => array(
+							'LowerBoundaryEmailURI' => '*@technikum-wien.at',
+							'InclusionExclusionCode' => 'I',
+							'IntervalBoundaryTypeCode' => 1
+						)
+					),
+					'ProcessingConditions' => array(
+						'QueryHitsUnlimitedIndicator' => true
+					)
+				)
+			),
+                        REST_Controller::HTTP_OK
 		);
 	}
 }
+
