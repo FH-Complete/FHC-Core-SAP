@@ -119,6 +119,7 @@ class SyncUsersLib
 						'VerbalCommunicationLanguageCode' => 'EN',
 						'ContactAllowedCode' => 3,
 						'LegalCompetenceIndicator' => true,
+						'ABCClassificationCode' => 'A',
 						'AddressInformation' => array(
 							'ObjectNodeSenderTechnicalID' => '002',
 							'AddressUsage' => array(
@@ -127,7 +128,11 @@ class SyncUsersLib
 								'DefaultIndicator' => false
 							),
 							'Address' => array(
-								'EmailURI' => $userData->email
+								'EmailURI' => $userData->email,
+								'PreferredCommunicationMediumTypeCod' => 'LET'
+								'PostalAddress' => array(
+									'CountryCode' => 'AT'
+								)
 							)
 						)
 					)
