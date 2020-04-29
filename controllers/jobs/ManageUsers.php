@@ -29,7 +29,7 @@ class ManageUsers extends JQW_Controller
 		$this->logInfo('Start new users data synchronization with SAP ByD');
 
 		$lastJobs = $this->getLastJobs(SyncUsersLib::SAP_USERS_CREATE);
-		if (isError($lasJobs))
+		if (isError($lastJobs))
 		{
 			$this->logError('An error occurred while creating new users in SAP', getError($lastJobs));
 		}
@@ -39,6 +39,10 @@ class ManageUsers extends JQW_Controller
 			if (isError($syncResult))
 			{
 				$this->logError('An error occurred while creating new users in SAP', getError($syncResult));
+			}
+			else
+			{
+				// $this->updateJobsQueue(SyncUsersLib::SAP_USERS_CREATE, $jobs)
 			}
 		}
 
@@ -53,7 +57,7 @@ class ManageUsers extends JQW_Controller
 		$this->logInfo('Start updated users data synchronization with SAP ByD');
 
 		$lastJobs = $this->getLastJobs(SyncUsersLib::SAP_USERS_UPDATE);
-		if (isError($lasJobs))
+		if (isError($lastJobs))
 		{
 			$this->logError('An error occurred while updating users data in SAP', getError($lastJobs));
 		}
@@ -63,6 +67,10 @@ class ManageUsers extends JQW_Controller
 			if (isError($syncResult))
 			{
 				$this->logError('An error occurred while updating users data in SAP', getError($syncResult));
+			}
+			else
+			{
+				// $this->updateJobsQueue(SyncUsersLib::SAP_USERS_CREATE, $jobs)
 			}
 		}
 
@@ -79,11 +87,19 @@ class ManageUsers extends JQW_Controller
 	{
 		$mergedUsersArray = array();
 
+		if (count($jobs) == 0) return $mergedUsersArray;
+
 		foreach ($jobs as $job)
 		{
-			$mergedUsersArray = array_merge($mergedUsersArray, json_decode($job->input));
+			$decodedInput = json_decode($job->input);
+			if ($decodedInput != null)
+			{
+				foreach ($decodedInput as $el)
+				{
+					$mergedUsersArray[] = $el->person_id;
+				}
+			}
 		}
-
 		return $mergedUsersArray;
 	}
 }
