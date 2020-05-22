@@ -23,65 +23,83 @@ class ManageUsers extends JQW_Controller
 
 	/**
 	 * This method is called to synchronize new users with SAP Business by Design
+	 * Wrapper method for _manageUsers
 	 */
 	public function createUsers()
 	{
-		$this->logInfo('Start new users data synchronization with SAP ByD');
-
-		$lastJobs = $this->getLastJobs(SyncUsersLib::SAP_USERS_CREATE);
-		if (isError($lastJobs))
-		{
-			$this->logError('An error occurred while creating new users in SAP', getError($lastJobs));
-		}
-		else
-		{
-			$syncResult = $this->syncuserslib->createUsers($this->_mergeUsersArray(getData($lastJobs)));
-			if (isError($syncResult))
-			{
-				$this->logError('An error occurred while creating new users in SAP', getError($syncResult));
-			}
-			else
-			{
-				// $this->updateJobsQueue(SyncUsersLib::SAP_USERS_CREATE, $jobs)
-			}
-		}
-
-		$this->logInfo('End new users data synchronization with SAP ByD');
+		$this->_manageUsers(SyncUsersLib::SAP_USERS_CREATE, 'create');
 	}
 
 	/**
 	 * This method is called to synchronize updated users data with SAP Business by Design
+	 * Wrapper method for _manageUsers
 	 */
 	public function updateUsers()
 	{
-		$this->logInfo('Start updated users data synchronization with SAP ByD');
-
-		$lastJobs = $this->getLastJobs(SyncUsersLib::SAP_USERS_UPDATE);
-		if (isError($lastJobs))
-		{
-			$this->logError('An error occurred while updating users data in SAP', getError($lastJobs));
-		}
-		else
-		{
-			$syncResult = $this->syncuserslib->updateUsers($this->_mergeUsersArray(getData($lastJobs)));
-			if (isError($syncResult))
-			{
-				$this->logError('An error occurred while updating users data in SAP', getError($syncResult));
-			}
-			else
-			{
-				// $this->updateJobsQueue(SyncUsersLib::SAP_USERS_CREATE, $jobs)
-			}
-		}
-
-		$this->logInfo('End updated users data synchronization with SAP ByD');
+		$this->_manageUsers(SyncUsersLib::SAP_USERS_UPDATE, 'update');
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
 	// Private methods
 
 	/**
-	 *
+	 * Performs data synchronization with SAP, depending on the first parameter can create or update users
+	 */
+	private function _manageUsers($jobType, $operation)
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: '.$operation);
+
+		// Gets the latest jobs
+		$lastJobs = $this->getLastJobs($jobType);
+		if (isError($lastJobs))
+		{
+			$this->logError('An error occurred while creating new users in SAP', getError($lastJobs));
+		}
+		else
+		{
+			// Create/update users on SAP side
+			if ($jobType == SyncUsersLib::SAP_USERS_CREATE)
+			{
+				$syncResult = $this->syncuserslib->createUsers($this->_mergeUsersArray(getData($lastJobs)));
+			}
+			else
+			{
+				$syncResult = $this->syncuserslib->updateUsers($this->_mergeUsersArray(getData($lastJobs)));
+			}
+			if (isError($syncResult))
+			{
+				$this->logError('An error occurred while creating new users in SAP', getError($syncResult));
+			}
+			else
+			{
+				// If non blocking errors are present...
+				if (hasData($syncResult))
+				{
+					if (!isEmptyArray(getData($syncResult)))
+					{
+						// ...then log them all as warnings
+						foreach (getData($syncResult) as $nonBlockingError)
+						{
+							$this->logWarning($nonBlockingError);
+						}
+					}
+					// Else if it a single message log it as info
+					elseif (!isEmptyString(getData($syncResult)))
+					{
+						$this->logInfo(getData($syncResult));
+					}
+				}
+				
+				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
+			}
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
+	}
+
+	/**
+	 * Gets a list of jobs as parameter and returns a merged array of person ids
+	 * Sets all jobs status to done
 	 */
 	private function _mergeUsersArray($jobs)
 	{
@@ -91,6 +109,8 @@ class ManageUsers extends JQW_Controller
 
 		foreach ($jobs as $job)
 		{
+			$job->status = JobsQueueLib::STATUS_DONE; // set all jobs as done
+
 			$decodedInput = json_decode($job->input);
 			if ($decodedInput != null)
 			{
