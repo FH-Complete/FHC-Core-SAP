@@ -14,6 +14,9 @@ class ManageUsers extends JQW_Controller
 	{
 		parent::__construct();
 
+		// Loads SAP common helper
+                $this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
+
 		// Loads SyncUsersLib
                 $this->load->library('extensions/FHC-Core-SAP/SyncUsersLib');
 	}
@@ -53,22 +56,23 @@ class ManageUsers extends JQW_Controller
 		$lastJobs = $this->getLastJobs($jobType);
 		if (isError($lastJobs))
 		{
-			$this->logError('An error occurred while creating new users in SAP', getError($lastJobs));
+			$this->logError('An error occurred while '.$operation.'ing users in SAP', getError($lastJobs));
 		}
 		else
 		{
 			// Create/update users on SAP side
 			if ($jobType == SyncUsersLib::SAP_USERS_CREATE)
 			{
-				$syncResult = $this->syncuserslib->createUsers($this->_mergeUsersArray(getData($lastJobs)));
+				$syncResult = $this->syncuserslib->createUsers(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 			else
 			{
-				$syncResult = $this->syncuserslib->updateUsers($this->_mergeUsersArray(getData($lastJobs)));
+				$syncResult = $this->syncuserslib->updateUsers(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
+
 			if (isError($syncResult))
 			{
-				$this->logError('An error occurred while creating new users in SAP', getError($syncResult));
+				$this->logError('An error occurred while '.$operation.'ing users in SAP', getError($syncResult));
 			}
 			else
 			{
@@ -95,32 +99,6 @@ class ManageUsers extends JQW_Controller
 		}
 
 		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
-	}
-
-	/**
-	 * Gets a list of jobs as parameter and returns a merged array of person ids
-	 * Sets all jobs status to done
-	 */
-	private function _mergeUsersArray($jobs)
-	{
-		$mergedUsersArray = array();
-
-		if (count($jobs) == 0) return $mergedUsersArray;
-
-		foreach ($jobs as $job)
-		{
-			$job->status = JobsQueueLib::STATUS_DONE; // set all jobs as done
-
-			$decodedInput = json_decode($job->input);
-			if ($decodedInput != null)
-			{
-				foreach ($decodedInput as $el)
-				{
-					$mergedUsersArray[] = $el->person_id;
-				}
-			}
-		}
-		return $mergedUsersArray;
 	}
 }
 

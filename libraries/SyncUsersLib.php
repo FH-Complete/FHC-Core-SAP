@@ -19,8 +19,6 @@ class SyncUsersLib
 	const ENGLISH_LANGUAGE = 'English'; // English language
 	const ENGLISH_LANGUAGE_ISO = 'EN'; // English language ISO
 
-	const DEFAULT_NATION_ISO = 'AT'; // Default nation ISO
-
 	// Genders
 	const FHC_GENDER_MALE = 'm';
 	const FHC_GENDER_FEMALE = 'w';
@@ -58,8 +56,8 @@ class SyncUsersLib
 		// Loads ManageCustomerInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageCustomerIn_model', 'ManageCustomerInModel');
 
-		// Loads SAPStudierendeModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudierende_model', 'SAPStudierendeModel');
+		// Loads SAPStudentsModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudents_model', 'SAPStudentsModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -111,8 +109,8 @@ class SyncUsersLib
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1(
 					array(
 						'BasicMessageHeader' => array(
-							'ID' => $this->_generateUID(self::CREATE_USER_PREFIX),
-							'UUID' => $this->_generateUUID()
+							'ID' => generateUID(self::CREATE_USER_PREFIX),
+							'UUID' => generateUUID()
 						),
 						'Customer' => array(
 							'actionCode' => '01',
@@ -192,11 +190,11 @@ class SyncUsersLib
 					// If data structure is ok...
 					if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
 					{
-						// Store in database the couple person_id sap_id
-						$insert = $this->_ci->SAPStudierendeModel->insert(
+						// Store in database the couple person_id sap_user_id
+						$insert = $this->_ci->SAPStudentsModel->insert(
 							array(
 								'person_id' => $userData->person_id,
-								'sap_id' => $manageCustomer->Customer->InternalID
+								'sap_user_id' => $manageCustomer->Customer->InternalID
 							)
 						);
 
@@ -275,8 +273,8 @@ class SyncUsersLib
 
 			// Gets the SAP id for the current user
 			$sapIdResult = $dbModel->execReadOnlyQuery('
-				SELECT s.sap_id
-				  FROM sync.tbl_sap_studierende s
+				SELECT s.sap_user_id
+				  FROM sync.tbl_sap_students s
 				WHERE s.person_id = ?
 			', array($userData->person_id));
 
@@ -313,13 +311,13 @@ class SyncUsersLib
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1(
 					array(
 						'BasicMessageHeader' => array(
-							'ID' => $this->_generateUID(self::CREATE_USER_PREFIX),
-							'UUID' => $this->_generateUUID()
+							'ID' => generateUID(self::UPDATE_USER_PREFIX),
+							'UUID' => generateUUID()
 						),
 						'Customer' => array(
 							'actionCode' => '02',
 							'addressInformationListCompleteTransmissionIndicator' => false,
-							'InternalID' => getData($sapIdResult)[0]->sap_id,
+							'InternalID' => getData($sapIdResult)[0]->sap_user_id,
 							'ProspectIndicator' => $userData->prospectIndicator,
 							'CustomerIndicator' => !$userData->prospectIndicator,
 							'Person' => array(
@@ -397,28 +395,6 @@ class SyncUsersLib
 	// Private methods
 
 	/**
-	 * Generates a unique UUID
-	 */
-	private function _generateUUID()
-	{
-		$data = openssl_random_pseudo_bytes(16);
-
-		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
-		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
-
-		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
-	}
-
-	/**
-	 * Generate a (almost) unique id to be used as id of each SAP SOAP call
-	 * Using uniqid here should be fine
-	 */
-	private function _generateUID($prefix)
-	{
-		return uniqid($prefix, true);
-	}
-
-	/**
 	 * Remove already created users from the given array
 	 * Wrapper method for _addOrRemoveUsers
 	 */
@@ -448,7 +424,7 @@ class SyncUsersLib
 		$dbModel = new DB_Model();
 		$dbSyncdUsers = $dbModel->execReadOnlyQuery('
 			SELECT s.person_id
-			  FROM sync.tbl_sap_studierende s
+			  FROM sync.tbl_sap_students s
 			 WHERE s.person_id IN ?
 		', array($users));
 
@@ -660,7 +636,7 @@ class SyncUsersLib
 
 	/**
 	 * Checks on SAP side if a user already exists with the given email address
-	 * Returns a success object with a true values if the user exists on SAP side, otherwise with a false value
+	 * Returns a success object with the found user data, otherwise with a false value
 	 * In case of error then an error object is returned
 	 */
 	private function _userExistsByEmailSAP($email)
@@ -677,6 +653,7 @@ class SyncUsersLib
 				),
 				'ProcessingConditions' => array(
 					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
 				)
 			)
 		);
