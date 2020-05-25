@@ -62,7 +62,7 @@ class SyncUsersLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
-	
+
 	/**
 	 * Creates new users in SAP using the array of person ids given as parameter
 	 */
@@ -87,7 +87,7 @@ class SyncUsersLib
 		if (isError($usersAllData)) return $usersAllData;
 		if (!hasData($usersAllData)) return error('No data available for the given users');
 
-		// Loops through users data 
+		// Loops through users data
 		foreach (getData($usersAllData) as $userData)
 		{
 			// If an email address was not found for this user...
@@ -102,7 +102,7 @@ class SyncUsersLib
 
 			if (isError($userDataSAP)) return $userDataSAP;
 
-			// If the current user is not present in SAP 
+			// If the current user is not present in SAP
 			if (!hasData($userDataSAP))
 			{
 				// Then create it!
@@ -155,12 +155,12 @@ class SyncUsersLib
 									'CompoundServiceInterfaceCode' => '11',
 									'EnabledIndicator' => true,
 									'CommunicationMediumTypeCode' => 'INT'
-								),   
+								),
 								2 => array(
 									'CompoundServiceInterfaceCode' => '27',
 									'EnabledIndicator' => true,
 									'CommunicationMediumTypeCode' => 'INT'
-								),   
+								),
 								3 => array(
 									'CompoundServiceInterfaceCode' => '28',
 									'EnabledIndicator' => true,
@@ -261,7 +261,7 @@ class SyncUsersLib
 
 		$dbModel = new DB_Model();
 
-		// Loops through users data 
+		// Loops through users data
 		foreach (getData($usersAllData) as $userData)
 		{
 			// If an email address was not found for this user...
@@ -285,12 +285,12 @@ class SyncUsersLib
 			$userDataSAP = $this->_userExistsByEmailSAP($userData->email);
 
 			if (isError($userDataSAP)) return $userDataSAP;
-	
-			// If the current user is present in SAP 
+
+			// If the current user is present in SAP
 			if (hasData($userDataSAP))
 			{
 				$sapCustomer = getData($userDataSAP); // get SAP customer data
-				
+
 				// Get the AddressInformation UUID
 				if (isset($sapCustomer->AddressInformation)
 					&& isset($sapCustomer->AddressInformation->UUID)
@@ -413,7 +413,7 @@ class SyncUsersLib
 	}
 
 	/**
-	 * Used to remove created or not created users from the given array 
+	 * Used to remove created or not created users from the given array
 	 * initialFoundValue is a toggle
 	 */
 	private function _addOrRemoveUsers($users, $initialFoundValue)
@@ -481,7 +481,7 @@ class SyncUsersLib
 		if (isError($dbUsersPersonalData)) return $dbUsersPersonalData;
 		if (!hasData($dbUsersPersonalData)) return error('The provided person ids are not present in database');
 
-		// Loops through users personal data 
+		// Loops through users personal data
 		foreach (getData($dbUsersPersonalData) as $userPersonalData)
 		{
 			// -------------------------------------------------------------------------------------------
@@ -542,7 +542,7 @@ class SyncUsersLib
 			$userAllData->classification = self::CLASSIFICATION_ANDERE;
 			// Default fallback for prospect indicator
 			$userAllData->prospectIndicator = false;
-			
+
 			// Fallback on the private email
 			$this->_ci->load->model('person/Kontakt_model', 'KontaktModel');
 			$this->_ci->KontaktModel->addOrder('updateamum', 'DESC');
@@ -560,75 +560,97 @@ class SyncUsersLib
 				$userAllData->email = getData($kontaktResult)[0]->kontakt;
 			}
 
-			// Get the last prestudent for the current user
-			$this->_ci->load->model('crm/Prestudent_model', 'PrestudentModel');
-			$resultLastPrestudent = $this->_ci->PrestudentModel->getLastPrestudent($userPersonalData->person_id);
+			// Get the prestudentstatus for the just obtained prestudent
+			$this->_ci->load->model('crm/Prestudentstatus_model', 'PrestudentstatusModel');
+			$resultLastPrestudentstatus = $this->_ci->PrestudentstatusModel->getLastStatusPerson($userPersonalData->person_id);
 
-			if (isError($resultLastPrestudent)) return $resultLastPrestudent;
-			if (hasData($resultLastPrestudent))
+			if (isError($resultLastPrestudentstatus)) return $resultLastPrestudentstatus;
+
+			// If there are no prestudents for the current user, or the current user is not a student...
+			if (hasData($resultLastPrestudentstatus))
 			{
-				// Get the prestudentstatus for the just obtained prestudent
-				$this->_ci->load->model('crm/Prestudentstatus_model', 'PrestudentstatusModel');
-				$resultLastPrestudentstatus = $this->_ci->PrestudentstatusModel->loadWhere(getData($resultLastPrestudent)[0]->prestudent_id);
+				$statuses = getData($resultLastPrestudentstatus);
 
-				if (isError($resultLastPrestudentstatus)) return $resultLastPrestudentstatus;
+				$is_student = false;
+				$is_bewerber = false;
+				$is_absolvent = false;
+				$is_interessent = false;
 
-				// If there are no prestudents for the current user, or the current user is not a student...
-				if (!hasData($resultLastPrestudentstatus))
+				foreach($statuses as $row_status)
 				{
-					// ...then use the private email -> fallback
-					// ...and the classification is set to fallback
+					if ($row_status->status_kurzbz == self::PS_STUDENT)
+					{
+						$is_student = true;
+					}
+
+					if ($row_status->status_kurzbz == self::PS_BEWERBER
+					 || $row_status->status_kurzbz == self::PS_AUFGENOMMENER)
+					{
+						$is_bewerber = true;
+					}
+
+					if ($row_status->status_kurzbz == self::PS_ABSOLVENT)
+					{
+						$is_absolvent = true;
+					}
+					if ($row_status->status_kurzbz == self::PS_INTERESSENT)
+					{
+						$is_interessent = true;
+					}
 				}
-				else // ...otherwise...
+
+				// Set classification
+				if ($is_student)
 				{
-					// Set classification
-					if (getData($resultLastPrestudentstatus)[0]->status_kurzbz == self::PS_STUDENT)
-					{
-						$userAllData->classification = self::CLASSIFICATION_STUDENT;
-					}
-					elseif (getData($resultLastPrestudentstatus)[0]->status_kurzbz == self::PS_BEWERBER
-						|| getData($resultLastPrestudentstatus)[0]->status_kurzbz == self::PS_AUFGECOMMENER)
-					{
-						$userAllData->classification = self::CLASSIFICATION_BEWERBER;
-					}
-					elseif (getData($resultLastPrestudentstatus)[0]->status_kurzbz == self::PS_ABSOLVENT)
-					{
-						$userAllData->classification = self::CLASSIFICATION_ALUMNI;
-					}
-					elseif (getData($resultLastPrestudentstatus)[0]->status_kurzbz == self::PS_INTERESSENT)
-					{
-						$userAllData->prospectIndicator = true;
-					}
-					// else fallback
-
-					// ...get the UID to compose the email address
-					$dbUIDResult = $dbModeal->execReadOnlyQuery('
-						SELECT b.uid, sg.oe_kurzbz 
-						  FROM public.tbl_benutzer b
-						  JOIN public.tbl_prestudent ps USING (person_id)
-					  	  JOIN public.tbl_studiengang sg USING (studiengang_kz)
-						 WHERE ps.prestudent_id = ?
-						   AND b.aktiv = TRUE
-					', array(getData($resultLastPrestudentstatus)[0]->prestudent_id));
-
-					if (isError($dbUIDResult)) return $dbUIDResult;
-
-					// Loads message configuration
-					$this->_ci->config->load('message');
-
-					// If data are present in database and the organisation unit is NOT in the list
-					// of organisation units that sent only to private emails
-					if (hasData($dbUIDResult)
-						&& array_search(getData($dbUIDResult)[0]->oe_kurzbz, $this->_ci->config->item(self::CFG_OU_RECEIVERS_PRIVATE)) === false)
-					{
-						$userAllData->email = getData($dbUIDResult)[0]->uid.'@'.DOMAIN;
-					}
-					// else no data are present in database -> use the private email -> fallback
+					$userAllData->classification = self::CLASSIFICATION_STUDENT;
 				}
+				elseif ($is_bewerber)
+				{
+					$userAllData->classification = self::CLASSIFICATION_BEWERBER;
+				}
+				elseif ($is_absolvent)
+				{
+					$userAllData->classification = self::CLASSIFICATION_ALUMNI;
+				}
+				else
+				{
+					$userAllData->classification = self::CLASSIFICATION_ANDERE;
+				}
+
+				if ($is_interessent)
+				{
+					$userAllData->prospectIndicator = true;
+				}
+				// else fallback
+
+				// ...get the UID to compose the email address
+				$dbUIDResult = $dbModel->execReadOnlyQuery('
+					SELECT b.uid, sg.oe_kurzbz
+					  FROM public.tbl_benutzer b
+					  JOIN public.tbl_prestudent ps USING (person_id)
+				  	  JOIN public.tbl_studiengang sg USING (studiengang_kz)
+					 WHERE ps.prestudent_id = ?
+					   AND b.aktiv = TRUE
+				', array(getData($resultLastPrestudentstatus)[0]->prestudent_id));
+
+				if (isError($dbUIDResult)) return $dbUIDResult;
+
+				// Loads message configuration
+				$this->_ci->config->load('message');
+
+				// If data are present in database and the organisation unit is NOT in the list
+				// of organisation units that sent only to private emails
+				if (hasData($dbUIDResult)
+					&& array_search(getData($dbUIDResult)[0]->oe_kurzbz, $this->_ci->config->item(self::CFG_OU_RECEIVERS_PRIVATE)) === false)
+				{
+					$userAllData->email = getData($dbUIDResult)[0]->uid.'@'.DOMAIN;
+				}
+				// else no data are present in database -> use the private email -> fallback
+
 			}
 
 			// Stores all data for the current user
-			$usersAllDataArray[] = $userAllData; 
+			$usersAllDataArray[] = $userAllData;
 		}
 
 		return success($usersAllDataArray); // everything was fine!
@@ -684,4 +706,3 @@ class SyncUsersLib
 		}
 	}
 }
-
