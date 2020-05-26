@@ -30,7 +30,6 @@ function generateUID($prefix)
 
 /**
  * Gets a list of jobs as parameter and returns a merged array of person ids
- * Sets all jobs status to done
  */
 function mergeUsersPersonIdArray($jobs)
 {
@@ -40,8 +39,6 @@ function mergeUsersPersonIdArray($jobs)
 
 	foreach ($jobs as $job)
 	{
-		$job->status = JobsQueueLib::STATUS_DONE; // set all jobs as done
-
 		$decodedInput = json_decode($job->input);
 		if ($decodedInput != null)
 		{
@@ -52,5 +49,29 @@ function mergeUsersPersonIdArray($jobs)
 		}
 	}
 	return $mergedUsersArray;
+}
+
+/**
+ * Updates the specified properties of the given jobs with the given values
+ */
+function updateJobs($jobs, $properties, $values)
+{
+	// If not valid arrays of properties and values arrays are not of the same size then exit
+	if (isEmptyArray($jobs) || isEmptyArray($properties) || isEmptyArray($values)) return;
+	if (count($properties) != count($values)) return;
+
+	// For each job
+	foreach ($jobs as $job)
+	{
+		// For each propery of the job
+		for ($pI = 0; $pI < count($properties); $pI++)
+		{
+			// If this property is present in the job object
+			if (property_exists($job, $properties[$pI]))
+			{
+				$job->{$properties[$pI]} = $values[$pI]; // set a new value
+			}
+		}
+	}
 }
 

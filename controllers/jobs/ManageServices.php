@@ -28,7 +28,7 @@ class ManageServices extends JQW_Controller
 	 * This method is called to synchronize new servicess with SAP Business by Design
 	 * Wrapper method for _manageServices
 	 */
-	public function createServices()
+	public function create()
 	{
 		$this->_manageServices(SyncServicesLib::SAP_SERVICES_CREATE, 'create');
 	}
@@ -37,7 +37,7 @@ class ManageServices extends JQW_Controller
 	 * This method is called to synchronize updated services data with SAP Business by Design
 	 * Wrapper method for _manageServices
 	 */
-	public function updateServices()
+	public function update()
 	{
 		$this->_manageServices(SyncServicesLib::SAP_SERVICES_UPDATE, 'update');
 	}
@@ -63,11 +63,11 @@ class ManageServices extends JQW_Controller
 			// Create/update users on SAP side
 			if ($jobType == SyncServicesLib::SAP_SERVICES_CREATE)
 			{
-				$syncResult = $this->syncserviceslib->createServices(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncserviceslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 			else
 			{
-				$syncResult = $this->syncserviceslib->updateServices(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncserviceslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 
 			if (isError($syncResult))
@@ -93,6 +93,13 @@ class ManageServices extends JQW_Controller
 						$this->logInfo(getData($syncResult));
 					}
 				}
+
+				// Update jobs properties values
+				updateJobs(
+					getData($lastJobs), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
+				);
 				
 				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
 			}

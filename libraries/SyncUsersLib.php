@@ -66,7 +66,7 @@ class SyncUsersLib
 	/**
 	 * Creates new users in SAP using the array of person ids given as parameter
 	 */
-	public function createUsers($users)
+	public function create($users)
 	{
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($users)) return success('No users to be created');
@@ -240,7 +240,7 @@ class SyncUsersLib
 	/**
 	 * Updates users data in SAP using the array of person ids given as parameter
 	 */
-	public function updateUsers($users)
+	public function update($users)
 	{
 		if (isEmptyArray($users)) return success('No users to be updated');
 
@@ -282,7 +282,7 @@ class SyncUsersLib
 			if (!hasData($sapIdResult)) continue; // should never happen since it was checked earlier
 
 			// Checks if the current user is already present in SAP
-			$userDataSAP = $this->_userExistsByEmailSAP($userData->email);
+			$userDataSAP = $this->_userExistsByIdSAP(getData($sapIdResult)[0]->sap_user_id);
 
 			if (isError($userDataSAP)) return $userDataSAP;
 
@@ -705,4 +705,55 @@ class SyncUsersLib
 			return error('The returned SAP object is not correctly structured');
 		}
 	}
+	
+	/**
+	 * Checks on SAP side if a user already exists with the given SAP id
+	 * Returns a success object with the found user data, otherwise with a false value
+	 * In case of error then an error object is returned
+	 */
+	private function _userExistsByIdSAP($id)
+	{
+		// Calls SAP to find a user with the given email
+		$queryCustomerResult = $this->_ci->QueryCustomerInModel->findByCommunicationData(
+			array(
+				'CustomerSelectionByCommunicationData' => array(
+					'SelectionByInternalID' => array(
+						'LowerBoundaryInternalID' => $id,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
+				)
+			)
+		);
+
+		if (isError($queryCustomerResult)) return $queryCustomerResult;
+		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using SAP id');
+
+		// Get data from the returned object
+		$queryCustomer = getData($queryCustomerResult);
+
+		// Checks the structure of the returned object
+		if (isset($queryCustomer->ProcessingConditions)
+			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
+		{
+			// Returns the customer object a user is present in SAP with the given email, otherwise an empty success
+			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0)
+			{
+				return success($queryCustomer->Customer);
+			}
+			else
+			{
+				return success();
+			}
+		}
+		else
+		{
+			return error('The returned SAP object is not correctly structured');
+		}
+	}
 }
+

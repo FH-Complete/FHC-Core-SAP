@@ -31,6 +31,8 @@ class SyncServicesLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryServiceProductValuationDataIn_model', 'QueryServiceProductValuationDataInModel');
 		// Loads ManageServiceProductInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductIn_model', 'ManageServiceProductInModel');
+		// Loads ManageServiceProductValuationDataInModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductValuationDataIn_model', 'ManageServiceProductValuationDataInModel');
 
 		// Loads SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');
@@ -42,7 +44,7 @@ class SyncServicesLib
 	/**
 	 * Creates new services in SAP using the array of person ids given as parameter
 	 */
-	public function createServices($users)
+	public function create($users)
 	{
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($users)) return success('No services to be created');
@@ -81,148 +83,32 @@ class SyncServicesLib
 			// If the current user is not present in SAP 
 			if (!hasData($serviceDataSAP))
 			{
-				// Then create it!
-				$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
-					array(
-						'BasicMessageHeader' => array(
-							'ID' => generateUID(self::CREATE_SERVICE_PREFIX),
-							'UUID' => generateUUID()
-						),
-						'ServiceProduct' => array(
-							'actionCode' => '01',
-							'descriptionListCompleteTransmissionIndicator' => true,
-							'salesListCompleteTransmissionIndicator' => true,
-							'deviantTaxClassificationListCompleteTransmissionIndicator' => true,
-							'valuationListCompleteTransmissionIndicator' => true,
-							'ProductCategoryID' => 'FE',
-							'BaseMeasureUnitCode' => 'HUR',
-							'ValuationMeasureUnitCode' => 'HUR',
-							'Description' => array(
-								0 => array(
-									'Description' => array(
-										'_' => $serviceData->description,
-										'languageCode' => 'DE'
-									)
-								),
-								1 => array(
-									'Description' => array(
-										'_' => $serviceData->description,
-										'languageCode' => 'EN'
-									)
-								)
-							),
-							'Purchasing' => array(
-								'purchasingNoteListCompleteTransmissionIndicator' => true,
-								'LifeCycleStatusCode' => 1,
-								'PurchasingMeasureUnitCode' => 'HUR'
-							),
-							'Sales' => array(
-								0 => array(
-									'SalesOrganisationID' => 'GMBH',
-									'DistributionChannelCode' => array('_' => '01'),
-									'LifeCycleStatusCode' => 2,
-									'SalesMeasureUnitCode' => 'HUR',
-									'ItemGroupCode' => 'PBTM'
-								),
-								1 => array(
-									'SalesOrganisationID' => 'GF20',
-									'DistributionChannelCode' => array('_' => '01'),
-									'LifeCycleStatusCode' => 2,
-									'SalesMeasureUnitCode' => 'HUR',
-									'ItemGroupCode' => 'PBTM'
-								),
-								2 => array(
-									'SalesOrganisationID' => '100003',
-									'DistributionChannelCode' => array('_' => '01'),
-									'LifeCycleStatusCode' => 2,
-									'SalesMeasureUnitCode' => 'HUR',
-									'ItemGroupCode' => 'PBTM'
-								)
-							),
-							'DeviantTaxClassification' => array(
-								'CountryCode' => 'AT',
-								'RegionCode' => array(
-									0 => '',
-									'listID' => 'AT'
-								),
-								'TaxTypeCode' => array(
-									'_' => 1,
-									'listID' => 'AT'
-								),
-								'TaxRateTypeCode' => array(
-									'_' => 1,
-									'listID' => 'AT'
-								)
-							),
-							'Valuation' => array(
-								0 => array(
-									'CompanyID' => 'GMBH',
-									'LifeCycleStatusCode' => 1
-								),
-								1 => array(
-									'CompanyID' => 'GST',
-									'LifeCycleStatusCode' => 1
-								),
-								2 => array(
-									'CompanyID' => '100000',
-									'LifeCycleStatusCode' => 1
-								)
-							)
-						)
-					)
-				);
+				// Create service
+				$createResult = $this->_manageServiceProductIn($serviceData->description, $serviceData->person_id, $nonBlockingErrorsArray);
+				if (isError($createResult)) return $createResult; // if fatal error
 
-				// If no error occurred...
-				if (!isError($manageServiceResult))
+				// Updated valuations
+				// If the previous call was successful -> no blocking errors, no fatal errors
+				if (hasData($createResult))
 				{
-					// SAP data
-					$manageService = getData($manageServiceResult);
+					// Get the previously created service id
+					// NOTE: Here is safe because was checked earlier in _manageServiceProductIn
+					$serviceId = getData($createResult)->ServiceProduct->InternalID->_;
 
-					// If data structure is ok...
-					if (isset($manageService->ServiceProduct) && isset($manageService->ServiceProduct->InternalID)
-						&& isset($manageService->ServiceProduct->InternalID->_))
-					{
-						// Store in database the couple person_id sap_service_id
-						$insert = $this->_ci->SAPServicesModel->insert(
-							array(
-								'person_id' => $serviceData->person_id,
-								'sap_service_id' => $manageService->ServiceProduct->InternalID->_
-							)
-						);
+					// Activate valuation for GMBH
+					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, 'GMBH', 75, $nonBlockingErrorsArray);
+					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
-						// If database error occurred then return it
-						if (isError($insert)) return $insert;
-					}
-					else // ...otherwise store a non blocking error and continue with the next user
-					{
-						// If it is present a description from SAP then use it
-						if (isset($manageService->Log) && isset($manageService->Log->Item)
-							&& isset($manageService->Log->Item))
-						{
-							if (!isEmptyArray($manageService->Log->Item))
-							{
-								foreach ($manageService->Log->Item as $item)
-								{
-									if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$serviceData->person_id;
-								}
-							}
-							elseif ($manageService->Log->Item->Note)
-							{
-								$nonBlockingErrorsArray[] = $manageService->Log->Item->Note.' for user: '.$serviceData->person_id;
-							}
-						}
-						else
-						{
-							// Default non blocking error
-							$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$serviceData->person_id;
-						}
-						continue;
-					}
+					// Activate valuation for GST
+					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, 'GST', 65, $nonBlockingErrorsArray);
+					if (isError($valuationResult)) return $valuationResult; // if fatal error
 				}
-				else // ...otherwise return it
-				{
-					return $manageServiceResult;
-				}
+				// otherwise non blocking error and continue with the next one 
+			}
+			else // if the service is already present in SAP
+			{
+				$nonBlockingErrorsArray[] = 'Service already present: '.$serviceData->description;
+				continue;
 			}
 		}
 
@@ -232,7 +118,7 @@ class SyncServicesLib
 	/**
 	 * Updates services data in SAP using the array of person ids given as parameter
 	 */
-	public function updateServices($users)
+	public function update($users)
 	{
 		if (isEmptyArray($users)) return success('No services to be updated');
 
@@ -353,6 +239,11 @@ class SyncServicesLib
 				{
 					return $manageServiceResult;
 				}
+			}
+			else // if the service is already present in SAP
+			{
+				$nonBlockingErrorsArray[] = 'Service is not present: '.$serviceData->description;
+				continue;
 			}
 		}
 
@@ -565,6 +456,240 @@ class SyncServicesLib
 		else
 		{
 			return error('The returned SAP object is not correctly structured');
+		}
+	}
+
+	/**
+	 *
+	 */
+	private function _manageServiceProductIn($description, $person_id, &$nonBlockingErrorsArray)
+	{
+		// Then create it!
+		$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
+			array(
+				'BasicMessageHeader' => array(
+					'ID' => generateUID(self::CREATE_SERVICE_PREFIX),
+					'UUID' => generateUUID()
+				),
+				'ServiceProduct' => array(
+					'actionCode' => '01',
+					'descriptionListCompleteTransmissionIndicator' => true,
+					'salesListCompleteTransmissionIndicator' => true,
+					'deviantTaxClassificationListCompleteTransmissionIndicator' => true,
+					'valuationListCompleteTransmissionIndicator' => true,
+					'ProductCategoryID' => 'FE',
+					'BaseMeasureUnitCode' => 'HUR',
+					'ValuationMeasureUnitCode' => 'HUR',
+					'Description' => array(
+						0 => array(
+							'Description' => array(
+								'_' => $description,
+								'languageCode' => 'DE'
+							)
+						),
+						1 => array(
+							'Description' => array(
+								'_' => $description,
+								'languageCode' => 'EN'
+							)
+						)
+					),
+					'Purchasing' => array(
+						'purchasingNoteListCompleteTransmissionIndicator' => true,
+						'LifeCycleStatusCode' => 1,
+						'PurchasingMeasureUnitCode' => 'HUR'
+					),
+					'Sales' => array(
+						0 => array(
+							'SalesOrganisationID' => 'GMBH',
+							'DistributionChannelCode' => array('_' => '01'),
+							'LifeCycleStatusCode' => 2,
+							'SalesMeasureUnitCode' => 'HUR',
+							'ItemGroupCode' => 'PBTM'
+						),
+						1 => array(
+							'SalesOrganisationID' => 'GF20',
+							'DistributionChannelCode' => array('_' => '01'),
+							'LifeCycleStatusCode' => 2,
+							'SalesMeasureUnitCode' => 'HUR',
+							'ItemGroupCode' => 'PBTM'
+						),
+						2 => array(
+							'SalesOrganisationID' => '100003',
+							'DistributionChannelCode' => array('_' => '01'),
+							'LifeCycleStatusCode' => 2,
+							'SalesMeasureUnitCode' => 'HUR',
+							'ItemGroupCode' => 'PBTM'
+						)
+					),
+					'DeviantTaxClassification' => array(
+						'CountryCode' => 'AT',
+						'RegionCode' => array(
+							0 => '',
+							'listID' => 'AT'
+						),
+						'TaxTypeCode' => array(
+							'_' => 1,
+							'listID' => 'AT'
+						),
+						'TaxRateTypeCode' => array(
+							'_' => 1,
+							'listID' => 'AT'
+						)
+					),
+					'Valuation' => array(
+						0 => array(
+							'CompanyID' => 'GMBH',
+							'LifeCycleStatusCode' => 1
+						),
+						1 => array(
+							'CompanyID' => 'GST',
+							'LifeCycleStatusCode' => 1
+						)
+					)
+				)
+			)
+		);
+
+		// If no error occurred...
+		if (!isError($manageServiceResult))
+		{
+			// SAP data
+			$manageService = getData($manageServiceResult);
+
+			// If data structure is ok...
+			if (isset($manageService->ServiceProduct) && isset($manageService->ServiceProduct->InternalID)
+				&& isset($manageService->ServiceProduct->InternalID->_))
+			{
+				// Store in database the couple person_id sap_service_id
+				$insert = $this->_ci->SAPServicesModel->insert(
+					array(
+						'person_id' => $person_id,
+						'sap_service_id' => $manageService->ServiceProduct->InternalID->_
+					)
+				);
+
+				// If database error occurred then return it
+				if (isError($insert)) return $insert;
+				// Returns the result from SAP
+				return $manageServiceResult; 
+			}
+			else // ...otherwise store a non blocking error...
+			{
+				// If it is present a description from SAP then use it
+				if (isset($manageService->Log) && isset($manageService->Log->Item)
+					&& isset($manageService->Log->Item))
+				{
+					if (!isEmptyArray($manageService->Log->Item))
+					{
+						foreach ($manageService->Log->Item as $item)
+						{
+							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$person_id;
+						}
+					}
+					elseif ($manageService->Log->Item->Note)
+					{
+						$nonBlockingErrorsArray[] = $manageService->Log->Item->Note.' for user: '.$person_id;
+					}
+				}
+				else
+				{
+					// Default non blocking error
+					$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$person_id;
+				}
+
+				// ...and return an empty success
+				return success();
+			}
+		}
+		else // ...otherwise return it
+		{
+			return $manageServiceResult;
+		}
+	}
+	
+	/**
+	 * Once the service is created its valuations are still inactive, this method activates a single valuation
+	 * specified by service id and company id
+	 */
+	private function _manageServiceProductValuationDataIn($sap_service_id, $company_id, $amount, &$nonBlockingErrorsArray)
+	{
+		$manageServiceProductValuationResult = $this->_ci->ManageServiceProductValuationDataInModel->MaintainBundle(
+			array(
+				'BasicMessageHeader' => array(
+					'ID' => generateUID(self::CREATE_SERVICE_PREFIX),
+				),
+				'ServiceProductValuationData' => array(
+					'actionCode' => '04',
+					'ServiceProductInternalID' => $sap_service_id,
+					'CompanyID' => $company_id,
+					'AccountDeterminationGroupCode' => 5000,
+					'CostRate' => array(
+						'actionCode' => '04',
+						'SetOfBooksID' => 'FH01',
+						'StartDate' => date('Y-m-d'),
+						'Amount' => array(
+							'_' => $amount,
+							'currencyCode' => 'EUR'
+						),
+						'Quantity' => array(
+							'_' => 1,
+							'unitCode' => 'HUR'
+						)
+					),
+					'FinancialProcessInformation' => array(
+						'actionCode' => '02',
+						'LifeCycleStatusCode' => 2
+					)
+				)
+			)
+		);
+
+		// If no error occurred...
+		if (!isError($manageServiceProductValuationResult))
+		{
+			// SAP data
+			$manageServiceProductValuation = getData($manageServiceProductValuationResult);
+
+			// If data structure is ok...
+			if (isset($manageServiceProductValuation->ServiceProductValuationData)
+				&& isset($manageServiceProductValuation->ServiceProductValuationData->ServiceProductInternalID)
+				&& isset($manageServiceProductValuation->ServiceProductValuationData->CompanyID))
+			{
+				// Returns the result from SAP
+				return $manageServiceProductValuationResult; 
+			}
+			else // ...otherwise store a non blocking error...
+			{
+				// If it is present a description from SAP then use it
+				if (isset($manageServiceProductValuation->Log) && isset($manageServiceProductValuation->Log->Item)
+					&& isset($manageServiceProductValuation->Log->Item))
+				{
+					if (!isEmptyArray($manageServiceProductValuation->Log->Item))
+					{
+						foreach ($manageServiceProductValuation->Log->Item as $item)
+						{
+							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for service: '.$sap_service_id;
+						}
+					}
+					elseif ($manageServiceProductValuation->Log->Item->Note)
+					{
+						$nonBlockingErrorsArray[] = $manageServiceProductValuation->Log->Item->Note.' for service: '.$sap_service_id;
+					}
+				}
+				else
+				{
+					// Default non blocking error
+					$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$sap_service_id;
+				}
+
+				// ...and return an empty success
+				return success();
+			}
+		}
+		else // ...otherwise return it
+		{
+			return $manageServiceProductValuationResult;
 		}
 	}
 }
