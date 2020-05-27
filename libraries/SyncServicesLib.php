@@ -14,6 +14,7 @@ class SyncServicesLib
 	// Prefix for SAP SOAP id calls
 	const CREATE_SERVICE_PREFIX = 'CS';
 	const UPDATE_SERVICE_PREFIX = 'US';
+	const UPDATE_PRICE_LIST_PREFIX = 'UPL';
 
 	const DEFAULT_LANGUAGE_ISO = 'DE'; // Default language ISO
 	const ENGLISH_LANGUAGE_ISO = 'EN'; // English language ISO
@@ -33,6 +34,10 @@ class SyncServicesLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductIn_model', 'ManageServiceProductInModel');
 		// Loads ManageServiceProductValuationDataInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductValuationDataIn_model', 'ManageServiceProductValuationDataInModel');
+		// Loads ManageSalesPriceListInModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
+		// Loads ManageProcurementPriceSpecificationInModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
 
 		// Loads SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');
@@ -150,6 +155,14 @@ class SyncServicesLib
 					// Activate valuation for GST
 					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, 'GST', 65, $nonBlockingErrorsArray);
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
+
+					// Link this service to a price list
+					$manageSalesPriceListInResult = $this->_manageSalesPriceListIn($serviceId, $nonBlockingErrorsArray);
+					if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
+
+					// Add a new list price that links this service to a list price
+					$manageSalesListPriceInResult = $this->_manageProcurementPriceSpecificationIn($serviceId, $nonBlockingErrorsArray);
+					if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 				}
 				// otherwise non blocking error and continue with the next one 
 			}
@@ -512,7 +525,7 @@ class SyncServicesLib
 					),
 					'Purchasing' => array(
 						'purchasingNoteListCompleteTransmissionIndicator' => true,
-						'LifeCycleStatusCode' => 1,
+						'LifeCycleStatusCode' => 2,
 						'PurchasingMeasureUnitCode' => 'HUR'
 					),
 					'Sales' => array(
@@ -706,6 +719,189 @@ class SyncServicesLib
 		else // ...otherwise return it
 		{
 			return $manageServiceProductValuationResult;
+		}
+	}
+
+	/**
+	 * Once the service is created the service is linked to a price list
+	 */
+	private function _manageSalesPriceListIn($sap_service_id, &$nonBlockingErrorsArray)
+	{
+		$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
+			array(
+				'BasicMessageHeader' => array(
+					'ID' => generateUID(self::UPDATE_PRICE_LIST_PREFIX)
+				),
+				'SalesPriceList' => array(
+					'actionCode' => '02',
+					'ID' => 'ILV-FHTW',
+					'StartDate' => date('Y-m-d'),
+					'EndDate' => '2021-01-01',
+					'PriceSpecification' => array(
+						'TypeCode' => '7PR1',
+						'Amount' => array(
+							'currencyCode' => 'EUR',
+							'_' => 50
+						),
+						'BaseQuantity' => array(
+							'unitCode' => 'HUR',
+							'_' => 1
+						),
+						'BaseQuantityTypeCode' => 'HUR',
+						'ProductID' => $sap_service_id
+					)
+				)
+			)
+		);
+
+		// If no error occurred...
+		if (!isError($manageSalesPriceListInResult))
+		{
+			// SAP data
+			$manageSalesPriceListIn = getData($manageSalesPriceListInResult);
+
+			// If data structure is ok...
+			if (isset($manageSalesPriceListIn->SalesPriceList)
+				&& isset($manageSalesPriceListIn->SalesPriceList->ID)
+				&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
+			{
+				// Returns the result from SAP
+				return $manageSalesPriceListInResult; 
+			}
+			else // ...otherwise store a non blocking error...
+			{
+				// If it is present a description from SAP then use it
+				if (isset($manageSalesPriceListIn->Log) && isset($manageSalesPriceListIn->Log->Item)
+					&& isset($manageSalesPriceListIn->Log->Item))
+				{
+					if (!isEmptyArray($manageSalesPriceListIn->Log->Item))
+					{
+						foreach ($manageSalesPriceListIn->Log->Item as $item)
+						{
+							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for price list: '.$sap_service_id;
+						}
+					}
+					elseif ($manageSalesPriceListIn->Log->Item->Note)
+					{
+						$nonBlockingErrorsArray[] = $manageSalesPriceListIn->Log->Item->Note.' for price list: '.$sap_service_id;
+					}
+				}
+				else
+				{
+					// Default non blocking error
+					$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: ILV-FHTW';
+				}
+
+				// ...and return an empty success
+				return success();
+			}
+		}
+		else // ...otherwise return it
+		{
+			return $manageSalesPriceListInResult;
+		}
+	}
+
+	/**
+	 * Once the service is created the service is linked to a list price
+	 */
+	private function _manageProcurementPriceSpecificationIn($sap_service_id, &$nonBlockingErrorsArray)
+	{
+		// Calls SAP to find a price list with the given supplier id
+		$manageProcurementPriceSpecificationInResult = $this->_ci->ManageProcurementPriceSpecificationInModel->maintainBundle(
+			array(
+				'BasicMessageHeader' => array(
+					'UUID' => generateUUID()
+				),
+				'ProcurementPriceSpecification' => array(
+					'actionCode' => '01',
+					'UUID' => generateUUID(),
+					'ValidityPeriod' => array(
+						'IntervalBoundaryTypeCode' => '',
+						'StartTimePoint' => array(
+							'TypeCode' => 1
+						),
+						'EndTimePoint' => array(
+							'TypeCode' => 1
+						)
+					),
+					'Rate' => array(
+						'DecimalValue' => 50,
+						'CurrencyCode' => 'EUR',
+						'BaseDecimalValue' => 1,
+						'BaseMeasureUnitCode' => 'HUR'
+					),
+					'PropertyValuation' => array(
+						0 => array(
+							'IdentifyingIndicator' => true,
+							'PriceSpecificationElementPropertyReference' => array(
+								'PriceSpecificationElementPropertyID' => 'CND_SUPPL_ID'
+							),
+							'PriceSpecificationElementPropertyValue' => array(
+								'ID' => 'GMBH',
+								'IntegerValue' => 0
+							)
+						),
+						1 => array(
+							'IdentifyingIndicator' => true,
+							'PriceSpecificationElementPropertyReference' => array(
+								'PriceSpecificationElementPropertyID' => 'CND_PRODUCT_ID'
+							),
+							'PriceSpecificationElementPropertyValue' => array(
+								'ID' => $sap_service_id,
+								'IntegerValue' => 0
+							)
+						)
+					)
+				)
+			)
+		);
+
+		// If no error occurred...
+		if (!isError($manageProcurementPriceSpecificationInResult))
+		{
+			// SAP data
+			$manageProcurementPriceSpecificationIn = getData($manageProcurementPriceSpecificationInResult);
+
+			// If data structure is ok...
+			if (isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification)
+				&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID)
+				&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID->_))
+			{
+				// Returns the result from SAP
+				return $manageProcurementPriceSpecificationInResult; 
+			}
+			else // ...otherwise store a non blocking error...
+			{
+				// If it is present a description from SAP then use it
+				if (isset($manageProcurementPriceSpecificationIn->Log) && isset($manageProcurementPriceSpecificationIn->Log->Item)
+					&& isset($manageProcurementPriceSpecificationIn->Log->Item))
+				{
+					if (!isEmptyArray($manageProcurementPriceSpecificationIn->Log->Item))
+					{
+						foreach ($manageProcurementPriceSpecificationIn->Log->Item as $item)
+						{
+							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for list price: '.$sap_service_id;
+						}
+					}
+					elseif ($manageProcurementPriceSpecificationIn->Log->Item->Note)
+					{
+						$nonBlockingErrorsArray[] = $manageProcurementPriceSpecificationIn->Log->Item->Note.' for list price: '.$sap_service_id;
+					}
+				}
+				else
+				{
+					// Default non blocking error
+					$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: ILV-FHTW';
+				}
+
+				// ...and return an empty success
+				return success();
+			}
+		}
+		else // ...otherwise return it
+		{
+			return $manageProcurementPriceSpecificationInResult;
 		}
 	}
 }
