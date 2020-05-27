@@ -42,6 +42,54 @@ class SyncServicesLib
 	// Public methods
 
 	/**
+	 * Return the raw result of SAP->QueryServiceProductValuationDataIn->SelectionByDescription->LowerBoundaryDescription
+	 */
+	public function getServiceByDescription($description)
+	{
+		// Calls SAP to find a service with the given description
+		return $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
+			array(
+				'ServiceProductSelectionByElements' => array(
+					'SelectionByDescription' => array(
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1,
+						'LowerBoundaryDescription' => $description
+						//'UpperBoundaryDescription' => null
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
+				)
+			)
+		);
+	}
+
+	/**
+	 * Return the raw result of SAP->QueryServiceProductValuationDataIn->SelectionByDescription->LowerBoundaryInternalID
+	 */
+	public function getServiceById($id)
+	{
+		// Calls SAP to find a service with the given service id
+		return $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
+			array(
+				'ServiceProductSelectionByElements' => array(
+					'SelectionByInternalID' => array(
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1,
+						'LowerBoundaryInternalID' => $id
+						//'UpperBoundaryDescription' => null
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
+				)
+			)
+		);
+	}
+
+	/**
 	 * Creates new services in SAP using the array of person ids given as parameter
 	 */
 	public function create($users)
@@ -364,23 +412,7 @@ class SyncServicesLib
 	 */
 	private function _serviceExistsByDescriptionSAP($description)
 	{
-		// Calls SAP to find a service with the given description
-		$queryServiceResult = $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
-			array(
-				'ServiceProductSelectionByElements' => array(
-					'SelectionByDescription' => array(
-						'InclusionExclusionCode' => 'I',
-						'IntervalBoundaryTypeCode' => 1,
-						'LowerBoundaryDescription' => $description
-						//'UpperBoundaryDescription' => null
-					)
-				),
-				'ProcessingConditions' => array(
-					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
-				)
-			)
-		);
+		$queryServiceResult = $this->getServiceByDescription($description);
 
 		if (isError($queryServiceResult)) return $queryServiceResult;
 		if (!hasData($queryServiceResult)) return error('Something went wrong while checking if a service is present using a description');
@@ -415,23 +447,7 @@ class SyncServicesLib
 	 */
 	private function _serviceExistsByIdSAP($id)
 	{
-		// Calls SAP to find a service with the given service id
-		$queryServiceResult = $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
-			array(
-				'ServiceProductSelectionByElements' => array(
-					'SelectionByInternalID' => array(
-						'InclusionExclusionCode' => 'I',
-						'IntervalBoundaryTypeCode' => 1,
-						'LowerBoundaryInternalID' => $id
-						//'UpperBoundaryDescription' => null
-					)
-				),
-				'ProcessingConditions' => array(
-					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
-				)
-			)
-		);
+		$queryServiceResult = $this->getServiceById($id);
 
 		if (isError($queryServiceResult)) return $queryServiceResult;
 		if (!hasData($queryServiceResult)) return error('Something went wrong while checking if a service is present using an id');

@@ -22,9 +22,11 @@ class SyncUsersLib
 	// Genders
 	const FHC_GENDER_MALE = 'm';
 	const FHC_GENDER_FEMALE = 'w';
+	const FHC_GENDER_NON_BINARY = 'x';
+	const SAP_GENDER_UNKNOWN = 0;
 	const SAP_GENDER_MALE = 1;
 	const SAP_GENDER_FEMALE = 2;
-	const SAP_GENDER_UNKNOWN = 3;
+	const SAP_GENDER_NON_BINARY = 3;
 
 	// Config entries for messaging
 	const CFG_OU_RECEIVERS_PRIVATE = 'ou_receivers_private';
@@ -62,6 +64,52 @@ class SyncUsersLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
+
+	/**
+	 * Return the raw result of SAP->QueryCustomerIn->FindByCommunicationData->SelectionByEmailURI
+	 */
+	public function getUserByEmail($email)
+	{
+		// Calls SAP to find a user with the given email
+		return $this->_ci->QueryCustomerInModel->findByCommunicationData(
+			array(
+				'CustomerSelectionByCommunicationData' => array(
+					'SelectionByEmailURI' => array(
+						'LowerBoundaryEmailURI' => $email,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
+				)
+			)
+		);
+	}
+
+	/**
+	 * Return the raw result of SAP->QueryCustomerIn->FindByCommunicationData->SelectionByInternalID
+	 */
+	public function getUserById($id)
+	{
+		// Calls SAP to find a user with the given id
+		return $this->_ci->QueryCustomerInModel->findByCommunicationData(
+			array(
+				'CustomerSelectionByCommunicationData' => array(
+					'SelectionByInternalID' => array(
+						'LowerBoundaryInternalID' => $id,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+					//'QueryHitsMaximumNumberValue' => 10
+				)
+			)
+		);
+	}
 
 	/**
 	 * Creates new users in SAP using the array of person ids given as parameter
@@ -486,17 +534,24 @@ class SyncUsersLib
 		{
 			// -------------------------------------------------------------------------------------------
 			// Gender
+			//
+			// Male
 			if ($userPersonalData->gender == self::FHC_GENDER_MALE)
 			{
-				// Male
 				$userPersonalData->gender = self::SAP_GENDER_MALE;
 			}
+			// Female
 			elseif ($userPersonalData->gender == self::FHC_GENDER_FEMALE)
 			{
-				// Female
 				$userPersonalData->gender = self::SAP_GENDER_FEMALE;
 			}
-			else // otherwise
+			// Non binary
+			elseif ($userPersonalData->gender == self::FHC_GENDER_NON_BINARY)
+			{
+				$userPersonalData->gender = self::SAP_GENDER_NON_BINARY;
+			}
+			// Unknown
+			else
 			{
 				$userPersonalData->gender = self::SAP_GENDER_UNKNOWN;
 			}
@@ -663,23 +718,8 @@ class SyncUsersLib
 	 */
 	private function _userExistsByEmailSAP($email)
 	{
-		// Calls SAP to find a user with the given email
-		$queryCustomerResult = $this->_ci->QueryCustomerInModel->findByCommunicationData(
-			array(
-				'CustomerSelectionByCommunicationData' => array(
-					'SelectionByEmailURI' => array(
-						'LowerBoundaryEmailURI' => $email,
-						'InclusionExclusionCode' => 'I',
-						'IntervalBoundaryTypeCode' => 1
-					)
-				),
-				'ProcessingConditions' => array(
-					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
-				)
-			)
-		);
-
+		$queryCustomerResult = $this->getUserByEmail($email);
+		
 		if (isError($queryCustomerResult)) return $queryCustomerResult;
 		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using email adress');
 
@@ -713,22 +753,7 @@ class SyncUsersLib
 	 */
 	private function _userExistsByIdSAP($id)
 	{
-		// Calls SAP to find a user with the given email
-		$queryCustomerResult = $this->_ci->QueryCustomerInModel->findByCommunicationData(
-			array(
-				'CustomerSelectionByCommunicationData' => array(
-					'SelectionByInternalID' => array(
-						'LowerBoundaryInternalID' => $id,
-						'InclusionExclusionCode' => 'I',
-						'IntervalBoundaryTypeCode' => 1
-					)
-				),
-				'ProcessingConditions' => array(
-					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
-				)
-			)
-		);
+		$queryCustomerResult = $this->getUserById($id);
 
 		if (isError($queryCustomerResult)) return $queryCustomerResult;
 		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using SAP id');

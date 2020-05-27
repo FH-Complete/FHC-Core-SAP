@@ -42,6 +42,24 @@ class ManageUsers extends JQW_Controller
 		$this->_manageUsers(SyncUsersLib::SAP_USERS_UPDATE, 'update');
 	}
 
+	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to find a user with the given email
+	 * and then returns the raw SOAP result
+	 */
+	public function getUserByEmail($email)
+	{
+		var_dump($this->syncuserslib->getUserByEmail(urldecode($email)));
+	}
+
+	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to find a user with the given id
+	 * and then returns the raw SOAP result
+	 */
+	public function getUserById($id)
+	{
+		var_dump($this->syncuserslib->getUserById(urldecode($id)));
+	}
+
 	//------------------------------------------------------------------------------------------------------------------
 	// Private methods
 

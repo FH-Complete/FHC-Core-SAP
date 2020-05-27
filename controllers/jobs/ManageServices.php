@@ -42,6 +42,24 @@ class ManageServices extends JQW_Controller
 		$this->_manageServices(SyncServicesLib::SAP_SERVICES_UPDATE, 'update');
 	}
 
+	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to find a service with the given description
+	 * and then returns the raw SOAP result
+	 */
+	public function getServiceByDescription($description)
+	{
+		var_dump($this->syncserviceslib->getServiceByDescription(urldecode($description)));
+	}
+
+	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to find a service with the given id
+	 * and then returns the raw SOAP result
+	 */
+	public function getServiceById($id)
+	{
+		var_dump($this->syncserviceslib->getServiceById(urldecode($id)));
+	}
+
 	//------------------------------------------------------------------------------------------------------------------
 	// Private methods
 
