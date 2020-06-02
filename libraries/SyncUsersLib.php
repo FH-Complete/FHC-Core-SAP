@@ -189,7 +189,10 @@ class SyncUsersLib
 									'EmailURI' => $userData->email,
 									'PreferredCommunicationMediumTypeCode' => 'INT',
 									'PostalAddress' => array(
-										'CountryCode' => $userData->country
+										'CountryCode' => $userData->country,
+										'CityName' => $userData->ort,
+										'StreetPostalCode' => $userData->plz,
+										'StreetName' => $userData->strasse
 									)
 								)
 							),
@@ -384,7 +387,10 @@ class SyncUsersLib
 								'Address' => array(
 									'EmailURI' => $userData->email,
 									'PostalAddress' => array(
-										'CountryCode' => $userData->country
+										'CountryCode' => $userData->country,
+										'CityName' => $userData->ort,
+										'StreetPostalCode' => $userData->plz,
+										'StreetName' => $userData->strasse
 									)
 								)
 							)
@@ -576,11 +582,11 @@ class SyncUsersLib
 			$this->_ci->AdresseModel->addOrder('updateamum', 'DESC');
 			$this->_ci->AdresseModel->addOrder('insertamum', 'DESC');
 			$this->_ci->AdresseModel->addLimit(1);
-                        $addressResult = $this->_ci->AdresseModel->loadWhere(
-                                array(
-                                        'person_id' => $userPersonalData->person_id, 'zustelladresse' => true
-                                )
-                        );
+			$addressResult = $this->_ci->AdresseModel->loadWhere(
+				array(
+					'person_id' => $userPersonalData->person_id, 'zustelladresse' => true
+				)
+			);
 
 			$userAllData->country = '';
 
@@ -588,6 +594,9 @@ class SyncUsersLib
 			if (hasData($addressResult)) // if a private email was found
 			{
 				$userAllData->country = getData($addressResult)[0]->iso3166_1_a2;
+				$userAllData->strasse = getData($addressResult)[0]->strasse;
+				$userAllData->plz = getData($addressResult)[0]->plz;
+				$userAllData->ort = getData($addressResult)[0]->ort;
 			}
 
 			// -------------------------------------------------------------------------------------------
@@ -719,7 +728,7 @@ class SyncUsersLib
 	private function _userExistsByEmailSAP($email)
 	{
 		$queryCustomerResult = $this->getUserByEmail($email);
-		
+
 		if (isError($queryCustomerResult)) return $queryCustomerResult;
 		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using email adress');
 
@@ -745,7 +754,7 @@ class SyncUsersLib
 			return error('The returned SAP object is not correctly structured');
 		}
 	}
-	
+
 	/**
 	 * Checks on SAP side if a user already exists with the given SAP id
 	 * Returns a success object with the found user data, otherwise with a false value
@@ -781,4 +790,3 @@ class SyncUsersLib
 		}
 	}
 }
-
