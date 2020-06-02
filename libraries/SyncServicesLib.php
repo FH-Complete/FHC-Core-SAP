@@ -118,7 +118,7 @@ class SyncServicesLib
 		if (isError($servicesAllData)) return $servicesAllData;
 		if (!hasData($servicesAllData)) return error('No services data available for the given users');
 
-		// Loops through services data 
+		// Loops through services data
 		foreach (getData($servicesAllData) as $serviceData)
 		{
 			// If the name is not set for this user...
@@ -133,11 +133,17 @@ class SyncServicesLib
 
 			if (isError($serviceDataSAP)) return $serviceDataSAP;
 
-			// If the current user is not present in SAP 
+			// If the current user is not present in SAP
 			if (!hasData($serviceDataSAP))
 			{
 				// Create service
-				$createResult = $this->_manageServiceProductIn($serviceData->description, $serviceData->person_id, $nonBlockingErrorsArray);
+				$createResult = $this->_manageServiceProductIn(
+					$serviceData->description,
+					$serviceData->person_id,
+					$serviceData->category,
+					$nonBlockingErrorsArray
+				);
+
 				if (isError($createResult)) return $createResult; // if fatal error
 
 				// Updated valuations
@@ -164,7 +170,7 @@ class SyncServicesLib
 					$manageSalesListPriceInResult = $this->_manageProcurementPriceSpecificationIn($serviceId, $nonBlockingErrorsArray);
 					if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 				}
-				// otherwise non blocking error and continue with the next one 
+				// otherwise non blocking error and continue with the next one
 			}
 			else // if the service is already present in SAP
 			{
@@ -200,7 +206,7 @@ class SyncServicesLib
 
 		$dbModel = new DB_Model();
 
-		// Loops through users data 
+		// Loops through users data
 		foreach (getData($servicesAllData) as $serviceData)
 		{
 			// If the name is not set for this user...
@@ -225,11 +231,11 @@ class SyncServicesLib
 
 			if (isError($serviceDataSAP)) return $serviceDataSAP;
 
-			// If the current service is present in SAP 
+			// If the current service is present in SAP
 			if (hasData($serviceDataSAP))
 			{
 				$sapService = getData($serviceDataSAP); // get SAP service data
-				
+
 				// Then update it!
 				$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
 					array(
@@ -333,7 +339,7 @@ class SyncServicesLib
 	}
 
 	/**
-	 * Used to remove created or not created users from the given array 
+	 * Used to remove created or not created users from the given array
 	 * initialFoundValue is a toggle
 	 */
 	private function _addOrRemoveUsers($users, $initialFoundValue)
@@ -390,7 +396,17 @@ class SyncServicesLib
 			SELECT p.person_id,
 				p.nachname AS surname,
 				p.vorname AS name,
-				m.personalnummer AS personalnumber
+				m.personalnummer AS personalnumber,
+				CASE WHEN EXISTS
+					(SELECT
+						1
+					FROM public.tbl_benutzerfunktion WHERE uid=b.uid AND funktion_kurzbz=\'oezuordnung\'
+					AND (datum_von is null OR datum_von<=now())
+					AND (datum_bis is null OR datum_bis>=now())
+					AND oe_kurzbz=\'gmbh\'
+					) THEN \'7GMBH\'
+					ELSE \'6FE\'
+				END as category
 			  FROM public.tbl_person p
 			  JOIN public.tbl_benutzer b USING(person_id)
 			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
@@ -412,7 +428,7 @@ class SyncServicesLib
 			);
 
 			// Stores all data for the current user
-			$servicesAllDataArray[] = $userPersonalData; 
+			$servicesAllDataArray[] = $userPersonalData;
 		}
 
 		return success($servicesAllDataArray); // everything was fine!
@@ -491,7 +507,7 @@ class SyncServicesLib
 	/**
 	 *
 	 */
-	private function _manageServiceProductIn($description, $person_id, &$nonBlockingErrorsArray)
+	private function _manageServiceProductIn($description, $person_id, $category, &$nonBlockingErrorsArray)
 	{
 		// Then create it!
 		$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
@@ -506,7 +522,7 @@ class SyncServicesLib
 					'salesListCompleteTransmissionIndicator' => true,
 					'deviantTaxClassificationListCompleteTransmissionIndicator' => true,
 					'valuationListCompleteTransmissionIndicator' => true,
-					'ProductCategoryID' => 'FE',
+					'ProductCategoryID' => $category,
 					'BaseMeasureUnitCode' => 'HUR',
 					'ValuationMeasureUnitCode' => 'HUR',
 					'Description' => array(
@@ -601,7 +617,7 @@ class SyncServicesLib
 				// If database error occurred then return it
 				if (isError($insert)) return $insert;
 				// Returns the result from SAP
-				return $manageServiceResult; 
+				return $manageServiceResult;
 			}
 			else // ...otherwise store a non blocking error...
 			{
@@ -636,7 +652,7 @@ class SyncServicesLib
 			return $manageServiceResult;
 		}
 	}
-	
+
 	/**
 	 * Once the service is created its valuations are still inactive, this method activates a single valuation
 	 * specified by service id and company id
@@ -686,7 +702,7 @@ class SyncServicesLib
 				&& isset($manageServiceProductValuation->ServiceProductValuationData->CompanyID))
 			{
 				// Returns the result from SAP
-				return $manageServiceProductValuationResult; 
+				return $manageServiceProductValuationResult;
 			}
 			else // ...otherwise store a non blocking error...
 			{
@@ -766,7 +782,7 @@ class SyncServicesLib
 				&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
 			{
 				// Returns the result from SAP
-				return $manageSalesPriceListInResult; 
+				return $manageSalesPriceListInResult;
 			}
 			else // ...otherwise store a non blocking error...
 			{
@@ -869,7 +885,7 @@ class SyncServicesLib
 				&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID->_))
 			{
 				// Returns the result from SAP
-				return $manageProcurementPriceSpecificationInResult; 
+				return $manageProcurementPriceSpecificationInResult;
 			}
 			else // ...otherwise store a non blocking error...
 			{
@@ -905,4 +921,3 @@ class SyncServicesLib
 		}
 	}
 }
-
