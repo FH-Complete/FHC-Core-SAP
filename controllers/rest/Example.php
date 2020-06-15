@@ -19,7 +19,7 @@ class Example extends API_Controller
 		);
 
 		// Loads QueryCustomerInModel
-		$this->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryCustomerIn_model', 'QueryCustomerInModel');
+		$this->load->model('extensions/FHC-Core-SAP/SOAP/QueryCustomerIn_model', 'QueryCustomerInModel');
 	}
 
 	/**

@@ -17,7 +17,7 @@ class SyncListPricesLib
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		// Loads ManageProcurementPriceSpecificationInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
 	}
 
 	// --------------------------------------------------------------------------------------------

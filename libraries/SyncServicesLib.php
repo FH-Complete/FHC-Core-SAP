@@ -29,15 +29,15 @@ class SyncServicesLib
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		// Loads QueryServiceProductValuationDataInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryServiceProductValuationDataIn_model', 'QueryServiceProductValuationDataInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryServiceProductValuationDataIn_model', 'QueryServiceProductValuationDataInModel');
 		// Loads ManageServiceProductInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductIn_model', 'ManageServiceProductInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageServiceProductIn_model', 'ManageServiceProductInModel');
 		// Loads ManageServiceProductValuationDataInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageServiceProductValuationDataIn_model', 'ManageServiceProductValuationDataInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageServiceProductValuationDataIn_model', 'ManageServiceProductValuationDataInModel');
 		// Loads ManageSalesPriceListInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
 		// Loads ManageProcurementPriceSpecificationInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
 
 		// Loads SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');

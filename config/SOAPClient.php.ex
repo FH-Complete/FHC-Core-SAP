@@ -1,11 +1,11 @@
 <?php
 
-$config['fhc_sap_active_connection'] = 'DEVELOPMENT'; // the used configuration set of the chosen connection
+$config['soap_active_connection'] = 'DEVELOPMENT'; // the used configuration set of the chosen connection
 
 // Example of a configuration set. All parameters are required!
-$config['fhc_sap_connections'] = array(
+$config['soap_connections'] = array(
 	'DEVELOPMENT' => array(
-		'SAPCoreAPI' => array(
+		'CoreAPI' => array(
 			'login' => 'SAPCoreAPIUsername',
 			'password' => 'SAPCoreAPIPassword'
 		),
@@ -15,9 +15,10 @@ $config['fhc_sap_connections'] = array(
 		)
 	),
 	'PRODUCTION' => array(
-		'SAPCoreAPI' => array(
+		'CoreAPI' => array(
 			'login' => 'SAPCoreAPIUsername', // basic HTTP authentication username
 			'password' => 'SAPCoreAPIPassword' // basic HTTP authentication password
 		)
 	)
 );
+

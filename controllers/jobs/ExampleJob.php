@@ -15,7 +15,7 @@ class ExampleJob extends JOB_Controller
 		parent::__construct();
 
 		// Loads QueryCustomerInModel
-                $this->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryCustomerIn_model', 'QueryCustomerInModel');
+                $this->load->model('extensions/FHC-Core-SAP/SOAP/QueryCustomerIn_model', 'QueryCustomerInModel');
 	}
 
 	//------------------------------------------------------------------------------------------------------------------

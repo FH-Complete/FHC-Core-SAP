@@ -17,7 +17,7 @@ class SyncPriceListsLib
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		// Loads QuerySalesPriceListInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QuerySalesPriceListIn_model', 'QuerySalesPriceListInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QuerySalesPriceListIn_model', 'QuerySalesPriceListInModel');
 	}
 
 	// --------------------------------------------------------------------------------------------

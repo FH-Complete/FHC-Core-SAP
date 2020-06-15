@@ -1,13 +1,13 @@
 <?php
 
-require_once 'SAPCoreAPIModel.php';
+require_once 'CoreAPIModel.php';
 
 /**
  * This implements all the calls for:
  * API set name SAPCoreAPI
- * Service name ManageServiceProductIn
+ * Service name ManageCustomerIn
  */
-class ManageServiceProductIn_model extends SAPCoreAPIModel
+class ManageCustomerIn_model extends CoreAPIModel
 {
 	/**
 	 * Set the properties to perform SOAP calls
@@ -16,7 +16,7 @@ class ManageServiceProductIn_model extends SAPCoreAPIModel
 	{
 		parent::__construct();
 
-		$this->_serviceName = 'ManageServiceProductIn'; // service name
+		$this->_serviceName = 'ManageCustomerIn'; // service name
 	}
 
 	// --------------------------------------------------------------------------------------------

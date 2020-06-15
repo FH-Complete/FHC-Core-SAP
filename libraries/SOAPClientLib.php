@@ -5,7 +5,7 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 /**
  * This library is used to call SAP Business by Design SOAP web services
  */
-class SAPClientLib
+class SOAPClientLib
 {
 	// Blocking errors
 	const ERROR = 				'ERR0001';
@@ -15,11 +15,11 @@ class SAPClientLib
 
 	const ERROR_STR = '%s: %s'; // Error message format
 
-	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/%s/%s.wsdl'; // Full name to the WSDL
+	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/WSDLs/%s/%s.wsdl'; // Full name to the WSDL
 
 	// Configs parameters names
-	const ACTIVE_CONNECTION = 'fhc_sap_active_connection';
-	const CONNECTIONS = 'fhc_sap_connections';
+	const ACTIVE_CONNECTION = 'soap_active_connection';
+	const CONNECTIONS = 'soap_connections';
 
 	private $_connectionsArray;		// connections array
 
@@ -38,7 +38,7 @@ class SAPClientLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
-		$this->_ci->config->load('extensions/FHC-Core-SAP/SAPClient'); // Loads FHC-SAP configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/SOAPClient'); // Loads FHC-SAP configuration
 
 		$this->_setPropertiesDefault(); // properties initialization
 
@@ -216,3 +216,4 @@ class SAPClientLib
 		$this->_errorMessage = $code.': '.$message;
 	}
 }
+

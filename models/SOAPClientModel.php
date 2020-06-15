@@ -3,7 +3,7 @@
 /**
  * Implements the SAP SOAP client basic funcitonalities
  */
-abstract class SAPClientModel extends CI_Model
+abstract class SOAPClientModel extends CI_Model
 {
 	protected $_apiSetName; // to store the name of the api set name
 	protected $_serviceName; // to store the service name
@@ -17,12 +17,12 @@ abstract class SAPClientModel extends CI_Model
 	protected function _call($soapFunction, $callParametersArray)
 	{
 		// Loads the SAPClientLib library
-		$this->load->library('extensions/FHC-Core-SAP/SAPClientLib');
+		$this->load->library('extensions/FHC-Core-SAP/SOAPClientLib');
 
 		// Checks if the property _apiSetName is valid
 		if ($this->_apiSetName == null || trim($this->_apiSetName) == '')
 		{
-			$this->sapclientlib->resetToDefault();
+			$this->soapclientlib->resetToDefault();
 
 			return error('API set name not valid');
 		}
@@ -30,14 +30,14 @@ abstract class SAPClientModel extends CI_Model
 		// Checks if the property _serviceName is valid
 		if ($this->_serviceName == null || trim($this->_serviceName) == '')
 		{
-			$this->sapclientlib->resetToDefault();
+			$this->soapclientlib->resetToDefault();
 
 			return error('Service name not valid');
 		}
 
 		// Call the SAP webservice with the given parameters
 		$wsResult = success(
-			$this->sapclientlib->call(
+			$this->soapclientlib->call(
 				$this->_apiSetName,
 				$this->_serviceName,
 				$soapFunction,
@@ -46,10 +46,11 @@ abstract class SAPClientModel extends CI_Model
 		);
 
 		// If an error occurred
-		if ($this->sapclientlib->isError()) $wsResult = error($this->sapclientlib->getError());
+		if ($this->soapclientlib->isError()) $wsResult = error($this->soapclientlib->getError());
 
-		$this->sapclientlib->resetToDefault(); // reset to the default values
+		$this->soapclientlib->resetToDefault(); // reset to the default values
 
 		return $wsResult;
 	}
 }
+

@@ -54,9 +54,9 @@ class SyncUsersLib
 		$this->_ci =& get_instance(); // get code igniter instance
 
 		// Loads QueryCustomerInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/QueryCustomerIn_model', 'QueryCustomerInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryCustomerIn_model', 'QueryCustomerInModel');
 		// Loads ManageCustomerInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPCoreAPI/ManageCustomerIn_model', 'ManageCustomerInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerIn_model', 'ManageCustomerInModel');
 
 		// Loads SAPStudentsModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudents_model', 'SAPStudentsModel');
