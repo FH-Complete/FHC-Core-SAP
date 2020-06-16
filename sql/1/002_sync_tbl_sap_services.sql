@@ -10,13 +10,13 @@ COMMENT ON COLUMN sync.tbl_sap_services.sap_service_id IS 'Service id from SAP B
 DO $$
 BEGIN
 	ALTER TABLE sync.tbl_sap_services ADD CONSTRAINT tbl_sap_services_pkey PRIMARY KEY (person_id, sap_service_id);
-	EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Primary key tbl_sap_services_pkey already exists';
+	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 DO $$
 BEGIN
 	ALTER TABLE ONLY sync.tbl_sap_services ADD CONSTRAINT tbl_sap_services_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.tbl_person(person_id) ON UPDATE CASCADE ON DELETE RESTRICT;
-	EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Foreign key tbl_sap_services_person_id_fkey already exists';
+	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sync.tbl_sap_services TO vilesci;

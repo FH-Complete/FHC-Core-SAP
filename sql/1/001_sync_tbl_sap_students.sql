@@ -10,13 +10,13 @@ COMMENT ON COLUMN sync.tbl_sap_students.sap_user_id IS 'User id from SAP ByD';
 DO $$
 BEGIN
 	ALTER TABLE sync.tbl_sap_students ADD CONSTRAINT tbl_sap_students_pkey PRIMARY KEY (person_id, sap_user_id);
-	EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Primary key tbl_sap_students_pkey already exists';
+	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 DO $$
 BEGIN
 	ALTER TABLE sync.tbl_sap_students ADD CONSTRAINT tbl_sap_students_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.tbl_person(person_id) ON UPDATE CASCADE ON DELETE RESTRICT;
-	EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Foreign key tbl_sap_students_person_id_fkey already exists';
+	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sync.tbl_sap_students TO vilesci;
