@@ -27,11 +27,20 @@ abstract class ODATAClientModel extends CI_Model
 		// Call the SAP ODATA webservice with the given parameters
 		$wsResult = $this->odataclientlib->call($wsFunction, $httpMethod, $callParametersArray);
 
-		// If an error occurred
-		if ($this->odataclientlib->isError()) $wsResult = error($this->odataclientlib->getError());
+		// If an error occurred return it
+		if ($this->odataclientlib->isError())
+		{
+			$wsResult = error($this->odataclientlib->getError());
+		}
+		else // otherwise return a success
+		{
+			$wsResult = success($wsResult);
+		}
 
+		// Reset the odataclientlib parameters
 		$this->odataclientlib->resetToDefault();
 
+		// Return a success object that contains the web service result
 		return $wsResult;
 	}
 }
