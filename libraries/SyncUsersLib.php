@@ -227,6 +227,16 @@ class SyncUsersLib
 									'EnabledIndicator' => true,
 									'CommunicationMediumTypeCode' => 'INT'
 								)
+							),
+							'PaymentData' => array(
+								0 => array(
+									'CompanyID' => '100000',
+									'AccountDeterminationDebtorGroupCode' => '4010'
+								),
+								1 => array(
+									'CompanyID' => 'GST',
+									'AccountDeterminationDebtorGroupCode' => '4010'
+								),
 							)
 						)
 					)
@@ -393,6 +403,16 @@ class SyncUsersLib
 										'StreetName' => $userData->strasse
 									)
 								)
+							),
+							'PaymentData' => array(
+								0 => array(
+									'CompanyID' => '100000',
+									'AccountDeterminationDebtorGroupCode' => '4010'
+								),
+								1 => array(
+									'CompanyID' => 'GST',
+									'AccountDeterminationDebtorGroupCode' => '4010'
+								),
 							)
 						)
 					)
