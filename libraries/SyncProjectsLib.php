@@ -18,6 +18,7 @@ class SyncProjectsLib
 	const PORJECT_UNIT_RESPONSIBLES = 'project_unit_responsibles';
 	const PROJECT_PERSON_RESPONSIBLES = 'project_person_responsibles';
 	const PROJECT_TYPES = 'project_types';
+	const PROJECT_MAX_NUMBER_COST_CENTERS = 'project_max_number_cost_centers';
 
 	private $_ci; // Code igniter instance
 
@@ -30,6 +31,8 @@ class SyncProjectsLib
 
 		// Loads model ProjectsModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Projects_model', 'ProjectsModel');
+		// Loads model ProjectsModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Employee_model', 'EmployeeModel');
 
 		// Loads Projects configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
@@ -123,6 +126,14 @@ class SyncProjectsLib
 				// If an error occurred while creating the project on ByD return the error
 				if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
 
+					// 
+					$employeeResult = $this->_ci->EmployeeModel->getEmployeeByUID('BISON');
+
+					var_dump($employeeResult);exit;
+
+					// If an error occurred 
+					if (isError($employeeResult)) return $employeeResult;
+
 				// Add employee to the project
 				$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
 					getData($createProjectResult)->ObjectID,
@@ -138,6 +149,8 @@ class SyncProjectsLib
 				// If structure is present for this category of project then write tasks
 				if (isset($projectStructures[$key]))
 				{
+					$countCostCenters = 1;
+
 					// For each cost center
 					foreach ($costCenters as $costCenter)
 					{
@@ -168,6 +181,15 @@ class SyncProjectsLib
 							// If error occurred during insert return database error
 							if (isError($insertResult)) return $insertResult;
 						}
+
+						// If the number of the created cost centers is the same of the config entry PROJECT_MAX_NUMBER_COST_CENTERS
+						// break this loop. Useful for debugging
+						if ($countCostCenters == $this->_ci->config->item(self::PROJECT_MAX_NUMBER_COST_CENTERS))
+						{
+							break;
+						}
+
+						$countCostCenters++; // count the number of cost centers added to this project
 					}
 				}
 

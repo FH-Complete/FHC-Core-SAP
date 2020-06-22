@@ -9,6 +9,16 @@ class Projects_model extends ODATAClientModel
 {
 	const URI_PREFIX = 'odata/cust/v1/projekt/';
 
+	/**
+	 * Object initialization
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+
+		$this->_apiSetName = 'business';
+	}
+
 	// --------------------------------------------------------------------------------------------
 	// Public methods GET API calls
 

@@ -1,5 +1,8 @@
 <?php
 
+// Max number of cost centers to create. Used for debuggig, by default -1 => disabled
+$config['project_max_number_cost_centers'] = 3;
+
 // Project id formats (required)
 $config['project_id_formats'] = array(
 	'admin' => 'ADM-%s',		// admin project id format

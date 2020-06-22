@@ -57,7 +57,8 @@ class ODATAClientLib
 	const USERNAME = 'username';
 	const PASSWORD = 'password';
 
-	private $_connectionArray;	// contains the connection parameters configuration array
+	private $_connectionsArray;	// contains the connection parameters configuration array
+	private $_apiSetName;		// contains the api set name parameter
 
 	private $_wsFunction;		// path to the webservice
 
@@ -75,7 +76,7 @@ class ODATAClientLib
 	/**
 	 * Object initialization
 	 */
-	public function __construct($credentials = null)
+	public function __construct()
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 		
@@ -83,7 +84,7 @@ class ODATAClientLib
 		
 		$this->_setPropertiesDefault(); // properties initialization
 
-		$this->_setConnection($credentials); // loads the configurations
+		$this->_setConnection(); // loads the configurations
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -92,8 +93,18 @@ class ODATAClientLib
 	/**
 	 * Performs a call to a remote web service
 	 */
-	public function call($wsFunction, $httpMethod = self::HTTP_GET_METHOD, $callParametersArray = array())
+	public function call($apiSetName, $wsFunction, $httpMethod = self::HTTP_GET_METHOD, $callParametersArray = array())
 	{
+		// Checks if the api set name is valid
+		if ($apiSetName == null || trim($apiSetName) == '')
+		{
+			$this->_error(self::MISSING_REQUIRED_PARAMETERS, 'Forgot API set name?');
+		}
+		else
+		{
+			$this->_apiSetName = $apiSetName;
+		}
+
 	    	// Checks if the webservice name is provided and it is valid
 	    	if ($wsFunction != null && trim($wsFunction) != '')
 	    	{
@@ -192,7 +203,7 @@ class ODATAClientLib
 	 */
 	private function _setPropertiesDefault()
 	{
-		$this->_connectionArray = null;
+		$this->_connectionsArray = null;
 		$this->_wsFunction = null;
 		$this->_httpMethod = null;
 		$this->_callParametersArray = array();
@@ -205,20 +216,12 @@ class ODATAClientLib
 	/**
 	 * Sets the connection
 	 */
-	private function _setConnection($credentials)
+	private function _setConnection()
 	{
 	    	$activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
 	    	$connectionsArray = $this->_ci->config->item(self::CONNECTIONS);
 	
-	    	$this->_connectionArray = $connectionsArray[$activeConnectionName];
-	
-	    	if (!isEmptyArray($credentials)
-	    		&& isset($credentials[self::USERNAME]) && isset($credentials[self::PASSWORD])
-	    		&& !isEmptyString($credentials[self::USERNAME]) && !isEmptyString($credentials[self::PASSWORD]))
-	    	{
-	    		$this->_connectionArray[self::USERNAME] = $credentials[self::USERNAME];
-	    		$this->_connectionArray[self::PASSWORD] = $credentials[self::PASSWORD];
-	    	}
+	    	$this->_connectionsArray = $connectionsArray[$activeConnectionName];
 	}
 
 	/**
@@ -252,9 +255,9 @@ class ODATAClientLib
 	{
         	$uri = sprintf(
 			self::URI_TEMPLATE,
-			$this->_connectionArray[self::PROTOCOL],
-			$this->_connectionArray[self::HOST],
-			$this->_connectionArray[self::PATH],
+			$this->_getConnectionByAPISetName()[self::PROTOCOL],
+			$this->_getConnectionByAPISetName()[self::HOST],
+			$this->_getConnectionByAPISetName()[self::PATH],
 			$this->_wsFunction
         	);
 
@@ -339,7 +342,7 @@ class ODATAClientLib
 		return \Httpful\Request::get($uri)
 			->expectsJson() // dangerous expectations
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
-			->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
+			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
 			->send();
 	}
 
@@ -357,7 +360,7 @@ class ODATAClientLib
 			->expectsJson() // dangerous expectations
 			->addHeader(self::TOKEN_HEADER_FETCH_NAME, self::TOKEN_HEADER_FETCH_VALUE) // token with option to fetch
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
-			->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
+			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
 			->send();
 
 		// Checks if the header is present and the needed data are present
@@ -398,7 +401,7 @@ class ODATAClientLib
 				->addHeader(self::COOKIE_HEADER_SEND_NAME, $header[self::COOKIE_HEADER_FETCH_NAME]) // session cookie value
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
-				->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
+				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
 				->sendsJson() // content type json
 				->send();
 		}
@@ -423,7 +426,7 @@ class ODATAClientLib
 				->addHeader(self::COOKIE_HEADER_SEND_NAME, $header[self::COOKIE_HEADER_FETCH_NAME]) // session cookie value
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
-				->authenticateWith($this->_connectionArray[self::USERNAME], $this->_connectionArray[self::PASSWORD])
+				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
 				->sendsJson() // content type json
 				->send();
 		}
@@ -575,6 +578,14 @@ class ODATAClientLib
 	{
 		$this->_error = true;
 		$this->_errorMessage = $code.': '.$message;
+	}
+
+	/**
+	 * Returns the connection array for this api set name
+	 */
+	private function _getConnectionByAPISetName()
+	{
+		return $this->_connectionsArray[$this->_apiSetName];
 	}
 }
 
