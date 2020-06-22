@@ -25,24 +25,6 @@ class ManageProjects extends JQW_Controller
 	// Public methods
 
 	/**
-	 * Wrapper method for _manageProjects
-	 */
-	public function create()
-	{
-		var_dump($this->syncprojectslib->create('TST-42'));
-		//$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_CREATE, 'create');
-	}
-
-	/**
-	 * Wrapper method for _manageProjects
-	 */
-	public function update()
-	{
-		var_dump($this->syncprojectslib->update('00163E9CE8511EEAABE4A55A85996094', 'Test 123'));
-		//$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_UPDATE, 'update');
-	}
-
-	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to get all projects
 	 */
 	public function getProjects()
@@ -66,6 +48,22 @@ class ManageProjects extends JQW_Controller
 		var_dump($this->syncprojectslib->getProjectTasks($id));
 	}
 
+	/**
+	 * Wrapper method for _manageProjects
+	 */
+	public function create()
+	{
+		$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_CREATE, 'create');
+	}
+
+	/**
+	 * Wrapper method for _manageProjects
+	 */
+	public function update()
+	{
+		$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_UPDATE, 'update');
+	}
+
 	//------------------------------------------------------------------------------------------------------------------
 	// Private methods
 
@@ -82,16 +80,16 @@ class ManageProjects extends JQW_Controller
 		{
 			$this->logError('An error occurred while '.$operation.'ing projects in SAP', getError($lastJobs));
 		}
-		else
+		elseif (hasData($lastJobs))
 		{
 			// Create/update projects on SAP side
 			if ($jobType == SyncProjectsLib::SAP_PROJECTS_CREATE)
 			{
-				$syncResult = $this->syncprojectslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncprojectslib->create();
 			}
 			else
 			{
-				$syncResult = $this->syncprojectslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncprojectslib->update();
 			}
 
 			if (isError($syncResult))

@@ -516,7 +516,7 @@ class ODATAClientLib
 				elseif ($response->code == self::HTTP_NOT_FOUND)
 				{
 					$errorCode = self::INVALID_WS;
-					$errorMessage = 'Does not exist a webservice that answer to this URL';
+					$errorMessage = 'Does not exist a webservice that answer to this URL, malformed URL or data not found';
 				}
 				// Not supported HTTP method
 				elseif ($response->code == self::HTTP_NOT_ALLOWED_METHOD)
