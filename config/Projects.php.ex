@@ -1,20 +1,20 @@
 <?php
 
 // Max number of cost centers to create. Used for debuggig, by default -1 => disabled
-$config['project_max_number_cost_centers'] = 3;
+$config['project_max_number_cost_centers'] = -1;
 
 // Project id formats (required)
 $config['project_id_formats'] = array(
 	'admin' => 'ADM-%s',		// admin project id format
 	'lehre' => 'LEH-%s',		// lehre project id format
-	'lehrgaenge' => 'LEG-%s'	// lehrgaenge project id format
+	'lehrgaenge' => 'LEG-%s-%s'	// lehrgaenge project id format
 );
 
 // Project name formats for each study semester (required)
 $config['project_name_formats'] = array(
-	'admin' => 'Admin - %s',		// admin project
-	'lehre' => 'Lehre - %s',		// lehre project
-	'lehrgaenge' => 'Lehrgaenge - %s'	// lehrgaenge project
+	'admin' => 'Admin %s',		// admin project
+	'lehre' => 'Lehre %s',		// lehre project
+	'lehrgaenge' => 'Lehrgaenge %s %s'	// lehrgaenge project
 );
 
 // Project structure for each project (optional)

@@ -11,13 +11,15 @@ COMMENT ON COLUMN sync.tbl_sap_projects.studiensemester_kurzbz IS 'FH Complete s
 
 DO $$
 BEGIN
-	ALTER TABLE sync.tbl_sap_projects ADD CONSTRAINT tbl_sap_projects_pkey PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz);
+	ALTER TABLE sync.tbl_sap_projects
+	ADD CONSTRAINT tbl_sap_projects_pkey PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 DO $$
 BEGIN
-	ALTER TABLE sync.tbl_sap_projects ADD CONSTRAINT tbl_sap_projects_studiensemester_kurzbz_fkey FOREIGN KEY (studiensemester_kurzbz)
+	ALTER TABLE sync.tbl_sap_projects
+	ADD CONSTRAINT tbl_sap_projects_studiensemester_kurzbz_fkey FOREIGN KEY (studiensemester_kurzbz)
 	REFERENCES public.tbl_studiensemester(studiensemester_kurzbz) ON UPDATE CASCADE ON DELETE RESTRICT;
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;

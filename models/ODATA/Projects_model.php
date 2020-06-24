@@ -143,7 +143,7 @@ class Projects_model extends ODATAClientModel
 			)
 		);
 	}
-
+	
 	/**
 	 * 
 	 */
@@ -158,13 +158,6 @@ class Projects_model extends ODATAClientModel
 				'ProductID' => $productID,
 				'PlannedStartDateTime' => '/Date('.$plannedStartDateTime.')/',
 				'PlannedEndDateTime' => '/Date('.$plannedEndDateTime.')/'
-
-				//'TotalActualWorkQuantity' => '38.5',
-				//'unitCode' => 'HUR',
-				//'TotalActualWorkQuantityTypeCode' => 'TIME',
-				//'TotalPlannedWorkQuantityTypeCode' => 'TIME',
-				//'TotalPlannedWorkQuantity' => '38.5',
-				//'unitCode1' => 'HUR'
 			)
 		);
 	}
