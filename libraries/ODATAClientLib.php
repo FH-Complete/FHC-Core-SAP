@@ -285,7 +285,7 @@ class ODATAClientLib
 				$firstParam = false;
 			}
 		
-			$uri .= $queryString;
+			$uri .= urlencode($queryString);
 		}
 
 		return $uri;

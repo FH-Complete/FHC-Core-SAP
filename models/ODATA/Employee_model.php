@@ -43,8 +43,8 @@ class Employee_model extends ODATAClientModel
 			self::URI_PREFIX.'Hcmempb',
 			ODATAClientLib::HTTP_GET_METHOD,
 			array(
-				'$select' => urlencode('C_EeId,C_EeFamilyName,C_BusinessUserId,C_EeGivenName,Count'),
-				'$filter' => urlencode($filter)
+				'$select' => 'C_EeId,C_EeFamilyName,C_BusinessUserId,C_EeGivenName,Count',
+				'$filter' => $filter
 			)
 		);
 	}
