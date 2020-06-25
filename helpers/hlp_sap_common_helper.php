@@ -75,3 +75,31 @@ function updateJobs($jobs, $properties, $values)
 	}
 }
 
+/**
+ * Convert a PHP timestamp date to a SAP ODATA date
+ */
+function toDate($phpTimestamp)
+{
+	return '/Date('.$phpTimestamp.'000)/';
+}
+
+/**
+ * Create an ODATA filter with the given parameters
+ */
+function filter($arrayValues, $searchFor, $condition, $operator, $function = '')
+{
+	$filter = '';
+	$counter = 0;
+
+	foreach ($arrayValues as $val)
+	{
+		if ($counter > 0) $filter .= ' '.$operator.' ';
+
+		$filter .= '('.$searchFor.' '.$condition.' '.$function.'\''.$val.'\')';
+
+		$counter++;
+	}
+
+	return $filter;
+}
+

@@ -27,24 +27,27 @@ class Employee_model extends ODATAClientModel
 	 */
 	public function getEmployeesByUIDs($arrayUids)
 	{
-		$filter = '';
-		$counter = 0;
-
-		foreach ($arrayUids as $uid)
-		{
-			if ($counter > 0) $filter .= ' or ';
-
-			$filter .= '(C_BusinessUserId eq \''.$uid.'\')';
-
-			$counter++;
-		}
-
 		return $this->_call(
 			self::URI_PREFIX.'Hcmempb',
 			ODATAClientLib::HTTP_GET_METHOD,
 			array(
 				'$select' => 'C_EeId,C_EeFamilyName,C_BusinessUserId,C_EeGivenName,Count',
-				'$filter' => $filter
+				'$filter' => filter($arrayUids, 'C_BusinessUserId', 'eq', 'or')
+			)
+		);
+	}
+
+	/**
+	 * 
+	 */
+	public function getEmployeesByUUIDs($arrayUuids)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'Hcmempb',
+			ODATAClientLib::HTTP_GET_METHOD,
+			array(
+				'$select' => 'C_EeId,C_EeFamilyName,C_BusinessUserId,C_EeGivenName,Count',
+				'$filter' => filter($arrayUuids, 'C_EeUuid', 'eq', 'or', 'guid')
 			)
 		);
 	}
