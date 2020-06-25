@@ -155,11 +155,11 @@ class SyncServicesLib
 					$serviceId = getData($createResult)->ServiceProduct->InternalID->_;
 
 					// Activate valuation for GMBH
-					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, 'GMBH', 75, $nonBlockingErrorsArray);
+					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '200000', 75, $nonBlockingErrorsArray);
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Activate valuation for GST
-					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, 'GST', 65, $nonBlockingErrorsArray);
+					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '100000', 65, $nonBlockingErrorsArray);
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Link this service to a price list
@@ -546,19 +546,19 @@ class SyncServicesLib
 					),
 					'Sales' => array(
 						0 => array(
-							'SalesOrganisationID' => 'GMBH',
+							'SalesOrganisationID' => '200000',
 							'DistributionChannelCode' => array('_' => '01'),
 							'LifeCycleStatusCode' => 2,
 							'SalesMeasureUnitCode' => 'HUR',
 							'ItemGroupCode' => 'PBTM'
-						),
+						)/*,
 						1 => array(
 							'SalesOrganisationID' => 'GF20',
 							'DistributionChannelCode' => array('_' => '01'),
 							'LifeCycleStatusCode' => 2,
 							'SalesMeasureUnitCode' => 'HUR',
 							'ItemGroupCode' => 'PBTM'
-						),
+						)*/,
 						2 => array(
 							'SalesOrganisationID' => '100003',
 							'DistributionChannelCode' => array('_' => '01'),
@@ -584,11 +584,11 @@ class SyncServicesLib
 					),
 					'Valuation' => array(
 						0 => array(
-							'CompanyID' => 'GMBH',
+							'CompanyID' => '200000', // GMBH
 							'LifeCycleStatusCode' => 1
 						),
 						1 => array(
-							'CompanyID' => 'GST',
+							'CompanyID' => '100000', // FH
 							'LifeCycleStatusCode' => 1
 						)
 					)
@@ -671,7 +671,7 @@ class SyncServicesLib
 					'AccountDeterminationGroupCode' => 5000,
 					'CostRate' => array(
 						'actionCode' => '04',
-						'SetOfBooksID' => 'FH01',
+						'SetOfBooksID' => 'FHT1',
 						'StartDate' => date('Y-m-d'),
 						'Amount' => array(
 							'_' => $amount,
