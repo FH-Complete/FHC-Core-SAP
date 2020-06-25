@@ -44,7 +44,7 @@ class ManageMitarbeiterzeiten extends JQW_Controller
             $temp['aktivitaet_kurzbz'] = 'Arbeit';
             $temp['start'] = date('Y-m-d', $timestamp) . ' ' . $this->_sanitizeTime($entry->C_StartTime);
             $temp['ende'] = date('Y-m-d', $timestamp) . ' ' . $this->_sanitizeTime($entry->C_EndTime);
-            //$temp['debug'] = $entry->C_WorkDescription;
+            $temp['debug'] = $this->syncmitarbeiterzeitenlib->getMitarbeiter($entry->C_EmployeeUuid);
 
             $results[] = $temp;
         }

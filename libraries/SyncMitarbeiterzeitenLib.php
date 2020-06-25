@@ -18,6 +18,9 @@ class SyncMitarbeiterzeitenLib
 
 		// Loads model MitarbeiterzeitenModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Mitarbeiterzeiten_model', 'MitarbeiterzeitenModel');
+
+        // Loads model EmployeeModel
+        $this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Employee_model', 'EmployeeModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -30,5 +33,10 @@ class SyncMitarbeiterzeitenLib
 	{
 		return $this->_ci->MitarbeiterzeitenModel->getMitarbeiterzeiten();
 	}
+
+	public function getMitarbeiter($uuid)
+    {
+        return $this->_ci->EmployeeModel->getEmployeesByUUIDs(array($uuid));
+    }
 }
 
