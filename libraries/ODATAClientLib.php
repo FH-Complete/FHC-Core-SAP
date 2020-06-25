@@ -67,6 +67,7 @@ class ODATAClientLib
 
 	private $_error;		// true if an error occurred
 	private $_errorMessage;		// contains the error message
+	private $_errorCode;		// contains the error code
 
 	private $_hasData;		// indicates if there are data in the response or not
 	private $_emptyResponse;	// indicates if the response is empty or not
@@ -147,6 +148,14 @@ class ODATAClientLib
 	public function getError()
 	{
 		return $this->_errorMessage;
+	}
+	
+	/**
+	 * Returns the error code stored in property _errorCode
+	 */
+	public function getErrorCode()
+	{
+		return $this->_errorCode;
 	}
 
 	/**
@@ -274,18 +283,18 @@ class ODATAClientLib
 				{
 					foreach ($value as $key => $val)
 					{
-						$queryString .= ($firstParam == true ? '?' : '&').$name.'[]='.$val;
+						$queryString .= ($firstParam == true ? '?' : '&').$name.'[]='.urlencode($val);
 					}
 				}
 				else // otherwise
 				{
-					$queryString .= ($firstParam == true ? '?' : '&').$name.'='.$value;
+					$queryString .= ($firstParam == true ? '?' : '&').$name.'='.urlencode($value);
 				}
 			
 				$firstParam = false;
 			}
 		
-			$uri .= urlencode($queryString);
+			$uri .= $queryString;
 		}
 
 		return $uri;
@@ -577,6 +586,7 @@ class ODATAClientLib
 	private function _error($code, $message = 'Generic error')
 	{
 		$this->_error = true;
+		$this->_errorCode = $code;
 		$this->_errorMessage = $code.': '.$message;
 	}
 
