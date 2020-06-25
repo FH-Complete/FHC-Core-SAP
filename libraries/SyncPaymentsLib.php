@@ -64,9 +64,9 @@ class SyncPaymentsLib
 	public function createGutschrift($person_arr)
 	{
 		$nonBlockingErrorsArray = array();
-		
+
 		// If the given array of person ids is empty stop here
-		if (isEmptyArray($person_arr)) return success('No users to be synced');
+		if (isEmptyArray($person_arr)) return success('No gutschrift to be synced');
 
 		foreach ($person_arr as $person_id)
 		{
@@ -92,10 +92,16 @@ class SyncPaymentsLib
 				$paymentData = getData($result_creditmemo);
 				foreach ($paymentData as $row_payment)
 				{
+					// Prepare Sales Positions
+					$service_id = $this->_getServiceID($row_payment->buchungstyp_kurzbz, $row_payment->studiengang_kz, $row_payment->studiensemester_kurzbz);
 
-					$service_id = '20000015';
+					if ($service_id === false)
+					{
+						$nonBlockingErrorsArray[] = 'Could not get Payment Service for '.$row_payment->buchungstyp_kurzbz.', '.$row_payment->studiengang_kz.', '.$row_payment->studiensemester_kurzbz;
+						$data = array();
+						continue;
+					}
 
-					/* TODO Disabled for Testing
 					$SalesUnitPartyID_result = $this->_getSalesUnitPartyID($row_payment->studiengang_kz);
 					if (!isError($SalesUnitPartyID_result) && hasData($SalesUnitPartyID_result))
 						$SalesUnitPartyID = getData($SalesUnitPartyID_result)[0]->oe_kurzbz_sap;
@@ -104,8 +110,9 @@ class SyncPaymentsLib
 						$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$row_payment->studiengang_kz;
 						continue;
 					}
-					*/
-					$SalesUnitPartyID = 'BBE';
+
+					//$service_id = '20000015';
+					//$SalesUnitPartyID = 'BBE';
 
 					$gutschriftID = 'FHC-OUT-'.$row_payment->buchungsnr;
 
@@ -121,7 +128,7 @@ class SyncPaymentsLib
 							),
 							'BaseBusinessTransactionDocumentID' => $gutschriftID,
 							'SalesAndServiceBusinessArea' => array(
-								'DistributionChannelCode' => '02'
+								'DistributionChannelCode' => '01'
 							),
 							'SalesUnitParty' => array(
 								'InternalID' => $SalesUnitPartyID
@@ -226,7 +233,7 @@ class SyncPaymentsLib
 	public function create($person_arr)
 	{
 		// If the given array of person ids is empty stop here
-		if (isEmptyArray($person_arr)) return success('No users to be synced');
+		if (isEmptyArray($person_arr)) return success('No payments to be synced');
 
 		// Array used to store non blocking error messages to be returned back and then logged
 		$nonBlockingErrorsArray = array();
@@ -272,7 +279,6 @@ class SyncPaymentsLib
 
 						// TODO: Sales Unit for Lehrgaenge? Project ?
 
-						/* TODO: DISABLED FOR TESTING
 						$SalesUnitPartyID_result = $this->_getSalesUnitPartyID($row_payment->studiengang_kz);
 						if (!isError($SalesUnitPartyID_result) && hasData($SalesUnitPartyID_result))
 							$SalesUnitPartyID = getData($SalesUnitPartyID_result)[0]->oe_kurzbz_sap;
@@ -281,8 +287,8 @@ class SyncPaymentsLib
 							$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$row_payment->studiengang_kz;
 							continue;
 						}
-						*/
-						$SalesUnitPartyID = 'BBE';
+
+						//$SalesUnitPartyID = 'BBE';
 
 						$data = array(
 							'BasicMessageHeader' => array(
@@ -310,6 +316,12 @@ class SyncPaymentsLib
 					// Prepare Sales Positions
 					$service_id = $this->_getServiceID($row_payment->buchungstyp_kurzbz, $row_payment->studiengang_kz, $row_payment->studiensemester_kurzbz);
 
+					if ($service_id === false)
+					{
+						$nonBlockingErrorsArray[] = 'Could not get Payment Service for '.$row_payment->buchungstyp_kurzbz.', '.$row_payment->studiengang_kz.', '.$row_payment->studiensemester_kurzbz;
+						$data = array();
+						continue;
+					}
 					$buchungsnr_arr[] = $row_payment->buchungsnr;
 
 					$position = array(
@@ -337,7 +349,11 @@ class SyncPaymentsLib
 			}
 
 			if (count($data) > 0)
-				$this->_CreateSalesOrder($data, $buchungsnr_arr);
+			{
+				$result = $this->_CreateSalesOrder($data, $buchungsnr_arr);
+				if(hasData($result))
+					$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($result));
+			}
 		}
 
 		return success($nonBlockingErrorsArray);
@@ -353,7 +369,7 @@ class SyncPaymentsLib
 
 		// Create the Entry
 		$manageSalesOrderResult = $this->_ci->ManageSalesOrderInModel->MaintainBundle($data);
-
+echo print_r($manageSalesOrderResult,true);
 		// If no error occurred...
 		if (!isError($manageSalesOrderResult))
 		{
@@ -386,18 +402,18 @@ class SyncPaymentsLib
 					{
 						foreach ($manageSalesOrder->Log->Item as $item)
 						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for Buchungsnr: '.explode($buchungsnr_arr);
+							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for Buchungsnr: '.implode(',',$buchungsnr_arr);
 						}
 					}
 					elseif ($manageSalesOrder->Log->Item->Note)
 					{
-						$nonBlockingErrorsArray[] = $manageSalesOrder->Log->Item->Note.' for Buchungsnr: '.explode($buchungsnr_arr);
+						$nonBlockingErrorsArray[] = $manageSalesOrder->Log->Item->Note.' for Buchungsnr: '.implode(',',$buchungsnr_arr);
 					}
 				}
 				else
 				{
 					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return the SalesOrderID for Buchungsnr: '.explode($buchungsnr_arr);
+					$nonBlockingErrorsArray[] = 'SAP did not return the SalesOrderID for Buchungsnr: '.implode(',',$buchungsnr_arr);
 				}
 			}
 		}
@@ -473,7 +489,7 @@ class SyncPaymentsLib
 			FROM
 				public.tbl_studiengang
 				JOIN public.tbl_organisationseinheit USING(oe_kurzbz)
-				JOIN sync.tbl_sap_organisationsstruktur
+				JOIN sync.tbl_sap_organisationsstruktur USING(oe_kurzbz)
 			WHERE
 				studiengang_kz = ?
 		', array($studiengang_kz));
@@ -490,24 +506,25 @@ class SyncPaymentsLib
 	 */
 	private function _getServiceID($buchungstyp_kurzbz, $studiengang_kz, $studiensemester_kurzbz)
 	{
-		switch($buchungstyp_kurzbz)
+		$dbModel = new DB_Model();
+		$dbUserData = $dbModel->execReadOnlyQuery('
+			SELECT
+				service_id
+			FROM
+				sync.tbl_sap_service_buchungstyp
+			WHERE
+				buchungstyp_kurzbz = ?
+				AND (studiensemester_kurzbz = ? OR studiensemester_kurzbz is null)
+				AND (studiengang_kz = ? OR studiengang_kz is null)
+		', array($buchungstyp_kurzbz, $studiensemester_kurzbz, $studiengang_kz));
+
+		if(hasData($dbUserData))
 		{
-			case 'OEH':
-				$serviceid = '20000013';
-				break;
-			case 'Unkostenbeitrag':
-				$serviceid = '20000014';
-				break;
-			case 'Studiengebuehr':
-				// TODO
-				// GET Service for STG und STSEM
-				//break;
-			default:
-				$serviceid = '20000013';
-				break;
+			$service = getData($dbUserData);
+			return $service[0]->service_id;
 		}
 
-		return $serviceid;
+		return false;
 	}
 
 	/**

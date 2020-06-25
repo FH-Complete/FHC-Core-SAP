@@ -153,94 +153,99 @@ class SyncUsersLib
 			// If the current user is not present in SAP
 			if (!hasData($userDataSAP))
 			{
-				// Then create it!
-				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1(
-					array(
-						'BasicMessageHeader' => array(
-							'ID' => generateUID(self::CREATE_USER_PREFIX),
-							'UUID' => generateUUID()
+
+				$data = array(
+					'BasicMessageHeader' => array(
+						'ID' => generateUID(self::CREATE_USER_PREFIX),
+						'UUID' => generateUUID()
+					),
+					'Customer' => array(
+						'actionCode' => '01',
+						'addressInformationListCompleteTransmissionIndicator' => true,
+						'communicationArrangementListCompleteTransmissionIndicator' => true,
+						'CategoryCode' => 1,
+						'ProspectIndicator' => $userData->prospectIndicator,
+						'CustomerIndicator' => !$userData->prospectIndicator,
+						'LifeCycleStatusCode' => 2,
+						'Person' => array(
+							'GivenName' => $userData->name,
+							'FamilyName' => $userData->surname,
+							'BirthName' => $userData->surname,
+							'NonVerbalCommunicationLanguageCode' => $userData->language,
+							'GenderCode' => $userData->gender
 						),
-						'Customer' => array(
+						'VerbalCommunicationLanguageCode' => $userData->language,
+						'ABCClassificationCode' => $userData->classification,
+						'ContactAllowedCode' => 1,
+						'LegalCompetenceIndicator' => true,
+						'AddressInformation' => array(
 							'actionCode' => '01',
 							'addressInformationListCompleteTransmissionIndicator' => true,
-							'communicationArrangementListCompleteTransmissionIndicator' => true,
-							'CategoryCode' => 1,
-							'ProspectIndicator' => $userData->prospectIndicator,
-							'CustomerIndicator' => !$userData->prospectIndicator,
-							'LifeCycleStatusCode' => 2,
-							'Person' => array(
-								'GivenName' => $userData->name,
-								'FamilyName' => $userData->surname,
-								'BirthName' => $userData->surname,
-								'NonVerbalCommunicationLanguageCode' => $userData->language,
-								'GenderCode' => $userData->gender
+							'AddressUsage' => array(
+								'AddressUsageCode' => 'XXDEFAULT'
 							),
-							'VerbalCommunicationLanguageCode' => $userData->language,
-							'ABCClassificationCode' => $userData->classification,
-							'ContactAllowedCode' => 1,
-							'LegalCompetenceIndicator' => true,
-							'AddressInformation' => array(
-								'actionCode' => '01',
-								'addressInformationListCompleteTransmissionIndicator' => true,
-								'AddressUsage' => array(
-									'AddressUsageCode' => 'XXDEFAULT'
-								),
-								'Address' => array(
-									'EmailURI' => $userData->email,
-									'PreferredCommunicationMediumTypeCode' => 'INT',
-									'PostalAddress' => array(
-										'CountryCode' => $userData->country,
-										'CityName' => $userData->ort,
-										'StreetPostalCode' => $userData->plz,
-										'StreetName' => $userData->strasse
-									)
-								)
-							),
-							'CommunicationArrangement' => array(
-								0 => array(
-									'CompoundServiceInterfaceCode' => '108',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								),
-								1 => array(
-									'CompoundServiceInterfaceCode' => '11',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								),
-								2 => array(
-									'CompoundServiceInterfaceCode' => '27',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								),
-								3 => array(
-									'CompoundServiceInterfaceCode' => '28',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								),
-								4 => array(
-									'CompoundServiceInterfaceCode' => '46',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								),
-								5 => array(
-									'CompoundServiceInterfaceCode' => '992',
-									'EnabledIndicator' => true,
-									'CommunicationMediumTypeCode' => 'INT'
-								)
-							),
-							'PaymentData' => array(
-								0 => array(
-									'CompanyID' => '100000',
-									'AccountDeterminationDebtorGroupCode' => '4010'
-								),
-								1 => array(
-									'CompanyID' => 'GST',
-									'AccountDeterminationDebtorGroupCode' => '4010'
-								),
+							'Address' => array(
+								'EmailURI' => $userData->email,
+								'PreferredCommunicationMediumTypeCode' => 'INT'
 							)
+						),
+						'CommunicationArrangement' => array(
+							0 => array(
+								'CompoundServiceInterfaceCode' => '108',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							),
+							1 => array(
+								'CompoundServiceInterfaceCode' => '11',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							),
+							2 => array(
+								'CompoundServiceInterfaceCode' => '27',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							),
+							3 => array(
+								'CompoundServiceInterfaceCode' => '28',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							),
+							4 => array(
+								'CompoundServiceInterfaceCode' => '46',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							),
+							5 => array(
+								'CompoundServiceInterfaceCode' => '992',
+								'EnabledIndicator' => true,
+								'CommunicationMediumTypeCode' => 'INT'
+							)
+						),
+						'PaymentData' => array(
+							0 => array(
+								'CompanyID' => '100000',
+								'AccountDeterminationDebtorGroupCode' => '4010'
+							),
+							1 => array(
+								'CompanyID' => 'GST',
+								'AccountDeterminationDebtorGroupCode' => '4010'
+							),
 						)
 					)
 				);
+
+				if(isset($userData->strasse))
+				{
+					$data['Customer']['AddressInformation']['Address']['PostalAddress'] = array(
+						'CountryCode' => $userData->country,
+						'CityName' => $userData->ort,
+						'StreetPostalCode' => $userData->plz,
+						'StreetName' => $userData->strasse
+					);
+				}
+
+				// Then create it!
+				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
 				// If no error occurred...
 				if (!isError($manageCustomerResult))
@@ -368,55 +373,59 @@ class SyncUsersLib
 					continue;
 				}
 
-				// Then update it!
-				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1(
-					array(
-						'BasicMessageHeader' => array(
-							'ID' => generateUID(self::UPDATE_USER_PREFIX),
-							'UUID' => generateUUID()
+				$data = array(
+					'BasicMessageHeader' => array(
+						'ID' => generateUID(self::UPDATE_USER_PREFIX),
+						'UUID' => generateUUID()
+					),
+					'Customer' => array(
+						'actionCode' => '02',
+						'addressInformationListCompleteTransmissionIndicator' => false,
+						'InternalID' => getData($sapIdResult)[0]->sap_user_id,
+						'ProspectIndicator' => $userData->prospectIndicator,
+						'CustomerIndicator' => !$userData->prospectIndicator,
+						'Person' => array(
+							'GivenName' => $userData->name,
+							'FamilyName' => $userData->surname,
+							'BirthName' => $userData->surname,
+							'NonVerbalCommunicationLanguageCode' => $userData->language,
+							'GenderCode' => $userData->gender
 						),
-						'Customer' => array(
+						'VerbalCommunicationLanguageCode' => $userData->language,
+						'ABCClassificationCode' => $userData->classification,
+						'AddressInformation' => array(
+							'UUID' => $userData->addressInformationUUID,
 							'actionCode' => '02',
 							'addressInformationListCompleteTransmissionIndicator' => false,
-							'InternalID' => getData($sapIdResult)[0]->sap_user_id,
-							'ProspectIndicator' => $userData->prospectIndicator,
-							'CustomerIndicator' => !$userData->prospectIndicator,
-							'Person' => array(
-								'GivenName' => $userData->name,
-								'FamilyName' => $userData->surname,
-								'BirthName' => $userData->surname,
-								'NonVerbalCommunicationLanguageCode' => $userData->language,
-								'GenderCode' => $userData->gender
-							),
-							'VerbalCommunicationLanguageCode' => $userData->language,
-							'ABCClassificationCode' => $userData->classification,
-							'AddressInformation' => array(
-								'UUID' => $userData->addressInformationUUID,
-								'actionCode' => '02',
-								'addressInformationListCompleteTransmissionIndicator' => false,
-								'Address' => array(
-									'EmailURI' => $userData->email,
-									'PostalAddress' => array(
-										'CountryCode' => $userData->country,
-										'CityName' => $userData->ort,
-										'StreetPostalCode' => $userData->plz,
-										'StreetName' => $userData->strasse
-									)
-								)
-							),
-							'PaymentData' => array(
-								0 => array(
-									'CompanyID' => '100000',
-									'AccountDeterminationDebtorGroupCode' => '4010'
-								),
-								1 => array(
-									'CompanyID' => 'GST',
-									'AccountDeterminationDebtorGroupCode' => '4010'
-								),
+							'Address' => array(
+								'EmailURI' => $userData->email
 							)
+						),
+						'PaymentData' => array(
+							0 => array(
+								'CompanyID' => '100000',
+								'AccountDeterminationDebtorGroupCode' => '4010'
+							),
+							1 => array(
+								'CompanyID' => 'GST',
+								'AccountDeterminationDebtorGroupCode' => '4010'
+							),
 						)
 					)
 				);
+
+				if(isset($userData->strasse))
+				{
+					$data['Customer']['AddressInformation']['Address']['PostalAddress'] = array(
+						'CountryCode' => $userData->country,
+						'CityName' => $userData->ort,
+						'StreetPostalCode' => $userData->plz,
+						'StreetName' => $userData->strasse
+					);
+				}
+
+				// Then update it!
+				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
 				// If no error occurred...
 				if (!isError($manageCustomerResult))
