@@ -1,8 +1,6 @@
 CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_courses (
 	project_id character varying(42) NOT NULL,
 	project_object_id character varying(42) NOT NULL,
-	project_task_id character varying(42) NOT NULL,
-	project_task_object_id character varying(42) NOT NULL,
 	studiensemester_kurzbz character varying(16) NOT NULL,
 	studiengang_kz integer NOT NULL
 );
@@ -10,8 +8,6 @@ CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_courses (
 COMMENT ON TABLE sync.tbl_sap_projects_courses IS 'Synchronization table with SAP ByD projects tasks and FHC courses';
 COMMENT ON COLUMN sync.tbl_sap_projects_courses.project_id IS 'SAP Project ID';
 COMMENT ON COLUMN sync.tbl_sap_projects_courses.project_object_id IS 'SAP Project Object ID ';
-COMMENT ON COLUMN sync.tbl_sap_projects_courses.project_task_id IS 'SAP Project Task ID';
-COMMENT ON COLUMN sync.tbl_sap_projects_courses.project_task_object_id IS 'SAP Project Task Object ID ';
 COMMENT ON COLUMN sync.tbl_sap_projects_courses.studiensemester_kurzbz IS 'FH Complete study semester';
 COMMENT ON COLUMN sync.tbl_sap_projects_courses.studiengang_kz IS 'FH Course ID';
 

@@ -72,7 +72,7 @@ class ManageProjects extends JQW_Controller
 	 */
 	private function _manageProjects($jobType, $operation)
 	{
-		$this->logInfo('Start data synchronization with SAP ByD: '.$operation);
+		$this->logInfo('Start projects synchronization with SAP ByD: '.$operation);
 
 		// Gets the latest jobs
 		$lastJobs = $this->getLastJobs($jobType);
@@ -94,7 +94,7 @@ class ManageProjects extends JQW_Controller
 
 			if (isError($syncResult))
 			{
-				$this->logError('An error occurred while '.$operation.'ing users in SAP', getError($syncResult));
+				$this->logError('An error occurred while '.$operation.'ing projects in SAP', getError($syncResult));
 			}
 			else
 			{
@@ -127,7 +127,7 @@ class ManageProjects extends JQW_Controller
 			}
 		}
 
-		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
+		$this->logInfo('End projects synchronization with SAP ByD: '.$operation);
 	}
 }
 

@@ -38,7 +38,7 @@ abstract class ODATAClientModel extends CI_Model
 		// If an error occurred return it
 		if ($this->odataclientlib->isError())
 		{
-			$wsResult = error($this->odataclientlib->getError());
+			$wsResult = error($this->odataclientlib->getError(), $this->odataclientlib->getErrorCode());
 		}
 		else // otherwise return a success
 		{

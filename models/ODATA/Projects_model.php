@@ -73,8 +73,8 @@ class Projects_model extends ODATAClientModel
 				'TypeCode' => $type,
 				'ResponsibleCostCentreID' => $unitResponsible,
 				'ResponsibleEmployeeID'  => $personResponsible,
-				'PlannedStartDateTime' => '/Date('.$startDate.')/',
-				'PlannedEndDateTime' => '/Date('.$endDate.')/',
+				'PlannedStartDateTime' => toDate($startDate),
+				'PlannedEndDateTime' => toDate($endDate),
 
 				// Constants
 				'LanguageCode' => 'DE',
@@ -128,7 +128,7 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function createTask($parentObjectID, $name)
+	public function createTask($parentObjectID, $name, $responsibleCostCentreID)
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection(\''.$parentObjectID.'\')/ProjectTask',
@@ -136,6 +136,7 @@ class Projects_model extends ODATAClientModel
 			array(
 				'ParentObjectID' => $parentObjectID,
 				'Name' => $name,
+				'ResponsibleCostCentreID' => $responsibleCostCentreID,
 				'MASollStunden1content_KUT' => '1.00000000000000',
 				'MASollStunden1unitCode_KUT' => 'HUR',
 				'LehreGrobplanung1content_KUT' => '20.00000000000000',
@@ -147,7 +148,7 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function addEmployee($parentObjectID, $employeeID, $productID, $plannedStartDateTime, $plannedEndDateTime)
+	public function addEmployee($parentObjectID, $employeeID, $plannedStartDateTime, $plannedEndDateTime, $committedWork)
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection(\''.$parentObjectID.'\')/ProjectParticipant',
@@ -155,9 +156,30 @@ class Projects_model extends ODATAClientModel
 			array(
 				'ParentObjectID' => $parentObjectID,
 				'EmployeeID' => $employeeID,
+				'PlannedStartDateTime' => toDate($plannedStartDateTime),
+				'PlannedEndDateTime' => toDate($plannedEndDateTime),
+				'ManagementCommittedWorkQuantity' => $committedWork
+			)
+		);
+	}
+
+	/**
+	 * 
+	 */
+	public function addEmployeeToTask($taskObjectID, $employeeID, $productID, $plannedWorkQuantity, $lehreGrobplanung = '0', $maSollStunden = '0')
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$taskObjectID.'\')/ProjectTaskService',
+			ODATAClientLib::HTTP_POST_METHOD,
+			array(
+				'ObjectID' => $taskObjectID,
+				'AssignedEmployeeID' => $employeeID,
 				'ProductID' => $productID,
-				'PlannedStartDateTime' => '/Date('.$plannedStartDateTime.')/',
-				'PlannedEndDateTime' => '/Date('.$plannedEndDateTime.')/'
+				'PlannedWorkQuantity' => $plannedWorkQuantity,
+				'LehreGrobplanungcontent_KUT' => $lehreGrobplanung,
+				'LehreGrobplanungunitCode_KUT' => 'HUR',
+				'MASollStundencontent_KUT' => $maSollStunden,
+				'MASollStundenunitCode_KUT' => 'HUR'
 			)
 		);
 	}
