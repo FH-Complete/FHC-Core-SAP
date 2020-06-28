@@ -15,7 +15,7 @@ class ManageServices extends JQW_Controller
 		parent::__construct();
 
 		// Loads SAP common helper
-                $this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
+		$this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
 
 		// Loads SyncServicesLib
 		$this->load->library('extensions/FHC-Core-SAP/SyncServicesLib');
@@ -118,7 +118,7 @@ class ManageServices extends JQW_Controller
 					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
 					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
 				);
-				
+
 				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
 			}
 		}
@@ -126,4 +126,3 @@ class ManageServices extends JQW_Controller
 		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
 	}
 }
-
