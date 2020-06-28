@@ -189,33 +189,39 @@ class SyncUsersLib
 								'PreferredCommunicationMediumTypeCode' => 'INT'
 							)
 						),
+						/*
+						INT = EMail
+						PRT = Drucker
+						XMS = Externes System
+						FAX = Fax
+						*/
 						'CommunicationArrangement' => array(
-							0 => array(
+							0 => array( // Mahnung
 								'CompoundServiceInterfaceCode' => '108',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
 							),
-							1 => array(
+							1 => array( // Zahlungsavis
 								'CompoundServiceInterfaceCode' => '11',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
 							),
-							2 => array(
+							2 => array( // Kundenauftragsbestaetigung
 								'CompoundServiceInterfaceCode' => '27',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
 							),
-							3 => array(
+							3 => array( // Kundenrechnung / Gutschrift
 								'CompoundServiceInterfaceCode' => '28',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
 							),
-							4 => array(
+							4 => array( // Angebot
 								'CompoundServiceInterfaceCode' => '46',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
 							),
-							5 => array(
+							5 => array( // Kundenvertragsbestätigung
 								'CompoundServiceInterfaceCode' => '992',
 								'EnabledIndicator' => true,
 								'CommunicationMediumTypeCode' => 'INT'
