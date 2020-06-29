@@ -28,7 +28,7 @@ class Mitarbeiterzeiten_model extends ODATAClientModel
 	public function getMitarbeiterzeiten()
 	{
 		return $this->_call(
-            self::URI_PREFIX.'Hcmtlmu01?$select=ID,C_EmployeeUuid,C_StartDate,C_StartTime,C_EndTime,C_WorkDescription&$format=json',
+            self::URI_PREFIX.'Hcmtlmu01?$select=ID,C_EmployeeUuid,C_StartDate,C_StartTime,C_EndTime,C_WorkDescription,C_TmitTypcode&$format=json',
 			ODATAClientLib::HTTP_GET_METHOD
 		);
 	}

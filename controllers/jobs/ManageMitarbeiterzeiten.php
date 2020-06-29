@@ -34,23 +34,26 @@ class ManageMitarbeiterzeiten extends JQW_Controller
 
 		foreach ($entries->retval as $entry)
         {
-            if ($entry->C_StartDate === null)
+            // C_TmitTypcode AT0001 = Istarbeitszeit in ByD
+            if ($entry->C_TmitTypcode != 'AT0001')
                 continue;
 
             $temp = array();
             $employee = $this->syncmitarbeiterzeitenlib->getMitarbeiter($entry->C_EmployeeUuid);
             $timestamp = substr(filter_var($entry->C_StartDate, FILTER_SANITIZE_NUMBER_INT), 0, 10);
 
-            $temp['uid'] = $employee->retval[0]->C_BusinessUserId;
+            $temp['uid'] = strtolower($employee->retval[0]->C_BusinessUserId);
             $temp['aktivitaet_kurzbz'] = 'Arbeit';
             $temp['start'] = date('Y-m-d', $timestamp) . ' ' . $this->_sanitizeTime($entry->C_StartTime);
             $temp['ende'] = date('Y-m-d', $timestamp) . ' ' . $this->_sanitizeTime($entry->C_EndTime);
-            $temp['debug'] = $employee;
 
             $results[] = $temp;
         }
 
-		var_dump($results);
+		foreach ($results as $entry)
+        {
+            $this->syncmitarbeiterzeitenlib->setWorkingHoursEntry($entry);
+        }
 	}
 
 	private function _sanitizeTime($value)

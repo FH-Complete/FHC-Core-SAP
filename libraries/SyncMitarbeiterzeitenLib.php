@@ -21,6 +21,12 @@ class SyncMitarbeiterzeitenLib
 
         // Loads model EmployeeModel
         $this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Employee_model', 'EmployeeModel');
+
+        // Loads model ZeitaufzeichnungModel
+        $this->_ci->load->model('ressource/Zeitaufzeichnung_model', 'ZeitaufzeichnungModel');
+
+        // Loads model ZeitsperreModel
+        $this->_ci->load->model('ressource/Zeitsperre_model', 'ZeitsperreModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -37,6 +43,11 @@ class SyncMitarbeiterzeitenLib
 	public function getMitarbeiter($uuid)
     {
         return $this->_ci->EmployeeModel->getEmployeesByUUIDs(array($uuid));
+    }
+
+    public function setWorkingHoursEntry($entry)
+    {
+        $this->_ci->ZeitaufzeichnungModel->insert($entry);
     }
 }
 
