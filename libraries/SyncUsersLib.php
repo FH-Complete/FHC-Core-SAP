@@ -304,6 +304,21 @@ class SyncUsersLib
 					return $manageCustomerResult;
 				}
 			}
+			else // Add the already present user to the sync table
+			{
+				$sapCustomer = getData($userDataSAP); // get SAP customer data
+
+				// Store in database the couple person_id sap_user_id
+				$insert = $this->_ci->SAPStudentsModel->insert(
+					array(
+						'person_id' => $userData->person_id,
+						'sap_user_id' => $sapCustomer->InternalID
+					)
+				);
+
+				// If database error occurred then return it
+				if (isError($insert)) return $insert;
+			}
 		}
 
 		return success($nonBlockingErrorsArray);
