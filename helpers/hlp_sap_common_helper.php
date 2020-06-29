@@ -48,6 +48,7 @@ function mergeUsersPersonIdArray($jobs)
 			}
 		}
 	}
+
 	return $mergedUsersArray;
 }
 
