@@ -538,7 +538,7 @@ class SyncProjectsLib
 
 			// Loads all the active cost centers
 			$costCentersResult = $dbModel->execReadOnlyQuery('
-				SELECT DISTINCT so.oe_kurzbz_sap
+				SELECT so.oe_kurzbz, so.oe_kurzbz_sap
 				  FROM public.tbl_mitarbeiter m
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
@@ -547,6 +547,7 @@ class SyncProjectsLib
 				   AND b.aktiv
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
 			// If error occurred while retrieving const centers from database the return the error
@@ -563,7 +564,7 @@ class SyncProjectsLib
 					// Create a task for this project
 					$createTaskResult = $this->_ci->ProjectsModel->createTask(
 						getData($createProjectResult)->ObjectID,
-						sprintf($taskFormatName, $costCenter->oe_kurzbz_sap),
+						sprintf($taskFormatName, $costCenter->oe_kurzbz),
 						$costCenter->oe_kurzbz_sap
 					);
 
@@ -594,7 +595,7 @@ class SyncProjectsLib
 						   AND b.aktiv
 						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-						   AND so.oe_kurzbz = ?
+						   AND so.oe_kurzbz_sap = ?
 					', array($studySemesterEndDate, $studySemesterStartDate, $costCenter->oe_kurzbz_sap));
 
 					// If error occurred while retrieving const center employee from database the return the error
