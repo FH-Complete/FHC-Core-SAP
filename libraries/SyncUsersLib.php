@@ -44,6 +44,10 @@ class SyncUsersLib
 	const CLASSIFICATION_ALUMNI = 'B';// Alumni
 	const CLASSIFICATION_BEWERBER = 'C';// Bewerber
 
+	// SAP user statuses
+	const USER_STATUS_PREPARATION = 1;
+	const USER_STATUS_ACTIVE = 2;
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -82,7 +86,6 @@ class SyncUsersLib
 				),
 				'ProcessingConditions' => array(
 					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
 				)
 			)
 		);
@@ -790,7 +793,9 @@ class SyncUsersLib
 			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{
 			// Returns the customer object a user is present in SAP with the given email, otherwise an empty success
-			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0)
+			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0
+				&& ($queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_PREPARATION
+				|| $queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_ACTIVE))
 			{
 				return success($queryCustomer->Customer);
 			}
@@ -824,8 +829,9 @@ class SyncUsersLib
 		if (isset($queryCustomer->ProcessingConditions)
 			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{
-			// Returns the customer object a user is present in SAP with the given email, otherwise an empty success
-			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0)
+			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0
+				&& ($queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_PREPARATION
+				|| $queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_ACTIVE))
 			{
 				return success($queryCustomer->Customer);
 			}
