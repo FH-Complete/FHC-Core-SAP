@@ -290,7 +290,7 @@ class SyncPaymentsLib
 
 						//$SalesUnitPartyID = 'BBE';
 						$ResponsiblePartyID = '23'; // TODO MIA
-						
+
 						$data = array(
 							'BasicMessageHeader' => array(
 								'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
@@ -310,7 +310,7 @@ class SyncPaymentsLib
 								'AccountParty' => array(
 									'PartyID' => $UserPartyID
 								),
-								'EmployeeResponsibleParty' = array(
+								'EmployeeResponsibleParty' => array(
 									'PartyID' => $ResponsiblePartyID
 								)
 							)
