@@ -290,7 +290,9 @@ class SyncPaymentsLib
 
 						//$SalesUnitPartyID = 'BBE';
 						$ResponsiblePartyID = '23'; // TODO MIA
-
+						$personalressource = '100200'; // TODO
+						// 100200 bei GST
+						// 200000 bei GMBH
 						$data = array(
 							'BasicMessageHeader' => array(
 								'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
@@ -335,7 +337,8 @@ class SyncPaymentsLib
 							'UnitOfMeasure' => 'EA'
 						),
 						'ItemServiceTerms' => array(
-							'ServicePlannedDuration' => 'P6M'
+							'ServicePlannedDuration' => 'P6M',
+							'ResourceID' => $personalressource
 						),
 						'PriceAndTaxCalculationItem' => array(
 							'ItemMainPrice'=> array(

@@ -6,8 +6,8 @@ $config['project_max_number_cost_centers'] = -1;
 // Project id formats (required)
 $config['project_id_formats'] = array(
 	'admin' => 'ADM-%s',		// admin project id format
-	'lehre' => 'LEH-%s',		// lehre project id format
-	'lehrgaenge' => 'LEG-%s-%s'	// lehrgaenge project id format
+	'lehre' => 'LEHRE-%s',		// lehre project id format
+	'lehrgaenge' => 'LG-%s-%s'	// lehrgaenge project id format
 );
 
 // Project name formats for each study semester (required)
@@ -29,9 +29,9 @@ $config['project_structures'] = array(
 
 // Project unit responsibles (required)
 $config['project_unit_responsibles'] = array(
-	'admin' => 'GF20',	// admin project unit responsible
-	'lehre' => 'GF20',	// lehre project unit responsible
-	'lehrgaenge' => 'GF20'	// lehrgaenge project unit responsible
+	'admin' => '100003',	// admin project unit responsible
+	'lehre' => '100003',	// lehre project unit responsible
+	'lehrgaenge' => '200000'	// lehrgaenge project unit responsible
 );
 
 // Project person responsibles (required)
@@ -47,4 +47,3 @@ $config['project_types'] = array(
 	'lehre' => 'Z3',	// lehre project type
 	'lehrgaenge' => 'Z2'	// lehrgaenge project type
 );
-
