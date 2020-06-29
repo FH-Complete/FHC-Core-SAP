@@ -15,7 +15,7 @@ class SyncProjectsLib
 	const PROJECT_ID_FORMATS = 'project_id_formats';
 	const PROJECT_NAME_FORMATS = 'project_name_formats';
 	const PROJECT_STRUCTURES = 'project_structures';
-	const PORJECT_UNIT_RESPONSIBLES = 'project_unit_responsibles';
+	const PROJECT_UNIT_RESPONSIBLES = 'project_unit_responsibles';
 	const PROJECT_PERSON_RESPONSIBLES = 'project_person_responsibles';
 	const PROJECT_TYPES = 'project_types';
 	const PROJECT_MAX_NUMBER_COST_CENTERS = 'project_max_number_cost_centers';
@@ -82,7 +82,7 @@ class SyncProjectsLib
 			// Project names format
 			$projectNameFormats = $this->_ci->config->item(self::PROJECT_NAME_FORMATS);
 			// Project unit responsibles
-			$projectUnitResponsibles = $this->_ci->config->item(self::PORJECT_UNIT_RESPONSIBLES);
+			$projectUnitResponsibles = $this->_ci->config->item(self::PROJECT_UNIT_RESPONSIBLES);
 			// Project person responsibles
 			$projectPersonResponsibles = $this->_ci->config->item(self::PROJECT_PERSON_RESPONSIBLES);
 			// Project types
@@ -165,7 +165,7 @@ class SyncProjectsLib
 	{
 		return $this->_ci->ProjectsModel->getProjects();
 	}
-	
+
 	/**
 	 * Return the raw result of projekt/ProjectCollection('$id')
 	 */
@@ -173,7 +173,7 @@ class SyncProjectsLib
 	{
 		return $this->_ci->ProjectsModel->getProjectById($id);
 	}
-	
+
 	/**
 	 * Return the raw result of projekt/ProjectCollection('$id')/ProjectTask
 	 */
@@ -184,7 +184,7 @@ class SyncProjectsLib
 
 	// --------------------------------------------------------------------------------------------
 	// Private methods
-	
+
 	/**
 	 *
 	 */
@@ -319,7 +319,7 @@ class SyncProjectsLib
 
 		return success('Project lehre synchronization ended succesfully');
 	}
-		
+
 	/**
 	 *
 	 */
@@ -343,7 +343,7 @@ class SyncProjectsLib
 		// Loads all the courses
 		$coursesResult = $dbModel->execReadOnlyQuery('
 			SELECT s.studiengang_kz,
-				UPPER(s.kurzbz || typ) AS name
+				UPPER(typ || s.kurzbz) AS name
 			  FROM public.tbl_studiengang s
 			 WHERE s.studiengang_kz < 0
 		      ORDER BY name
@@ -542,7 +542,7 @@ class SyncProjectsLib
 				  FROM public.tbl_mitarbeiter m
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz) 
+				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
 				   AND b.aktiv
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -589,7 +589,7 @@ class SyncProjectsLib
 						  FROM public.tbl_mitarbeiter m
 						  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz) 
+						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
 						   AND b.aktiv
 						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -668,4 +668,3 @@ class SyncProjectsLib
 		return success('Project admin synchronization ended succesfully');
 	}
 }
-
