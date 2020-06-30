@@ -47,12 +47,22 @@ class SyncMitarbeiterzeitenLib
 
     public function setWorkingHoursEntry($entry)
     {
-        $this->_ci->ZeitaufzeichnungModel->insert($entry);
+        return $this->_ci->ZeitaufzeichnungModel->insert($entry);
     }
 
     public function setAbsenceEntry($entry)
     {
-        $this->_ci->ZeitsperreModel->insert($entry);
+        return $this->_ci->ZeitsperreModel->insert($entry);
+    }
+
+    public function deleteWorkingHoursForToday()
+    {
+        return $this->_ci->ZeitaufzeichnungModel->deleteEntriesForCurrentDay();
+    }
+
+    public function deleteAbsencesForToday()
+    {
+        return $this->_ci->ZeitsperreModel->deleteEntriesForCurrentDay();
     }
 }
 

@@ -68,6 +68,11 @@ class ManageMitarbeiterzeiten extends JQW_Controller
             }
         }
 
+		// delete entries for today
+        $this->syncmitarbeiterzeitenlib->deleteWorkingHoursForToday();
+		$this->syncmitarbeiterzeitenlib->deleteAbsencesForToday();
+
+		// sync entries
 		foreach ($results['workinghours'] as $entry)
         {
             $this->syncmitarbeiterzeitenlib->setWorkingHoursEntry($entry);
