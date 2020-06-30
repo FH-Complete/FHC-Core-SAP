@@ -48,6 +48,9 @@ class SyncUsersLib
 	const USER_STATUS_PREPARATION = 1;
 	const USER_STATUS_ACTIVE = 2;
 
+	// SAP default address value
+	const DEFAULT_ADDRESS = 'XXDEFAULT';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -380,6 +383,7 @@ class SyncUsersLib
 			if (hasData($userDataSAP))
 			{
 				$sapCustomer = getData($userDataSAP); // get SAP customer data
+				$userData->addressInformationUUID = null; // default is null
 
 				// Get the AddressInformation UUID
 				if (isset($sapCustomer->AddressInformation)
@@ -388,10 +392,28 @@ class SyncUsersLib
 				{
 					$userData->addressInformationUUID = $sapCustomer->AddressInformation->UUID->_;
 				}
+				elseif (isset($sapCustomer->AddressInformation) && !isEmptyArray($sapCustomer->AddressInformation))
+				{
+					// For each address
+					foreach ($sapCustomer->AddressInformation as $addressInformation)
+					{
+						// Get the mail address for this user
+						if (isset($addressInformation->AddressUsage)
+							&& isset($addressInformation->UUID)
+							&& isset($addressInformation->UUID->_)
+							&& isset($addressInformation->AddressUsage->AddressUsageCode)
+							&& isset($addressInformation->AddressUsage->AddressUsageCode->_)
+							&& $addressInformation->AddressUsage->AddressUsageCode->_ == self::DEFAULT_ADDRESS)
+						{
+							$userData->addressInformationUUID = $addressInformation->UUID->_;
+						}
+					}
+				}
+
 				// Should never happen, just to be shure
 				// In case is not possible to retrieve the AddressInformation UUID the call would fail anyway
 				// better to skip to the next user
-				else
+				if ($userData->addressInformationUUID == null)
 				{
 					$nonBlockingErrorsArray[] = 'Was no possible to retrieve the AddressInformation UUID for user '.$userData->person_id;
 					continue;
