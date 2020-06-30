@@ -49,5 +49,10 @@ class SyncMitarbeiterzeitenLib
     {
         $this->_ci->ZeitaufzeichnungModel->insert($entry);
     }
+
+    public function setAbsenceEntry($entry)
+    {
+        $this->_ci->ZeitsperreModel->insert($entry);
+    }
 }
 
