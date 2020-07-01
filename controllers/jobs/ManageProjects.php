@@ -49,54 +49,28 @@ class ManageProjects extends JQW_Controller
 	}
 
 	/**
-	 * Wrapper method for _manageProjects
+	 * 
 	 */
-	public function create()
+	public function sync()
 	{
-		$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_CREATE, 'create');
-	}
-
-	/**
-	 * Wrapper method for _manageProjects
-	 */
-	public function update()
-	{
-		$this->_manageProjects(SyncProjectsLib::SAP_PROJECTS_UPDATE, 'update');
-	}
-
-	//------------------------------------------------------------------------------------------------------------------
-	// Private methods
-
-	/**
-	 * Performs data synchronization with SAP, depending on the first parameter can create or update projects
-	 */
-	private function _manageProjects($jobType, $operation)
-	{
-		$this->logInfo('Start projects synchronization with SAP ByD: '.$operation);
+		$this->logInfo('Start projects synchronization with SAP ByD');
 
 		// Gets the latest jobs
-		$lastJobs = $this->getLastJobs($jobType);
+		$lastJobs = $this->getLastJobs(SyncProjectsLib::SAP_PROJECTS_SYNC);
 		if (isError($lastJobs))
 		{
-			$this->logError('An error occurred while '.$operation.'ing projects in SAP', getError($lastJobs));
+			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncProjectsLib::SAP_PROJECTS_SYNC);
 		}
 		elseif (hasData($lastJobs))
 		{
-			// Create/update projects on SAP side
-			if ($jobType == SyncProjectsLib::SAP_PROJECTS_CREATE)
-			{
-				$syncResult = $this->syncprojectslib->create();
-			}
-			else
-			{
-				$syncResult = $this->syncprojectslib->update();
-			}
+			$syncResult = $this->syncprojectslib->sync();
 
+			// If an error occurred then log it
 			if (isError($syncResult))
 			{
-				$this->logError('An error occurred while '.$operation.'ing projects in SAP', getError($syncResult));
+				$this->logError(getCode($syncResult).': '.getError($syncResult));
 			}
-			else
+			else // otherwise
 			{
 				// If non blocking errors are present...
 				if (hasData($syncResult))
@@ -123,11 +97,11 @@ class ManageProjects extends JQW_Controller
 					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
 				);
 				
-				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
+				if (hasData($lastJobs)) $this->updateJobsQueue(SyncProjectsLib::SAP_PROJECTS_SYNC, getData($lastJobs));
 			}
 		}
 
-		$this->logInfo('End projects synchronization with SAP ByD: '.$operation);
+		$this->logInfo('End projects synchronization with SAP ByD');
 	}
 }
 

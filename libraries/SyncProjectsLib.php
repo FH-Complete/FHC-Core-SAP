@@ -8,8 +8,7 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 class SyncProjectsLib
 {
 	// Jobs types used by this lib
-	const SAP_PROJECTS_CREATE = 'SAPProjectsCreate';
-	const SAP_PROJECTS_UPDATE = 'SAPProjectsUpdate';
+	const SAP_PROJECTS_SYNC = 'SAPProjectsSync';
 
 	// Indexes used to access to the configuration array
 	const PROJECT_ID_FORMATS = 'project_id_formats';
@@ -61,7 +60,7 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function create()
+	public function sync()
 	{
 		// Get the last or current studysemester
 		$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getLastOrAktSemester();
@@ -101,7 +100,7 @@ class SyncProjectsLib
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
 			// Create admin project
-			$createResult = $this->_createAdminProject(
+			$createResult = $this->_syncAdminProject(
 				$lastOrCurrentStudySemester,
 				$projectStructures,
 				$projectIdFormats,
@@ -117,7 +116,7 @@ class SyncProjectsLib
 			if (isError($createResult)) return $createResult;
 
 			// Create lehre project
-			$createResult = $this->_createLehreProject(
+			$createResult = $this->_syncLehreProject(
 				$lastOrCurrentStudySemester,
 				$projectIdFormats,
 				$projectNameFormats,
@@ -130,7 +129,7 @@ class SyncProjectsLib
 			if (isError($createResult)) return $createResult;
 
 			// Create lehrgaenge projects
-			$createResult = $this->_createLehrgaengeProject(
+			$createResult = $this->_syncLehrgaengeProject(
 				$lastOrCurrentStudySemester,
 				$projectIdFormats,
 				$projectNameFormats,
@@ -149,13 +148,6 @@ class SyncProjectsLib
 		{
 			return success('No study semesters configured in data base');
 		}
-	}
-
-	/**
-	 * Updates projects fot the current study semester
-	 */
-	public function update()
-	{
 	}
 
 	/**
@@ -188,7 +180,7 @@ class SyncProjectsLib
 	/**
 	 *
 	 */
-	private function _createLehreProject(
+	private function _syncLehreProject(
 		$studySemester,
 		$projectIdFormats,
 		$projectNameFormats,
@@ -323,7 +315,7 @@ class SyncProjectsLib
 	/**
 	 *
 	 */
-	private function _createLehrgaengeProject(
+	private function _syncLehrgaengeProject(
 		$studySemester,
 		$projectIdFormats,
 		$projectNameFormats,
@@ -343,7 +335,7 @@ class SyncProjectsLib
 		// Loads all the courses
 		$coursesResult = $dbModel->execReadOnlyQuery('
 			SELECT s.studiengang_kz,
-				UPPER(typ || s.kurzbz) AS name
+				UPPER(s.typ || s.kurzbz) AS name
 			  FROM public.tbl_studiengang s
 			 WHERE s.studiengang_kz < 0
 		      ORDER BY name
@@ -477,7 +469,7 @@ class SyncProjectsLib
 	/**
 	 *
 	 */
-	private function _createAdminProject(
+	private function _syncAdminProject(
 		$studySemester,
 		$projectStructures,
 		$projectIdFormats,
@@ -666,6 +658,13 @@ class SyncProjectsLib
 			}
 		}
 
+		// Set the project as active
+		// $setActiveResult = $this->_ci->ProjectsModel->setActive(getData($createProjectResult)->ObjectID);
+
+		// If an error occurred while setting the project as active on ByD return the error
+		// if (isError($setActiveResult)) return $setActiveResult;
+
 		return success('Project admin synchronization ended succesfully');
 	}
 }
+

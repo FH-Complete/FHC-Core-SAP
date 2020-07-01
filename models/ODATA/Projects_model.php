@@ -201,5 +201,20 @@ class Projects_model extends ODATAClientModel
 			)
 		);
 	}
+
+	/**
+	 * 
+	 */
+	public function setActive($projectObjectId)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$projectObjectId.'\')',
+			ODATAClientLib::HTTP_MERGE_METHOD,
+			array(
+				'ProjectID' => $projectObjectId,
+				'ProjectLifeCycleStatusCode' => '3'
+			)
+		);
+	}
 }
 

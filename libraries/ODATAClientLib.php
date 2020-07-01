@@ -20,35 +20,21 @@ class ODATAClientLib
 	const COOKIE_HEADER_SEND_NAME = 'Cookie'; // cookie header name when posting
 	const ACCEPT_HEADER_NAME = 'Accept'; // accept header name
 	const ACCEPT_HEADER_VALUE = 'application/json'; // accept header value
+	const SAP_MESSAGE_HEADER_NAME = 'sap-message'; // SAP message header name
 
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'odata_active_connection';
 	const CONNECTIONS = 'odata_connections';
 
+	// HTTP codes
 	const HTTP_OK = 200; // HTTP success code
 	const HTTP_CREATED = 201; // HTTP success code created
 	const HTTP_NO_CONTENT = 204; // HTTP success code no content (aka successfully updated)
 
-	// HTTP error codes
-	const HTTP_UNAUTHORIZED = 401;
-	const HTTP_FORBIDDEN = 403;
-	const HTTP_NOT_FOUND = 404;
-	const HTTP_NOT_ALLOWED_METHOD = 405;
-	const HTTP_RESOURCE_NOT_AVAILABLE = 409;
-	const HTTP_WRONG_PARAMETERS = 422;
-	const HTTP_INTERNAL_SERVER_ERROR = 500;
-
 	// Blocking errors
-	const ERROR =				'ERR0001';
-	const CONNECTION_ERROR = 		'ERR0002';
-	const JSON_PARSE_ERROR = 		'ERR0003';
-	const UNAUTHORIZED = 			'ERR0004';
-	const MISSING_REQUIRED_PARAMETERS =	'ERR0005';
-	const WRONG_WS_PARAMETERS = 		'ERR0006';
-	const INVALID_WS = 			'ERR0007';
-	const WS_NOT_READY =			'ERR0008';
-	const HTTP_WRONG_METHOD =		'ERR0009';
-	const RS_ERROR =			'ERR0010';
+	const ERROR =			'ERR0001';
+	const CONNECTION_ERROR =	'ERR0002';
+	const JSON_PARSE_ERROR =	'ERR0003';
 
 	// Connection parameters names
 	const PROTOCOL = 'protocol';
@@ -334,7 +320,7 @@ class ODATAClientLib
 		// remote web service is not json so a parse error is raised
 		catch (Exception $e)
 		{
-			$this->_error(self::JSON_PARSE_ERROR, 'The remote server answerd with a not valid json');
+			$this->_error(self::JSON_PARSE_ERROR, 'The remote server answered with a not valid json');
 		}
 
 		if ($this->isError()) return null; // If an error was raised then return a null value
@@ -508,63 +494,58 @@ class ODATAClientLib
 			}
 			else // otherwise checks what error occurred
 			{
-				$errorCode = self::RS_ERROR; // generic error code by default
-				$errorMessage = 'A fatal error occurred on the remote server, contact the maintainer'; // default error message
+				$errorCode = self::ERROR; // generic error code by default
+				$errorMessage = 'A fatal error occurred on the remote server'; // default error message
 
-				// Checks if the remote system answered with an error message
-				if (isset($response->body) && isset($response->body->error) && isset($response->body->error->message)
+				// Checks if the header is present and the needed data are present
+				if (isset($response->headers) && is_object($response->headers) && method_exists($response->headers, 'toArray'))
+				{
+					$headerArray = $response->headers->toArray();
+
+					// Try to retrieve the SAP message
+					if (isset($headerArray[self::SAP_MESSAGE_HEADER_NAME]))
+					{
+						$sapMessage = json_decode($headerArray[self::SAP_MESSAGE_HEADER_NAME]);
+
+						// If json decoding was successfull and the SAP message is well structured
+						if ($sapMessage != null
+							&& isset($sapMessage->details)
+							&& !isEmptyArray($sapMessage->details))
+						{
+							// If the code is present
+							if (isset($sapMessage->details[0]->code))
+							{
+								$errorCode = $sapMessage->details[0]->code;
+							}
+
+							// If the error message is present
+							if (isset($sapMessage->details[0]->message))
+							{
+								$errorMessage = $sapMessage->details[0]->message;
+							}
+						}
+					}
+				}
+				
+				// If was no possible to retrieve info from the header, try to get info from the body
+				if ($errorCode == self::ERROR
+					&& isset($response->body) && isset($response->body->error) && isset($response->body->error->message)
 					&& isset($response->body->error->message->value))
 				{
 					$errorMessage = $response->body->error->message->value;
 				}
-
-				// Unauthorized call (wrong username, password...)
-				if ($response->code == self::HTTP_UNAUTHORIZED || $response->code == self::HTTP_FORBIDDEN)
-				{
-					$errorCode = self::UNAUTHORIZED;
-					$errorMessage = 'The authentication credentials provided are not valid';
-				}
-				// At the called URL does not answer any webservice
-				elseif ($response->code == self::HTTP_NOT_FOUND)
-				{
-					$errorCode = self::INVALID_WS;
-					$errorMessage = 'Does not exist a webservice that answer to this URL, malformed URL or data not found';
-				}
-				// Not supported HTTP method
-				elseif ($response->code == self::HTTP_NOT_ALLOWED_METHOD)
-				{
-					$errorCode = self::HTTP_WRONG_METHOD;
-					$errorMessage = 'The used HTTP method is not supported by this webservice';
-				}
-				// This resource is not currently available
-				elseif ($response->code == self::HTTP_RESOURCE_NOT_AVAILABLE)
-				{
-					$errorCode = self::WS_NOT_READY;
-					$errorMessage = 'The called resource is not currently available';
-				}
-				// Name, value type, quantity of one or more parameters are not valid
-				elseif ($response->code == self::HTTP_WRONG_PARAMETERS)
-				{
-					$errorCode = self::WRONG_WS_PARAMETERS;
-					$errorMessage = 'The parameters needed by this webservice are not provided or their value is not valid';
-				}
-				// Internal server error
-				elseif ($response->code == self::HTTP_INTERNAL_SERVER_ERROR)
-				{
-					// defaults previously set
-				}
-				else // Every other not contemplated possible error
+				
+				// Every other not contemplated possible error
+				if ($errorCode == self::ERROR)
 				{
 					// If some info is present
 					if (isset($response->raw_body))
 					{
-						$errorCode = self::ERROR;
-						$errorMessage = 'Generic error occurred: '.$response->raw_body;
+						$errorMessage .= $response->raw_body;
 					}
 					else // Otherwise return the entire JSON encoded response
 					{
-						$errorCode = self::ERROR;
-						$errorMessage = 'Generic error occurred: '.json_encode($response);
+						$errorMessage .= json_encode($response);
 					}
 				}
 
@@ -587,7 +568,7 @@ class ODATAClientLib
 	{
 		$this->_error = true;
 		$this->_errorCode = $code;
-		$this->_errorMessage = $code.': '.$message;
+		$this->_errorMessage = $message;
 	}
 
 	/**
