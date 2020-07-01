@@ -239,7 +239,7 @@ class SyncUsersLib
 								'AccountDeterminationDebtorGroupCode' => '4010'
 							),
 							1 => array(
-								'CompanyID' => 'GST',
+								'CompanyID' => '200000',
 								'AccountDeterminationDebtorGroupCode' => '4010'
 							),
 						)

@@ -277,22 +277,44 @@ class SyncPaymentsLib
 						$last_stg = $row_payment->studiengang_kz;
 						$buchungsnr_arr = array();
 
-						// TODO: Sales Unit for Lehrgaenge? Project ?
 
-						$SalesUnitPartyID_result = $this->_getSalesUnitPartyID($row_payment->studiengang_kz);
-						if (!isError($SalesUnitPartyID_result) && hasData($SalesUnitPartyID_result))
-							$SalesUnitPartyID = getData($SalesUnitPartyID_result)[0]->oe_kurzbz_sap;
+						$task_id = '';
+						if ($row_payment->studiengang_kz < 0 || $row_payment->studiengang_kz > 10000)
+						{
+							// GMBH or Special Courses
+
+							// Get ProjectID if it is a Lehrgang or Special Course
+							$TaskResult = $this->_getTaskId($row_payment->studiengang_kz, $row_payment->studiensemester_kurzbz);
+							if (!isError($TaskResult) && hasData($TaskResult))
+								$task_id = getData($TaskResult)[0]->project_id;
+							else
+							{
+								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.$row_payment->studiengang_kz.' and studysemester '.$row_payment->studiensemester_kurzbz;
+								continue;
+							}
+
+							$ResponsiblePartyID = '23'; // TODO MA
+							$personalressource = '200000'; // TODO
+							$SalesUnitPartyID = '200000'; // TODO
+						}
 						else
 						{
-							$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$row_payment->studiengang_kz;
-							continue;
-						}
+							// FH
+							$SalesUnitPartyID_result = $this->_getSalesUnitPartyID($row_payment->studiengang_kz);
+							if (!isError($SalesUnitPartyID_result) && hasData($SalesUnitPartyID_result))
+								$SalesUnitPartyID = getData($SalesUnitPartyID_result)[0]->oe_kurzbz_sap;
+							else
+							{
+								$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$row_payment->studiengang_kz;
+								continue;
+							}
 
-						//$SalesUnitPartyID = 'BBE';
-						$ResponsiblePartyID = '23'; // TODO MIA
-						$personalressource = '100200'; // TODO
-						// 100200 bei GST
-						// 200000 bei GMBH
+							//$SalesUnitPartyID = 'BBE';
+							$ResponsiblePartyID = '23'; // TODO MIA
+							$personalressource = '100200'; // TODO
+							// 100200 bei GST
+							// 200000 bei GMBH
+						}
 						$data = array(
 							'BasicMessageHeader' => array(
 								'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
@@ -350,6 +372,19 @@ class SyncPaymentsLib
 							)
 						)
 					);
+
+					// If it is Payment for a Lehrgang or Special Degree Programm
+					// add the reference to a project
+					if ($task_id != '')
+					{
+						$position['ItemAccountingCodingBlockDistribution'] = array(
+							'AccountingCodingBlockAssignment' => array(
+								'ProjectTaskKey' => array(
+									'TaskID' => $task_id
+								)
+							)
+						);
+					}
 
 					$data['SalesOrder']['Item'][] = $position;
 				}
@@ -550,6 +585,25 @@ echo print_r($manageSalesOrderResult,true);
 			WHERE
 				person_id = ?
 		', array($person_id));
+
+		return $dbUserData;
+	}
+
+	/**
+	 * Load the Project of a Course
+	 */
+	private function _getTaskId($studiengang_kz, $studiensemester_kurzbz)
+	{
+		$dbModel = new DB_Model();
+		$dbUserData = $dbModel->execReadOnlyQuery('
+			SELECT
+				project_id
+			FROM
+				sync.tbl_sap_projects_courses
+			WHERE
+				studiengang_kz = ?
+				AND studiensemester_kurzbz = ?
+		', array($studiengang_kz, $studiensemester_kurzbz));
 
 		return $dbUserData;
 	}
