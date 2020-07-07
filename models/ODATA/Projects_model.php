@@ -184,6 +184,20 @@ class Projects_model extends ODATAClientModel
 		);
 	}
 
+	/**
+	 * 
+	 */
+	public function setActive($projectObjectId)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectStartAndRelease?ObjectID=\''.$projectObjectId.'\'',
+			ODATAClientLib::HTTP_POST_METHOD,
+			array(
+				'ObjectID' => $projectObjectId
+			)
+		);
+	}
+
 	// --------------------------------------------------------------------------------------------
 	// Public methods MERGE API calls
 
@@ -198,21 +212,6 @@ class Projects_model extends ODATAClientModel
 			array(
 				'ObjectID' => $projectObjectId,
 				'Name' => $name
-			)
-		);
-	}
-
-	/**
-	 * 
-	 */
-	public function setActive($projectObjectId)
-	{
-		return $this->_call(
-			self::URI_PREFIX.'ProjectTaskCollection(\''.$projectObjectId.'\')',
-			ODATAClientLib::HTTP_MERGE_METHOD,
-			array(
-				'ProjectID' => $projectObjectId,
-				'ProjectLifeCycleStatusCode' => '3'
 			)
 		);
 	}

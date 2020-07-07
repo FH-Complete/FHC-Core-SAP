@@ -43,7 +43,7 @@ $config['project_person_responsibles'] = array(
 
 // Project types (required)
 $config['project_types'] = array(
-	'admin' => '20',	// admin project type
+	'admin' => 'Z7',	// admin project type
 	'lehre' => 'Z3',	// lehre project type
 	'lehrgaenge' => 'Z2'	// lehrgaenge project type
 );

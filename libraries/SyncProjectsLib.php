@@ -24,6 +24,12 @@ class SyncProjectsLib
 	const LEHRE_PROJECT = 'lehre';
 	const LEHRGAENGE_PROJECT = 'lehrgaenge';
 
+	// SAP ByD logic errors
+	const PROJECT_EXISTS_ERROR = 'PRO_CMN_SHRD:003';
+	const PARTECIPANT_PROJ_EXISTS_ERROR = 'PRO_CMN_PROJ:010';
+	const PARTECIPANT_TASK_EXISTS_ERROR = 'PRO_CMN_ESRV:010';
+	const RELEASE_PROJECT_ERROR = 'CM_DS_APPL_ERROR:000';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -60,10 +66,25 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function sync()
+	public function sync($studySemester = null)
 	{
-		// Get the last or current studysemester
-		$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getLastOrAktSemester();
+		$lastOrCurrentStudySemesterResult = null;
+
+		// If a study semester was given as parameter
+		if (!isEmptyString($studySemester))
+		{
+			// Get info about the provided study semester
+			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->loadWhere(
+				array(
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+		}
+		else // otherwise get the last or current one
+		{
+			// Get the last or current studysemester
+			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getLastOrAktSemester();
+		}
 
 		// If an error occurred while getting the study semester return it
 		if (isError($lastOrCurrentStudySemesterResult)) return $lastOrCurrentStudySemesterResult;
@@ -142,11 +163,11 @@ class SyncProjectsLib
 			if (isError($createResult)) return $createResult;
 
 			// If here everything went fine
-			return success('Was really hard, but we did it!');
+			return success('All projects were successfully synchronized');
 		}
 		else
 		{
-			return success('No study semesters configured in data base');
+			return success('No study semesters configured in database');
 		}
 	}
 
@@ -191,7 +212,7 @@ class SyncProjectsLib
 		$studySemesterEndDateTS
 	)
 	{
-		$projectId = sprintf($projectIdFormats[self::LEHRE_PROJECT], $studySemester); // project id
+		$projectId = strtoupper(sprintf($projectIdFormats[self::LEHRE_PROJECT], $studySemester)); // project id
 		$type = $projectTypes[self::LEHRE_PROJECT]; // Project type
 		$unitResponsible = $projectUnitResponsibles[self::LEHRE_PROJECT]; // project unit responsible
 		$personResponsible = $projectPersonResponsibles[self::LEHRE_PROJECT]; // project person responsible
@@ -206,30 +227,68 @@ class SyncProjectsLib
 			$studySemesterEndDateTS
 		);
 
-		// If an error occurred while creating the project on ByD return the error
-		if (isError($createProjectResult)) return $createProjectResult;
+		// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
 
-		// Add entry database into sync table for projects
-		$insertResult = $this->_ci->SAPProjectsModel->insert(
-			array(
-				'project_id' => $projectId,
-				'project_object_id' => getData($createProjectResult)->ObjectID,
-				'studiensemester_kurzbz' => $studySemester
-			)
-		);
+		$projectObjectId = null;
 
-		// If error occurred during insert return database error
-		if (isError($insertResult)) return $insertResult;
+		// If the projects is not alredy present it is _not_ needed to sync the database
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Add entry database into sync table for projects
+			$insertResult = $this->_ci->SAPProjectsModel->insert(
+				array(
+					'project_id' => $projectId,
+					'project_object_id' => getData($createProjectResult)->ObjectID,
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+
+			// If error occurred during insert return database error
+			if (isError($insertResult)) return $insertResult;
+
+			$projectObjectId = getData($createProjectResult)->ObjectID;
+		}
+		else // otherwise get the project info from sync table
+		{
+			$projectResult = $this->_ci->SAPProjectsModel->loadWhere(
+				array(
+					'project_id' => $projectId,
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+
+			// If an error occurred while getting project info from database return the error itself
+			if (isError($projectResult)) return $projectResult;
+			// If no data found with these parameters
+			if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects');
+
+			$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+		}
+
+		// If was not possible to find a valid project object id
+		if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid lehre project object id');
 
 		// Update project ProjectTaskCollection name
 		$projectName = sprintf($projectNameFormats[self::LEHRE_PROJECT], $studySemester);
 		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
-			getData($createProjectResult)->ObjectID,
+			$projectObjectId,
 			$projectName
 		);
 
 		// If an error occurred while creating the project on ByD return the error
 		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+		// Set the project as active
+		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+		// If an error occurred while setting the project as active on ByD
+		// and not because the project was alredy released then return the error
+		if (isError($setActiveResult)
+			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		{
+			return $setActiveResult;
+		}
 
 		$dbModel = new DB_Model();
 
@@ -246,8 +305,10 @@ class SyncProjectsLib
 			  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
 			  JOIN public.tbl_studiengang s USING(studiengang_kz)
 			  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+			  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
 			 WHERE l.studiensemester_kurzbz = ?
 			   AND s.typ IN (\'b\', \'m\')
+			   AND m.fixangestellt = TRUE
 		      GROUP BY lm.mitarbeiter_uid, b.person_id
 		', array($studySemester));
 
@@ -263,6 +324,7 @@ class SyncProjectsLib
 				// Get the service id for this employee
 				$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $lehreEmployee->person_id));
 
+				// If error occurred return it
 				if (isError($serviceResult)) return $serviceResult;
 
 				// If the service is present for this employee
@@ -275,15 +337,15 @@ class SyncProjectsLib
 						)
 					);
 
-					// If an error occurred and this error is _not_ data not found then return the error
-					if (isError($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS) return $sapEmployeeResult;
+					// If an error occurred and this error then return the error
+					if (isError($sapEmployeeResult)) return $sapEmployeeResult;
 
 					// If an employee was found in SAP
-					if (hasData($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS)
+					if (hasData($sapEmployeeResult))
 					{
-						// Add employee to project
+						// Add employee to project team and staffing
 						$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-							getData($createProjectResult)->ObjectID,
+							$projectObjectId,
 							getData($sapEmployeeResult)[0]->C_EeId,
 							$studySemesterStartDateTS,
 							$studySemesterEndDateTS,
@@ -291,11 +353,15 @@ class SyncProjectsLib
 						);
 
 						// If an error occurred and it is not because of an already existing employee in this project
-						if (isError($addEmployeeResult) && getCode($addEmployeeResult) != ODATAClientLib::RS_ERROR) return $addEmployeeResult;
+						if (isError($addEmployeeResult)
+							&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
+						{
+							return $addEmployeeResult;
+						}
 
-						// Add employee to project task
+						// Add employee to project work
 						$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-							getData($createProjectResult)->ObjectID,
+							$projectObjectId,
 							getData($sapEmployeeResult)[0]->C_EeId,
 							getData($serviceResult)[0]->sap_service_id,
 							'37',
@@ -303,7 +369,12 @@ class SyncProjectsLib
 							$lehreEmployee->ma_soll_stunden
 						);
 
-						if (isError($addEmployeeToTaskResult)) return $addEmployeeToTaskResult;
+						// If an error occurred and it is not because of an already existing employee in this project
+						if (isError($addEmployeeToTaskResult)
+							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+						{
+							return $addEmployeeToTaskResult;
+						}
 					}
 				}
 			}
@@ -348,7 +419,7 @@ class SyncProjectsLib
 		// For each course found in database
 		foreach (getData($coursesResult) as $course)
 		{
-			$projectId = sprintf($projectIdFormats[self::LEHRGAENGE_PROJECT], $course->name, $studySemester); // project id
+			$projectId = strtoupper(sprintf($projectIdFormats[self::LEHRGAENGE_PROJECT], $course->name, $studySemester)); // project id
 
 			// Create the project on ByD
 			$createProjectResult = $this->_ci->ProjectsModel->create(
@@ -360,31 +431,70 @@ class SyncProjectsLib
 				$studySemesterEndDateTS
 			);
 
-			// If an error occurred while creating the project on ByD return the error
-			if (isError($createProjectResult)) return $createProjectResult;
+			// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+			if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
 
-			// Add entry database into sync table for projects
-			$insertResult = $this->_ci->SAPProjectsCoursesModel->insert(
-				array(
-					'project_id' => $projectId,
-					'project_object_id' => getData($createProjectResult)->ObjectID,
-					'studiensemester_kurzbz' => $studySemester,
-					'studiengang_kz' => $course->studiengang_kz
-				)
-			);
+			$projectObjectId = null;
 
-			// If error occurred during insert return database error
-			if (isError($insertResult)) return $insertResult;
+			// If the projects is not alredy present it is _not_ needed to sync the database
+			if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+			{
+				// Add entry database into sync table for projects
+				$insertResult = $this->_ci->SAPProjectsCoursesModel->insert(
+					array(
+						'project_id' => $projectId,
+						'project_object_id' => getData($createProjectResult)->ObjectID,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $course->studiengang_kz
+					)
+				);
+
+				// If error occurred during insert return database error
+				if (isError($insertResult)) return $insertResult;
+
+				$projectObjectId = getData($createProjectResult)->ObjectID;
+			}
+			else
+			{
+				$projectResult = $this->_ci->SAPProjectsCoursesModel->loadWhere(
+					array(
+						'project_id' => $projectId,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $course->studiengang_kz
+					)
+				);
+
+				// If an error occurred while getting project info from database return the error itself
+				if (isError($projectResult)) return $projectResult;
+				// If no data found with these parameters
+				if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects_courses');
+
+				$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+			}
+
+			// If was not possible to find a valid project object id
+			if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid lehrgaenge project object id');
 
 			// Update project ProjectTaskCollection name
 			$projectName = sprintf($projectNameFormats[self::LEHRGAENGE_PROJECT], $course->name, $studySemester);
 			$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
-				getData($createProjectResult)->ObjectID,
+				$projectObjectId,
 				$projectName
 			);
 
 			// If an error occurred while creating the project on ByD return the error
 			if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+			// Set the project as active
+			$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+			// If an error occurred while setting the project as active on ByD
+			// and not because the project was alredy released then return the error
+			if (isError($setActiveResult)
+				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			{
+				return $setActiveResult;
+			}
 
 			// Loads employees for this course
 			$courseEmployeesResult = $dbModel->execReadOnlyQuery('
@@ -399,8 +509,10 @@ class SyncProjectsLib
 				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
 				  JOIN public.tbl_studiengang s USING(studiengang_kz)
 				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
 				 WHERE l.studiensemester_kurzbz = ?
 				   AND s.studiengang_kz = ?
+			   	   AND m.fixangestellt = TRUE
 			      GROUP BY lm.mitarbeiter_uid, b.person_id
 			      ORDER BY lm.mitarbeiter_uid
 			', array($studySemester, $course->studiengang_kz));
@@ -429,15 +541,15 @@ class SyncProjectsLib
 							)
 						);
 
-						// If an error occurred and this error is _not_ data not found then return the error
-						if (isError($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS) return $sapEmployeeResult;
+						// If an error occurred return it
+						if (isError($sapEmployeeResult)) return $sapEmployeeResult;
 
 						// If an employee was found in SAP
-						if (hasData($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS)
+						if (hasData($sapEmployeeResult))
 						{
 							// Add employee to project team
 							$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-								getData($createProjectResult)->ObjectID,
+								$projectObjectId,
 								getData($sapEmployeeResult)[0]->C_EeId,
 								$studySemesterStartDateTS,
 								$studySemesterEndDateTS,
@@ -445,17 +557,26 @@ class SyncProjectsLib
 							);
 
 							// If an error occurred and it is not because of an already existing employee in this project
-							if (isError($addEmployeeResult) && getCode($addEmployeeResult) != ODATAClientLib::RS_ERROR) return $addEmployeeResult;
+							if (isError($addEmployeeResult)
+								&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
+							{
+								return $addEmployeeResult;
+							}
 
 							// Add employee to project work
 							$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-								getData($createProjectResult)->ObjectID,
+								$projectObjectId,
 								getData($sapEmployeeResult)[0]->C_EeId,
 								getData($serviceResult)[0]->sap_service_id,
 								'37'
 							);
 
-							if (isError($addEmployeeToTaskResult)) return $addEmployeeToTaskResult;
+							// If an error occurred and it is not because of an already existing employee in this project
+							if (isError($addEmployeeToTaskResult)
+								&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+							{
+								return $addEmployeeToTaskResult;
+							}
 						}
 					}
 				}
@@ -464,7 +585,6 @@ class SyncProjectsLib
 
 		return success('Project lehrgaenge synchronization ended succesfully');
 	}
-
 
 	/**
 	 *
@@ -483,7 +603,7 @@ class SyncProjectsLib
 		$studySemesterEndDateTS
 	)
 	{
-		$projectId = sprintf($projectIdFormats[self::ADMIN_PROJECT], $studySemester); // project id
+		$projectId = strtoupper(sprintf($projectIdFormats[self::ADMIN_PROJECT], $studySemester)); // project id
 		$type = $projectTypes[self::ADMIN_PROJECT]; // Project type
 		$unitResponsible = $projectUnitResponsibles[self::ADMIN_PROJECT]; // project unit responsible
 		$personResponsible = $projectPersonResponsibles[self::ADMIN_PROJECT]; // project person responsible
@@ -498,30 +618,63 @@ class SyncProjectsLib
 			$studySemesterEndDateTS
 		);
 
-		// If an error occurred while creating the project on ByD return the error
-		if (isError($createProjectResult)) return $createProjectResult;
+		// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
 
-		// Add entry database into sync table for projects
-		$insertResult = $this->_ci->SAPProjectsModel->insert(
-			array(
-				'project_id' => $projectId,
-				'project_object_id' => getData($createProjectResult)->ObjectID,
-				'studiensemester_kurzbz' => $studySemester
-			)
-		);
+		$projectObjectId = null;
 
-		// If error occurred during insert return database error
-		if (isError($insertResult)) return $insertResult;
+		// If the projects is not alredy present it is _not_ needed to sync the database
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Add entry database into sync table for projects
+			$insertResult = $this->_ci->SAPProjectsModel->insert(
+				array(
+					'project_id' => $projectId,
+					'project_object_id' => getData($createProjectResult)->ObjectID,
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+
+			// If error occurred during insert return database error
+			if (isError($insertResult)) return $insertResult;
+
+			$projectObjectId = getData($createProjectResult)->ObjectID; // store the project object id
+		}
+		else // otherwise retrieves the project object id from database
+		{
+			$projectResult = $this->_ci->SAPProjectsModel->loadWhere(array('project_id' => $projectId, 'studiensemester_kurzbz' => $studySemester));
+
+			// If an error occurred while getting project info from database return the error itself
+			if (isError($projectResult)) return $projectResult;
+			// If no data found with these parameters
+			if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects');
+
+			$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+		}
+
+		// If was not possible to get a valid project object id
+		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
 
 		// Update project ProjectTaskCollection name
 		$projectName = sprintf($projectNameFormats[self::ADMIN_PROJECT], $studySemester);
 		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
-			getData($createProjectResult)->ObjectID,
+			$projectObjectId,
 			$projectName
 		);
 
 		// If an error occurred while creating the project on ByD return the error
 		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+		// Set the project as active
+		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+		// If an error occurred while setting the project as active on ByD
+		// and not because the project was alredy released then return the error
+		if (isError($setActiveResult)
+			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		{
+			return $setActiveResult;
+		}
 
 		// If structure is present
 		if (isset($projectStructures[self::ADMIN_PROJECT]))
@@ -530,7 +683,8 @@ class SyncProjectsLib
 
 			// Loads all the active cost centers
 			$costCentersResult = $dbModel->execReadOnlyQuery('
-				SELECT so.oe_kurzbz, so.oe_kurzbz_sap
+				SELECT so.oe_kurzbz,
+					so.oe_kurzbz_sap
 				  FROM public.tbl_mitarbeiter m
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
@@ -545,35 +699,67 @@ class SyncProjectsLib
 			// If error occurred while retrieving const centers from database the return the error
 			if (isError($costCentersResult)) return $costCentersResult;
 
-			$countCostCenters = 1;
-
 			// For each cost center
 			foreach (getData($costCentersResult) as $costCenter)
 			{
+				$countStructures = 0;
+
 				// For each project task in the structure
 				foreach ($projectStructures[self::ADMIN_PROJECT] as $taskFormatName)
 				{
-					// Create a task for this project
-					$createTaskResult = $this->_ci->ProjectsModel->createTask(
-						getData($createProjectResult)->ObjectID,
-						sprintf($taskFormatName, $costCenter->oe_kurzbz),
-						$costCenter->oe_kurzbz_sap
-					);
+					$countStructures++; // count the number of structures for each task type
 
-					// If an error occurred while creating the project task on ByD return the error
-					if (isError($createTaskResult)) return $createTaskResult;
-
-					// Add entry database into sync table for projects
-					$insertResult = $this->_ci->SAPProjectsCostcentersModel->insert(
+					// Check if this cost center is already present in SAP looking in the sync table
+					$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
 						array(
-							'project_id' => $projectId,
-							'project_object_id' => getData($createProjectResult)->ObjectID,
-							'project_task_id' => getData($createTaskResult)->ID,
-							'project_task_object_id' => getData($createTaskResult)->ObjectID,
+							'project_task_id' => $projectId.'-'.$countStructures,
 							'studiensemester_kurzbz' => $studySemester,
 							'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
 						)
 					);
+
+					// If error occurred then return it
+					if (isError($syncCostCenterResult)) return $syncCostCenterResult;
+
+					$taskObjectId = null;
+
+					// If is _not_ present then create it
+					if (!hasData($syncCostCenterResult))
+					{
+						// Create a task for this project
+						$createTaskResult = $this->_ci->ProjectsModel->createTask(
+							$projectObjectId,
+							sprintf($taskFormatName, $costCenter->oe_kurzbz),
+							$costCenter->oe_kurzbz_sap
+						);
+
+						// If an error occurred while creating the project task on ByD return the error
+						if (isError($createTaskResult)) return $createTaskResult;
+
+						// Add entry database into sync table for projects
+						$insertResult = $this->_ci->SAPProjectsCostcentersModel->insert(
+							array(
+								'project_id' => $projectId,
+								'project_object_id' => $projectObjectId,
+								'project_task_id' => getData($createTaskResult)->ID,
+								'project_task_object_id' => getData($createTaskResult)->ObjectID,
+								'studiensemester_kurzbz' => $studySemester,
+								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+							)
+						);
+
+						// If error occurred while saving into database then return the error
+						if (isError($insertResult)) return $insertResult;
+
+						$taskObjectId = getData($createTaskResult)->ObjectID;
+					}
+					else // otherwise get the task object id from database
+					{
+						$taskObjectId = getData($syncCostCenterResult)[0]->project_task_object_id;
+					}
+
+					// If was _not_ possible to get a valid task object id
+					if (isEmptyString($taskObjectId)) return error('Was _not_ possible to retrieve a valid task object id');
 
 					// Loads employees for this cost center
 					$costCenterEmployeesResult = $dbModel->execReadOnlyQuery('
@@ -585,6 +771,7 @@ class SyncProjectsLib
 						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
 						   AND b.aktiv
+			   			   AND m.fixangestellt = TRUE
 						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
 						   AND so.oe_kurzbz_sap = ?
@@ -615,14 +802,14 @@ class SyncProjectsLib
 								);
 
 								// If an error occurred and this error is _not_ data not found then return the error
-								if (isError($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS) return $sapEmployeeResult;
+								if (isError($sapEmployeeResult)) return $sapEmployeeResult;
 
 								// If an employee was found in SAP
-								if (hasData($sapEmployeeResult) && getCode($sapEmployeeResult) != ODATAClientLib::INVALID_WS)
+								if (hasData($sapEmployeeResult))
 								{
 									// Add employee to project
 									$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-										getData($createProjectResult)->ObjectID,
+										$projectObjectId,
 										getData($sapEmployeeResult)[0]->C_EeId,
 										$studySemesterStartDateTS,
 										$studySemesterEndDateTS,
@@ -630,39 +817,33 @@ class SyncProjectsLib
 									);
 
 									// If an error occurred and it is not because of an already existing employee in this project
-									if (isError($addEmployeeResult) && getCode($addEmployeeResult) != ODATAClientLib::RS_ERROR) return $addEmployeeResult;
+									if (isError($addEmployeeResult)
+										&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
+									{
+										return $addEmployeeResult;
+									}
 
 									// Add employee to project task
 									$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-										getData($createTaskResult)->ObjectID,
+										$taskObjectId,
 										getData($sapEmployeeResult)[0]->C_EeId,
 										getData($serviceResult)[0]->sap_service_id,
 										'37'
 									);
 
-									if (isError($addEmployeeToTaskResult)) return $addEmployeeToTaskResult;
+									// If an error occurred and it is not because of an already existing employee in this project
+									if (isError($addEmployeeToTaskResult)
+										&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+									{
+										return $addEmployeeToTaskResult;
+									}
 								}
 							}
 						}
 					}
 				}
-
-				// If the number of the created cost centers is the same of the config entry PROJECT_MAX_NUMBER_COST_CENTERS
-				// break this loop. Useful for debugging
-				if ($countCostCenters == $this->_ci->config->item(self::PROJECT_MAX_NUMBER_COST_CENTERS))
-				{
-					break;
-				}
-
-				$countCostCenters++; // count the number of cost centers added to this project
 			}
 		}
-
-		// Set the project as active
-		// $setActiveResult = $this->_ci->ProjectsModel->setActive(getData($createProjectResult)->ObjectID);
-
-		// If an error occurred while setting the project as active on ByD return the error
-		// if (isError($setActiveResult)) return $setActiveResult;
 
 		return success('Project admin synchronization ended succesfully');
 	}

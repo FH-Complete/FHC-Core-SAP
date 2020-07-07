@@ -74,7 +74,7 @@ class ManageServices extends JQW_Controller
 		$lastJobs = $this->getLastJobs($jobType);
 		if (isError($lastJobs))
 		{
-			$this->logError('An error occurred while '.$operation.'ing services in SAP', getError($lastJobs));
+			$this->logError(getCode($lastJobs).': '.getError($lastJobs), $jobType);
 		}
 		else
 		{
@@ -90,7 +90,7 @@ class ManageServices extends JQW_Controller
 
 			if (isError($syncResult))
 			{
-				$this->logError('An error occurred while '.$operation.'ing services in SAP', getError($syncResult));
+				$this->logError(getCode($syncResult).': '.getError($syncResult));
 			}
 			else
 			{
