@@ -33,10 +33,6 @@ class SyncServicesLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageServiceProductIn_model', 'ManageServiceProductInModel');
 		// Loads ManageServiceProductValuationDataInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageServiceProductValuationDataIn_model', 'ManageServiceProductValuationDataInModel');
-		// Loads ManageSalesPriceListInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
-		// Loads ManageProcurementPriceSpecificationInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
 
 		// Loads SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');
@@ -63,12 +59,10 @@ class SyncServicesLib
 						'InclusionExclusionCode' => 'I',
 						'IntervalBoundaryTypeCode' => 1,
 						'LowerBoundaryDescription' => $description
-						//'UpperBoundaryDescription' => null
 					)
 				),
 				'ProcessingConditions' => array(
 					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
 				)
 			)
 		);
@@ -87,12 +81,10 @@ class SyncServicesLib
 						'InclusionExclusionCode' => 'I',
 						'IntervalBoundaryTypeCode' => 1,
 						'LowerBoundaryInternalID' => $id
-						//'UpperBoundaryDescription' => null
 					)
 				),
 				'ProcessingConditions' => array(
 					'QueryHitsUnlimitedIndicator' => true
-					//'QueryHitsMaximumNumberValue' => 10
 				)
 			)
 		);
@@ -167,18 +159,31 @@ class SyncServicesLib
 
 					// Activate valuation for GMBH
 					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '200000', $stundensatz, $nonBlockingErrorsArray);
+
+					var_dump($valuationResult);
+
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Activate valuation for GST
 					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '100000', $stundensatz, $nonBlockingErrorsArray);
+
+					var_dump($valuationResult);
+
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Link this service to a price list
 					$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
+
+					var_dump('price list');
+					var_dump($manageSalesPriceListInResult);
+
 					if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
 					// Add a new list price that links this service to a list price
 					$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
+
+					var_dump($manageSalesListPriceInResult);
+
 					if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 				}
 				// otherwise non blocking error and continue with the next one
@@ -238,7 +243,7 @@ class SyncServicesLib
 			$sapIdResult = $dbModel->execReadOnlyQuery('
 				SELECT s.sap_service_id
 				  FROM sync.tbl_sap_services s
-				WHERE s.person_id = ?
+	 			 WHERE s.person_id = ?
 			', array($serviceData->person_id));
 
 			if (isError($sapIdResult)) return $sapIdResult;
@@ -283,6 +288,8 @@ class SyncServicesLib
 					)
 				);
 
+				var_dump($manageServiceResult);
+
 				// If no error occurred...
 				if (!isError($manageServiceResult))
 				{
@@ -290,9 +297,60 @@ class SyncServicesLib
 					$manageService = getData($manageServiceResult);
 
 					// If data structure is ok...
-					if (isset($manageService->ServiceProduct) && isset($manageService->ServiceProduct->InternalID))
+					if (isset($manageService->ServiceProduct)
+						&& isset($manageService->ServiceProduct->InternalID)
+						&& isset($manageService->ServiceProduct->InternalID->_))
 					{
-						// Everything is fine!
+						// Get the previously created service id
+						$serviceId = getData($manageService)->ServiceProduct->InternalID->_;
+
+						// Activate valuation for GMBH
+						$valuationResult = $this->_manageServiceProductValuationDataIn(
+							$serviceId,
+							'200000',
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
+
+						if (isError($valuationResult)) return $valuationResult; // if fatal error
+
+						// Activate valuation for GST
+						$valuationResult = $this->_manageServiceProductValuationDataIn(
+							$serviceId,
+							'100000',
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
+
+						if (isError($valuationResult)) return $valuationResult; // if fatal error
+
+						// Link this service to a price list
+						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn(
+							$serviceId,
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
+
+						var_dump('price list');
+						var_dump($serviceId);
+						var_dump($stundensatz);
+						var_dump($nonBlockingErrorsArray);
+						var_dump($manageSalesPriceListInResult);
+
+						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
+
+						// Add a new list price that links this service to a list price
+						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
+							$serviceId,
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
+
+						var_dump('list price');
+						var_dump($manageSalesListPriceInResult);
+						exit;
+
+						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 					}
 					else // ...otherwise store a non blocking error and continue with the next user
 					{
@@ -573,14 +631,7 @@ class SyncServicesLib
 							'LifeCycleStatusCode' => 2,
 							'SalesMeasureUnitCode' => 'HUR',
 							'ItemGroupCode' => 'PBTM'
-						)/*,
-						1 => array(
-							'SalesOrganisationID' => 'GF20',
-							'DistributionChannelCode' => array('_' => '01'),
-							'LifeCycleStatusCode' => 2,
-							'SalesMeasureUnitCode' => 'HUR',
-							'ItemGroupCode' => 'PBTM'
-						)*/,
+						),
 						2 => array(
 							'SalesOrganisationID' => '100003',
 							'DistributionChannelCode' => array('_' => '01'),
@@ -760,3 +811,4 @@ class SyncServicesLib
 		}
 	}
 }
+

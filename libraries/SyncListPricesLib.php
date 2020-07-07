@@ -25,7 +25,6 @@ class SyncListPricesLib
 
 	/**
 	 * Return the raw result of SAP->ManageProcurementPriceSpecificationIn->Read
-	 * TODO: fix it!!!
 	 */
 	public function getListPriceById($id)
 	{
@@ -139,7 +138,7 @@ class SyncListPricesLib
 				else
 				{
 					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: ILV-FHTW';
+					$nonBlockingErrorsArray[] = 'SAP did not return ID for list price: ILV-FHTW';
 				}
 
 				// ...and return an empty success

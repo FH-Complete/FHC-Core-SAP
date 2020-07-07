@@ -20,6 +20,8 @@ class SyncPriceListsLib
 
 		// Loads QuerySalesPriceListInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QuerySalesPriceListIn_model', 'QuerySalesPriceListInModel');
+		// Loads ManageSalesPriceListInModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -60,7 +62,7 @@ class SyncPriceListsLib
 					'ID' => generateUID(self::UPDATE_PRICE_LIST_PREFIX)
 				),
 				'SalesPriceList' => array(
-					'actionCode' => '02',
+					'actionCode' => '01',
 					'ID' => 'ILV-FHTW',
 					'StartDate' => date('Y-m-d'),
 					'EndDate' => '2021-01-01',
@@ -129,3 +131,4 @@ class SyncPriceListsLib
 		}
 	}
 }
+
