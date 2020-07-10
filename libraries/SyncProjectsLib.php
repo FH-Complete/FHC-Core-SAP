@@ -349,7 +349,7 @@ class SyncProjectsLib
 							getData($sapEmployeeResult)[0]->C_EeId,
 							$studySemesterStartDateTS,
 							$studySemesterEndDateTS,
-							'38.5'
+							$lehreEmployee->commited_work
 						);
 
 						// If an error occurred and it is not because of an already existing employee in this project
@@ -364,7 +364,7 @@ class SyncProjectsLib
 							$projectObjectId,
 							getData($sapEmployeeResult)[0]->C_EeId,
 							getData($serviceResult)[0]->sap_service_id,
-							'37',
+							$lehreEmployee->planned_work,
 							$lehreEmployee->lehre_grobplanung,
 							$lehreEmployee->ma_soll_stunden
 						);
@@ -553,7 +553,7 @@ class SyncProjectsLib
 								getData($sapEmployeeResult)[0]->C_EeId,
 								$studySemesterStartDateTS,
 								$studySemesterEndDateTS,
-								'38.5'
+								$courseEmployee->commited_work
 							);
 
 							// If an error occurred and it is not because of an already existing employee in this project
@@ -568,7 +568,7 @@ class SyncProjectsLib
 								$projectObjectId,
 								getData($sapEmployeeResult)[0]->C_EeId,
 								getData($serviceResult)[0]->sap_service_id,
-								'37'
+								$courseEmployee->planned_work
 							);
 
 							// If an error occurred and it is not because of an already existing employee in this project
@@ -763,19 +763,28 @@ class SyncProjectsLib
 
 					// Loads employees for this cost center
 					$costCenterEmployeesResult = $dbModel->execReadOnlyQuery('
-						SELECT m.mitarbeiter_uid,
-						       b.person_id
-						  FROM public.tbl_mitarbeiter m
-						  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
-						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
-						   AND b.aktiv
-			   			   AND m.fixangestellt = TRUE
-						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
-						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-						   AND so.oe_kurzbz_sap = ?
-					', array($studySemesterEndDate, $studySemesterStartDate, $costCenter->oe_kurzbz_sap));
+						SELECT
+							m.mitarbeiter_uid,
+							b.person_id,
+							(
+								SELECT sum(wochenstunden) * 15
+								FROM public.tbl_benutzerfunktion bfws
+								WHERE
+								bfws.uid=m.mitarbeiter_uid
+								AND (bfws.datum_von IS NULL OR bfws.datum_von <= ?)
+								AND (bfws.datum_bis IS NULL OR bfws.datum_bis >= ?)
+							) as planned_work
+						FROM public.tbl_mitarbeiter m
+							JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+							JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+							JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
+						WHERE bf.funktion_kurzbz = \'oezuordnung\'
+							AND b.aktiv
+							AND m.fixangestellt = TRUE
+							AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+							AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+							AND so.oe_kurzbz_sap = ?
+					', array($studySemesterEndDate, $studySemesterStartDate,$studySemesterEndDate, $studySemesterStartDate, $costCenter->oe_kurzbz_sap));
 
 					// If error occurred while retrieving const center employee from database the return the error
 					if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
@@ -813,7 +822,7 @@ class SyncProjectsLib
 										getData($sapEmployeeResult)[0]->C_EeId,
 										$studySemesterStartDateTS,
 										$studySemesterEndDateTS,
-										'38.5'
+										$costCenterEmployee->planned_work
 									);
 
 									// If an error occurred and it is not because of an already existing employee in this project
@@ -828,7 +837,7 @@ class SyncProjectsLib
 										$taskObjectId,
 										getData($sapEmployeeResult)[0]->C_EeId,
 										getData($serviceResult)[0]->sap_service_id,
-										'37'
+										$costCenterEmployee->planned_work
 									);
 
 									// If an error occurred and it is not because of an already existing employee in this project
@@ -848,4 +857,3 @@ class SyncProjectsLib
 		return success('Project admin synchronization ended succesfully');
 	}
 }
-
