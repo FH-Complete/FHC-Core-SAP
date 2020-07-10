@@ -336,7 +336,8 @@ class SyncPaymentsLib
 								),
 								'EmployeeResponsibleParty' => array(
 									'PartyID' => $ResponsiblePartyID
-								)
+								),
+								'DataOriginTypeCode' => '4' // E-Commerce
 							)
 						);
 					}
