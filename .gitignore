@@ -1,4 +1,4 @@
-config/SAPClient.php
+config/SOAPClient.php
 config/ODATAClient.php
 config/Projects.php
 

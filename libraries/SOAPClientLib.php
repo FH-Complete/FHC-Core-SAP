@@ -15,18 +15,19 @@ class SOAPClientLib
 
 	const ERROR_STR = '%s: %s'; // Error message format
 
-	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/WSDLs/%s/%s.wsdl'; // Full name to the WSDL
+	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/WSDLs/%s/%s/%s.wsdl'; // Full name to the WSDL
 
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'soap_active_connection';
 	const CONNECTIONS = 'soap_connections';
 
 	private $_connectionsArray;		// connections array
+	private $_activeConnectionName;		// active connection name
 
-	private $_error;				// true if an error occurred
+	private $_error;			// true if an error occurred
 	private $_errorMessage;			// contains the error message
 
-	private $_hasData;				// indicates if there are data in the response or not
+	private $_hasData;			// indicates if there are data in the response or not
 	private $_emptyResponse;		// indicates if the response is empty or not
 
 	private $_ci; // Code igniter instance
@@ -141,10 +142,10 @@ class SOAPClientLib
 	 */
 	private function _setConnection()
 	{
-		$activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
+		$this->_activeConnectionName = $this->_ci->config->item(self::ACTIVE_CONNECTION);
 		$connectionsArray = $this->_ci->config->item(self::CONNECTIONS);
 		
-		$this->_connectionsArray = $connectionsArray[$activeConnectionName];
+		$this->_connectionsArray = $connectionsArray[$this->_activeConnectionName];
 	}
 
 	/**
@@ -158,7 +159,7 @@ class SOAPClientLib
 		{
 			// Call the SoapClient giving the path in the file system to the WSDL file and the options needed to connect
 			$soapClient = new SoapClient(
-				sprintf(self::WSDL_FULL_NAME, $apiSetName, $serviceName),
+				sprintf(self::WSDL_FULL_NAME, $this->_activeConnectionName, $apiSetName, $serviceName),
 				$this->_connectionsArray[$apiSetName]
 			);
 

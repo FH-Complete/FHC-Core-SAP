@@ -1,10 +1,10 @@
 <?php
 
-$config['soap_active_connection'] = 'DEVELOPMENT'; // the used configuration set of the chosen connection
+$config['soap_active_connection'] = 'dev'; // the used configuration set of the chosen connection
 
 // Example of a configuration set. All parameters are required!
 $config['soap_connections'] = array(
-	'DEVELOPMENT' => array(
+	'dev' => array(
 		'CoreAPI' => array(
 			'login' => 'SAPCoreAPIUsername',
 			'password' => 'SAPCoreAPIPassword'
@@ -14,7 +14,7 @@ $config['soap_connections'] = array(
 			'password' => 'PASSWORD2' // basic HTTP authentication password
 		)
 	),
-	'PRODUCTION' => array(
+	'live' => array(
 		'CoreAPI' => array(
 			'login' => 'SAPCoreAPIUsername', // basic HTTP authentication username
 			'password' => 'SAPCoreAPIPassword' // basic HTTP authentication password
