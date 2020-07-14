@@ -31,6 +31,9 @@ class SyncPaymentsLib
 
 		// Loads SAPSalesOrderModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPSalesOrder_model', 'SAPSalesOrderModel');
+
+		// Loads Payment configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -279,6 +282,10 @@ class SyncPaymentsLib
 
 
 						$task_id = '';
+						$name = $row_payment->studiengang_kurzbz;
+						$externeReferenz = $row_payment->studiengang_kurzbz;
+						$wunschtermin = $row_payment->studiensemester_start.'T00:00:00Z';
+
 						if ($row_payment->studiengang_kz < 0 || $row_payment->studiengang_kz > 10000)
 						{
 							// GMBH or Special Courses
@@ -293,9 +300,10 @@ class SyncPaymentsLib
 								continue;
 							}
 
-							$ResponsiblePartyID = '23'; // TODO MA
-							$personalressource = '200000'; // TODO
-							$SalesUnitPartyID = '200000'; // TODO
+							// TODO Speziallehrgänge die in der FH sein sollen statt in der GMBH!
+							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];
+							$personalressource = $this->_ci->config->item('payments_personal_ressource')['gmbh'];
+						 	$SalesUnitPartyID = $this->_ci->config->item('payments_sales_unit_gmbh');
 						}
 						else
 						{
@@ -309,11 +317,8 @@ class SyncPaymentsLib
 								continue;
 							}
 
-							//$SalesUnitPartyID = 'BBE';
-							$ResponsiblePartyID = '23'; // TODO MIA
-							$personalressource = '100200'; // TODO
-							// 100200 bei GST
-							// 200000 bei GMBH
+							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
+							$personalressource = $this->_ci->config->item('payments_personal_ressource')['fh'];
 						}
 						$data = array(
 							'BasicMessageHeader' => array(
@@ -322,6 +327,13 @@ class SyncPaymentsLib
 							),
 							'SalesOrder' => array(
 								'actionCode' => '01',
+								'Name' => $name,
+								'BuyerID' => $externeReferenz,
+								'RequestedFulfillmentPeriodPeriodTerms' => array(
+									'actionCode' => '01',
+ 									'StartDateTime' => $wunschtermin,
+ 									'EndDateTime' => $wunschtermin
+								),
 								'DeliveryTerms' => array(
 									'CompleteDeliveryRequestedIndicator' => 1
 								),
@@ -502,10 +514,14 @@ echo print_r($manageSalesOrderResult,true);
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
-				buchungsnr, studiengang_kz, studiensemester_kurzbz, betrag, buchungsdatum,
-				buchungstext, buchungstyp_kurzbz
+				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
+				bk.buchungstext, bk.buchungstyp_kurzbz,
+				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
+				tbl_studiensemester.start as studiensemester_start
 			FROM
 				public.tbl_konto bk
+				JOIN public.tbl_studiengang USING(studiengang_kz)
+				JOIN public.tbl_studiensemester USING(studiensemester_kurzbz)
 			WHERE
 				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
 				AND betrag < 0
