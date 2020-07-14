@@ -94,7 +94,7 @@ class ManageProjects extends JQW_Controller
 				updateJobs(
 					getData($lastJobs), // Jobs to be updated
 					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
-					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
 				);
 				
 				if (hasData($lastJobs)) $this->updateJobsQueue(SyncProjectsLib::SAP_PROJECTS_SYNC, getData($lastJobs));

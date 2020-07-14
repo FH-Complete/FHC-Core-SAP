@@ -160,29 +160,20 @@ class SyncServicesLib
 					// Activate valuation for GMBH
 					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '200000', $stundensatz, $nonBlockingErrorsArray);
 
-					var_dump($valuationResult);
-
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Activate valuation for GST
 					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '100000', $stundensatz, $nonBlockingErrorsArray);
-
-					var_dump($valuationResult);
 
 					if (isError($valuationResult)) return $valuationResult; // if fatal error
 
 					// Link this service to a price list
 					$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
 
-					var_dump('price list');
-					var_dump($manageSalesPriceListInResult);
-
 					if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
 					// Add a new list price that links this service to a list price
 					$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
-
-					var_dump($manageSalesListPriceInResult);
 
 					if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 				}
@@ -288,8 +279,6 @@ class SyncServicesLib
 					)
 				);
 
-				var_dump($manageServiceResult);
-
 				// If no error occurred...
 				if (!isError($manageServiceResult))
 				{
@@ -302,7 +291,7 @@ class SyncServicesLib
 						&& isset($manageService->ServiceProduct->InternalID->_))
 					{
 						// Get the previously created service id
-						$serviceId = getData($manageService)->ServiceProduct->InternalID->_;
+						$serviceId = $manageService->ServiceProduct->InternalID->_;
 
 						// Activate valuation for GMBH
 						$valuationResult = $this->_manageServiceProductValuationDataIn(
@@ -331,11 +320,7 @@ class SyncServicesLib
 							$nonBlockingErrorsArray
 						);
 
-						var_dump('price list');
-						var_dump($serviceId);
-						var_dump($stundensatz);
-						var_dump($nonBlockingErrorsArray);
-						var_dump($manageSalesPriceListInResult);
+						var_dump($manageSalesPriceListInResult);exit;
 
 						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
@@ -345,10 +330,6 @@ class SyncServicesLib
 							$stundensatz,
 							$nonBlockingErrorsArray
 						);
-
-						var_dump('list price');
-						var_dump($manageSalesListPriceInResult);
-						exit;
 
 						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 					}

@@ -138,7 +138,7 @@ class SyncListPricesLib
 				else
 				{
 					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return ID for list price: ILV-FHTW';
+					$nonBlockingErrorsArray[] = 'SAP did not return ID for list price: ILV-GMBH';
 				}
 
 				// ...and return an empty success
