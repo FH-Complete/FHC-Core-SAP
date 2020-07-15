@@ -3,4 +3,5 @@ config/ODATAClient.php
 config/Projects.php
 config/PriceLists.php
 config/Users.php
+config/Services.php
 

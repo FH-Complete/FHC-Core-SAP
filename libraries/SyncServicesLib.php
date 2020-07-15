@@ -18,6 +18,13 @@ class SyncServicesLib
 	const DEFAULT_LANGUAGE_ISO = 'DE'; // Default language ISO
 	const ENGLISH_LANGUAGE_ISO = 'EN'; // English language ISO
 
+	// Config entry names
+	const SERVICES_VALUATION_COMPANY_IDS = 'services_valuation_company_ids';
+	const ACCOUNT_DETERMINATION_GROUP_CODE = 'services_account_determination_group_code';
+	const SET_OF_BOOKS_ID = 'services_set_of_books_id';
+	const SALES_ORGANISATION_ID = 'services_sales_organisation_id';
+	const ITEM_GROUP_CODE = 'services_item_group_code';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -41,6 +48,9 @@ class SyncServicesLib
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPriceListsLib');
 		// Loads SyncListPricesLib
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncListPricesLib');
+
+		// Loads services configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Services');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -157,15 +167,21 @@ class SyncServicesLib
 					// NOTE: Here is safe because was checked earlier in _manageServiceProductIn
 					$serviceId = getData($createResult)->ServiceProduct->InternalID->_;
 
-					// Activate valuation for GMBH
-					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '200000', $stundensatz, $nonBlockingErrorsArray);
+					// Get all company ids
+					$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
+					// Activate valuation for each company
+					foreach ($companyIdsArray as $companyId)
+					{
+						// Activate valuation
+						$valuationResult = $this->_manageServiceProductValuationDataIn(
+							$serviceId,
+							$companyId,
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
 
-					if (isError($valuationResult)) return $valuationResult; // if fatal error
-
-					// Activate valuation for GST
-					$valuationResult = $this->_manageServiceProductValuationDataIn($serviceId, '100000', $stundensatz, $nonBlockingErrorsArray);
-
-					if (isError($valuationResult)) return $valuationResult; // if fatal error
+						if (isError($valuationResult)) return $valuationResult; // if fatal error
+					}
 
 					// Link this service to a price list
 					$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
@@ -293,25 +309,21 @@ class SyncServicesLib
 						// Get the previously created service id
 						$serviceId = $manageService->ServiceProduct->InternalID->_;
 
-						// Activate valuation for GMBH
-						$valuationResult = $this->_manageServiceProductValuationDataIn(
-							$serviceId,
-							'200000',
-							$stundensatz,
-							$nonBlockingErrorsArray
-						);
+						// Get all company ids
+						$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
+						// Activate valuation for each company
+						foreach ($companyIdsArray as $companyId)
+						{
+							// Activate valuation
+							$valuationResult = $this->_manageServiceProductValuationDataIn(
+								$serviceId,
+								$companyId,
+								$stundensatz,
+								$nonBlockingErrorsArray
+							);
 
-						if (isError($valuationResult)) return $valuationResult; // if fatal error
-
-						// Activate valuation for GST
-						$valuationResult = $this->_manageServiceProductValuationDataIn(
-							$serviceId,
-							'100000',
-							$stundensatz,
-							$nonBlockingErrorsArray
-						);
-
-						if (isError($valuationResult)) return $valuationResult; // if fatal error
+							if (isError($valuationResult)) return $valuationResult; // if fatal error
+						}
 
 						// Link this service to a price list
 						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn(
@@ -319,8 +331,6 @@ class SyncServicesLib
 							$stundensatz,
 							$nonBlockingErrorsArray
 						);
-
-						var_dump($manageSalesPriceListInResult);exit;
 
 						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
@@ -605,22 +615,7 @@ class SyncServicesLib
 						'LifeCycleStatusCode' => 2,
 						'PurchasingMeasureUnitCode' => 'HUR'
 					),
-					'Sales' => array(
-						0 => array(
-							'SalesOrganisationID' => '200000',
-							'DistributionChannelCode' => array('_' => '01'),
-							'LifeCycleStatusCode' => 2,
-							'SalesMeasureUnitCode' => 'HUR',
-							'ItemGroupCode' => 'PBTM'
-						),
-						2 => array(
-							'SalesOrganisationID' => '100003',
-							'DistributionChannelCode' => array('_' => '01'),
-							'LifeCycleStatusCode' => 2,
-							'SalesMeasureUnitCode' => 'HUR',
-							'ItemGroupCode' => 'PBTM'
-						)
-					),
+					'Sales' => $this->_getSalesArray(),
 					'DeviantTaxClassification' => array(
 						'CountryCode' => 'AT',
 						'RegionCode' => array(
@@ -636,16 +631,7 @@ class SyncServicesLib
 							'listID' => 'AT'
 						)
 					),
-					'Valuation' => array(
-						0 => array(
-							'CompanyID' => '200000', // GMBH
-							'LifeCycleStatusCode' => 1
-						),
-						1 => array(
-							'CompanyID' => '100000', // FH
-							'LifeCycleStatusCode' => 1
-						)
-					)
+					'Valuation' => $this->_getValuationArray()
 				)
 			)
 		);
@@ -722,10 +708,10 @@ class SyncServicesLib
 					'actionCode' => '04',
 					'ServiceProductInternalID' => $sap_service_id,
 					'CompanyID' => $company_id,
-					'AccountDeterminationGroupCode' => 5000,
+					'AccountDeterminationGroupCode' => $this->_ci->config->item(self::ACCOUNT_DETERMINATION_GROUP_CODE),
 					'CostRate' => array(
 						'actionCode' => '04',
-						'SetOfBooksID' => 'FHT1',
+						'SetOfBooksID' => $this->_ci->config->item(self::SET_OF_BOOKS_ID),
 						'StartDate' => date('Y-m-d'),
 						'Amount' => array(
 							'_' => $amount,
@@ -790,6 +776,51 @@ class SyncServicesLib
 		{
 			return $manageServiceProductValuationResult;
 		}
+	}
+
+	/**
+	 * Generate valuation array
+	 */
+	private function _getValuationArray()
+	{
+		$valuationArray = [];
+
+		// Get all company ids
+		$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
+		// Activate valuation for each company
+		foreach ($companyIdsArray as $companyId)
+		{
+			$valuationArray[] = array(
+				'CompanyID' => $companyId,
+				'LifeCycleStatusCode' => 1
+			);
+		}
+
+		return $valuationArray;
+	}
+
+	/**
+	 * Generate sales array
+	 */
+	private function _getSalesArray()
+	{
+		$salesArray = [];
+
+		// Get all company ids
+		$companyIdsArray = $this->_ci->config->item(self::SALES_ORGANISATION_ID);
+		// Activate valuation for each company
+		foreach ($companyIdsArray as $companyId)
+		{
+			$salesArray[] = array(
+				'SalesOrganisationID' => $companyId,
+				'DistributionChannelCode' => array('_' => '01'),
+				'LifeCycleStatusCode' => 2,
+				'SalesMeasureUnitCode' => 'HUR',
+				'ItemGroupCode' => $this->_ci->config->item(self::ITEM_GROUP_CODE)
+			);
+		}
+
+		return $salesArray;
 	}
 }
 
