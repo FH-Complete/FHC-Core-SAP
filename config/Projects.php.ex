@@ -1,8 +1,5 @@
 <?php
 
-// Max number of cost centers to create. Used for debuggig, by default -1 => disabled
-$config['project_max_number_cost_centers'] = -1;
-
 // Project id formats (required)
 $config['project_id_formats'] = array(
 	'admin' => 'ADM-%s',		// admin project id format
@@ -29,9 +26,9 @@ $config['project_structures'] = array(
 
 // Project unit responsibles (required)
 $config['project_unit_responsibles'] = array(
-	'admin' => '100003',	// admin project unit responsible
-	'lehre' => '100003',	// lehre project unit responsible
-	'lehrgaenge' => '200000'	// lehrgaenge project unit responsible
+	'admin' => 'GF20',	// admin project unit responsible
+	'lehre' => 'GF20',	// lehre project unit responsible
+	'lehrgaenge' => 'GF20'	// lehrgaenge project unit responsible
 );
 
 // Project person responsibles (required)

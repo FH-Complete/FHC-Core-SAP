@@ -16,6 +16,10 @@ class SyncPriceListsLib
 	const CREATE_PRICE_LIST_PREFIX = 'CPL';
 	const UPDATE_PRICE_LIST_PREFIX = 'UPL';
 
+	// Config entries names
+	const PRICE_LISTS_ID_FORMATS = 'price_lists_id_formats';
+	const PRICE_LISTS_ACCOUNT_IDS = 'price_lists_account_ids';
+
 	/**
 	 * Object initialization
 	 */
@@ -27,6 +31,9 @@ class SyncPriceListsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QuerySalesPriceListIn_model', 'QuerySalesPriceListInModel');
 		// Loads ManageSalesPriceListInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesPriceListIn_model', 'ManageSalesPriceListInModel');
+
+		// Loads Price Lists configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/PriceLists');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -61,74 +68,85 @@ class SyncPriceListsLib
 	 */
 	public function create()
 	{
-		$dateObj = DateTime::createFromFormat('!m', date('n'));
-		$monthName = $dateObj->format('F');
-		$priceListId = strtoupper('ILV-FHTW-'.$monthName);
+		$nonBlockingErrorsArray = array();
 
-		$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
-			array(
-				'BasicMessageHeader' => array(
-					'ID' => generateUID(self::CREATE_PRICE_LIST_PREFIX)
-				),
-				'SalesPriceList' => array(
-					'actionCode' => '01',
-					'ID' => $priceListId,
-					'AccountID' => '100000',
-					'TypeCode' => '7PL0',
-					'CurrencyCode' => 'EUR',
-					'StartDate' => date('Y-m').'-01', // beginning of the current month
-					'EndDate' => date('Y-m-t')
-				)
-			)
-		);
+		// Get price lists id formats from config
+		$priceListsIdFormats = $this->_ci->config->item(self::PRICE_LISTS_ID_FORMATS);
+		// Get price lists account ids from config
+		$priceListsAccountIds = $this->_ci->config->item(self::PRICE_LISTS_ACCOUNT_IDS);
 
-		// If no error occurred...
-		if (!isError($manageSalesPriceListInResult))
+		// Get the current month name
+		$monthName = (DateTime::createFromFormat('!m', date('n')))->format('F');
+
+		// For each price list that have to be created for the current month
+		foreach ($priceListsIdFormats as $companyId => $priceListsIdFormat)
 		{
-			// SAP data
-			$manageSalesPriceListIn = getData($manageSalesPriceListInResult);
-			$nonBlockingErrorsArray = array();
+			// Id of the current price list
+			$priceListId = strtoupper(sprintf($priceListsIdFormat, $monthName));
 
-			// If data structure is ok...
-			if (isset($manageSalesPriceListIn->SalesPriceList)
-				&& isset($manageSalesPriceListIn->SalesPriceList->ID)
-				&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
+			// Create a new price list in SAP
+			$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
+				array(
+					'BasicMessageHeader' => array(
+						'ID' => generateUID(self::CREATE_PRICE_LIST_PREFIX)
+					),
+					'SalesPriceList' => array(
+						'actionCode' => '01',
+						'ID' => $priceListId,
+						'AccountID' => $priceListsAccountIds[$companyId],
+						'TypeCode' => '7PL0',
+						'CurrencyCode' => 'EUR',
+						'StartDate' => date('Y-m').'-01', // beginning of the current month
+						'EndDate' => date('Y-m-t') // end of the current month
+					)
+				)
+			);
+
+			// If no error occurred...
+			if (!isError($manageSalesPriceListInResult))
 			{
-				// Returns the result from SAP
-				return $manageSalesPriceListInResult;
-			}
-			else // ...otherwise store a non blocking error...
-			{
-				// If it is present a description from SAP then use it
-				if (isset($manageSalesPriceListIn->Log) && isset($manageSalesPriceListIn->Log->Item)
-					&& isset($manageSalesPriceListIn->Log->Item))
+				// SAP data
+				$manageSalesPriceListIn = getData($manageSalesPriceListInResult);
+
+				// If data structure is ok...
+				if (isset($manageSalesPriceListIn->SalesPriceList)
+					&& isset($manageSalesPriceListIn->SalesPriceList->ID)
+					&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
 				{
-					if (!isEmptyArray($manageSalesPriceListIn->Log->Item))
+					// Everything is ok!
+				}
+				else // ...otherwise store a non blocking error...
+				{
+					// If it is present a description from SAP then use it
+					if (isset($manageSalesPriceListIn->Log) && isset($manageSalesPriceListIn->Log->Item)
+						&& isset($manageSalesPriceListIn->Log->Item))
 					{
-						foreach ($manageSalesPriceListIn->Log->Item as $item)
+						if (!isEmptyArray($manageSalesPriceListIn->Log->Item))
 						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note;
+							foreach ($manageSalesPriceListIn->Log->Item as $item)
+							{
+								if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note;
+							}
+						}
+						elseif ($manageSalesPriceListIn->Log->Item->Note)
+						{
+							$nonBlockingErrorsArray[] = $manageSalesPriceListIn->Log->Item->Note;
 						}
 					}
-					elseif ($manageSalesPriceListIn->Log->Item->Note)
+					else
 					{
-						$nonBlockingErrorsArray[] = $manageSalesPriceListIn->Log->Item->Note;
+						// Default non blocking error
+						$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: '.$priceListId;
 					}
 				}
-				else
-				{
-					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: '.$priceListId;
-				}
-
-				// ...and return an empty success
-				return success($nonBlockingErrorsArray);
+			}
+			else // ...otherwise return it
+			{
+				return $manageSalesPriceListInResult;
 			}
 		}
-		else // ...otherwise return it
-		{
-			return $manageSalesPriceListInResult;
-		}
+
+		return success($nonBlockingErrorsArray);
 	}
 
 	/**
