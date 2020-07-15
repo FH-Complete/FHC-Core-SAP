@@ -51,6 +51,9 @@ class SyncUsersLib
 	// SAP default address value
 	const DEFAULT_ADDRESS = 'XXDEFAULT';
 
+	// Config entries name
+	const USERS_PAYMENT_COMPANY_IDS = 'users_payment_company_ids';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -67,6 +70,9 @@ class SyncUsersLib
 
 		// Loads SAPStudentsModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudents_model', 'SAPStudentsModel');
+
+		// Load users configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -141,7 +147,7 @@ class SyncUsersLib
 		if (isError($usersAllData)) return $usersAllData;
 		if (!hasData($usersAllData)) return error('No data available for the given users');
 
-		// Loops through users data
+				// Loops through users data
 		foreach (getData($usersAllData) as $userData)
 		{
 			// If an email address was not found for this user...
@@ -188,7 +194,7 @@ class SyncUsersLib
 							'actionCode' => '01',
 							'addressInformationListCompleteTransmissionIndicator' => true,
 							'AddressUsage' => array(
-								'AddressUsageCode' => 'XXDEFAULT'
+								'AddressUsageCode' => self::DEFAULT_ADDRESS
 							),
 							'Address' => array(
 								'EmailURI' => $userData->email,
@@ -233,16 +239,7 @@ class SyncUsersLib
 								'CommunicationMediumTypeCode' => 'INT'
 							)
 						),
-						'PaymentData' => array(
-							0 => array(
-								'CompanyID' => '100000',
-								'AccountDeterminationDebtorGroupCode' => '4010'
-							),
-							1 => array(
-								'CompanyID' => '200000',
-								'AccountDeterminationDebtorGroupCode' => '4010'
-							),
-						)
+						'PaymentData' => $this->_getPaymentCompanyIdArray()
 					)
 				);
 
@@ -447,16 +444,7 @@ class SyncUsersLib
 								'EmailURI' => $userData->email
 							)
 						),
-						'PaymentData' => array(
-							0 => array(
-								'CompanyID' => '100000',
-								'AccountDeterminationDebtorGroupCode' => '4010'
-							),
-							1 => array(
-								'CompanyID' => 'GST',
-								'AccountDeterminationDebtorGroupCode' => '4010'
-							),
-						)
+						'PaymentData' => $this->_getPaymentCompanyIdArray()
 					)
 				);
 
@@ -866,5 +854,25 @@ class SyncUsersLib
 		{
 			return error('The returned SAP object is not correctly structured');
 		}
+	}
+
+	/**
+	 * Generate payment data array
+	 */
+	private function _getPaymentCompanyIdArray()
+	{
+		// Get users payment company ids
+		$paymentCompanyIds = $this->_ci->config->item(self::USERS_PAYMENT_COMPANY_IDS);
+		$paymentCompanyIdsArray = [];
+
+		foreach ($paymentCompanyIds as $paymentCompanyId)
+		{
+			$paymentCompanyIdsArray[] = array(
+				'CompanyID' => $paymentCompanyId,
+				'AccountDeterminationDebtorGroupCode' => '4010'
+			);
+		}
+
+		return $paymentCompanyIdsArray;
 	}
 }
