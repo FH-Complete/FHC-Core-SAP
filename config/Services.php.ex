@@ -21,3 +21,9 @@ $config['services_sales_organisation_id'] = array(
 // Services ItemGroupCode value (required)
 $config['services_item_group_code'] = 'PBTM';
 
+// Services category GMBH
+$config['services_category_gmbh'] = '7GMBH';
+
+// Services category not GMBH
+$config['services_category_not_gmbh'] = '6FE';
+

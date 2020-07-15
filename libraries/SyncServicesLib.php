@@ -24,6 +24,8 @@ class SyncServicesLib
 	const SET_OF_BOOKS_ID = 'services_set_of_books_id';
 	const SALES_ORGANISATION_ID = 'services_sales_organisation_id';
 	const ITEM_GROUP_CODE = 'services_item_group_code';
+	const CATEGORY_GMBH = 'services_category_gmbh';
+	const CATEGORY_NOT_GMBH = 'services_category_not_gmbh';
 
 	private $_ci; // Code igniter instance
 
@@ -464,20 +466,25 @@ class SyncServicesLib
 				p.nachname AS surname,
 				p.vorname AS name,
 				m.personalnummer AS personalnumber,
-				CASE WHEN EXISTS
-					(SELECT
-						1
-					FROM public.tbl_benutzerfunktion WHERE uid=b.uid AND funktion_kurzbz=\'oezuordnung\'
-					AND (datum_von is null OR datum_von<=now())
-					AND (datum_bis is null OR datum_bis>=now())
-					AND oe_kurzbz=\'gmbh\'
-					) THEN \'7GMBH\'
-					ELSE \'6FE\'
-				END as category,
-				(SELECT tbl_sap_stundensatz.sap_kalkulatorischer_stundensatz FROM sync.tbl_sap_stundensatz
-					WHERE mitarbeiter_uid=m.mitarbeiter_uid
-					ORDER BY insertamum DESC
-					limit 1) as stundensatz
+				CASE WHEN EXISTS (
+					SELECT 1
+				 	  FROM public.tbl_benutzerfunktion bf
+					 WHERE bf.uid = b.uid
+					   AND bf.funktion_kurzbz = \'oezuordnung\'
+					   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
+					   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
+					   AND bf.oe_kurzbz = \'gmbh\'
+				)
+				THEN \''.$this->_ci->config->item(self::CATEGORY_GMBH).'\'
+				ELSE \''.$this->_ci->config->item(self::CATEGORY_NOT_GMBH).'\'
+				END AS category,
+				(
+					SELECT s.sap_kalkulatorischer_stundensatz
+					  FROM sync.tbl_sap_stundensatz s
+					 WHERE s.mitarbeiter_uid = m.mitarbeiter_uid
+				      ORDER BY s.insertamum DESC
+					 LIMIT 1
+				) AS stundensatz
 			  FROM public.tbl_person p
 			  JOIN public.tbl_benutzer b USING(person_id)
 			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
