@@ -19,6 +19,8 @@ class SyncPriceListsLib
 	// Config entries names
 	const PRICE_LISTS_ID_FORMATS = 'price_lists_id_formats';
 	const PRICE_LISTS_ACCOUNT_IDS = 'price_lists_account_ids';
+	const PRICE_LISTS_START_DATE = 'price_lists_start_date';
+	const PRICE_LISTS_END_DATE = 'price_lists_end_date';
 
 	/**
 	 * Object initialization
@@ -75,14 +77,11 @@ class SyncPriceListsLib
 		// Get price lists account ids from config
 		$priceListsAccountIds = $this->_ci->config->item(self::PRICE_LISTS_ACCOUNT_IDS);
 
-		// Get the current month name
-		$monthName = (DateTime::createFromFormat('!m', date('n')))->format('F');
-
 		// For each price list that have to be created for the current month
 		foreach ($priceListsIdFormats as $companyId => $priceListsIdFormat)
 		{
 			// Id of the current price list
-			$priceListId = strtoupper(sprintf($priceListsIdFormat, $monthName));
+			$priceListId = strtoupper($priceListsIdFormat);
 
 			// Create a new price list in SAP
 			$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
@@ -96,8 +95,8 @@ class SyncPriceListsLib
 						'AccountID' => $priceListsAccountIds[$companyId],
 						'TypeCode' => '7PL0',
 						'CurrencyCode' => 'EUR',
-						'StartDate' => date('Y-m').'-01', // beginning of the current month
-						'EndDate' => date('Y-m-t') // end of the current month
+						'StartDate' => $this->_ci->config->item(self::PRICE_LISTS_START_DATE),
+						'EndDate' => $this->_ci->config->item(self::PRICE_LISTS_END_DATE)
 					)
 				)
 			);
@@ -152,12 +151,8 @@ class SyncPriceListsLib
 	/**
 	 * Add service to the current price list
 	 */
-	public function addServiceToCurrentPriceList($sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
+	public function addServiceToPriceList($priceListId, $sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
 	{
-		$dateObj = DateTime::createFromFormat('!m', date('n'));
-		$monthName = $dateObj->format('F');
-		$priceListId = strtoupper('ILV-FHTW-'.$monthName);
-
 		$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
 			array(
 				'BasicMessageHeader' => array(
@@ -165,7 +160,9 @@ class SyncPriceListsLib
 				),
 				'SalesPriceList' => array(
 					'actionCode' => '04',
-					'ID' => $priceListId,
+					'ID' => strtoupper($priceListId),
+					'StartDate' => $this->_ci->config->item(self::PRICE_LISTS_START_DATE),
+					'EndDate' => $this->_ci->config->item(self::PRICE_LISTS_END_DATE),
 					'PriceSpecification' => array(
 						'TypeCode' => '7PR1',
 						'Amount' => array(

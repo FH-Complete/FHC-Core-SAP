@@ -27,6 +27,9 @@ class SyncServicesLib
 	const CATEGORY_GMBH = 'services_category_gmbh';
 	const CATEGORY_NOT_GMBH = 'services_category_not_gmbh';
 
+	const GMBH_CONFIG_INDX = 'gmbh';
+	const FHTW_CONFIG_INDX = 'fhtw';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -45,6 +48,9 @@ class SyncServicesLib
 
 		// Loads SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');
+
+		// Loads MessageTokenModel
+		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
 
 		// Loads SyncPriceListsLib
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPriceListsLib');
@@ -185,15 +191,59 @@ class SyncServicesLib
 						if (isError($valuationResult)) return $valuationResult; // if fatal error
 					}
 
-					// Link this service to a price list
-					$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
+					// Price list & list price
+					// If root_organization_unit is not null then it is possible to add this service to a price list and to a list price
+					if ($serviceData->root_organization_unit != null)
+					{
+						// Price list
+						$priceListId = '';
+						// If the root organization unit is GMBH then add this service to the FHTW price list
+						// NOTE: for price list the logic is inverted!
+						if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+						{
+							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
+						}
+						else // otherwise to the GMBH price list
+						{
+							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::GMBH_CONFIG_INDX];
+						}
 
-					if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
+						// Finally add this service to a price list
+						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
+							$priceListId,
+							$serviceId,
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
 
-					// Add a new list price that links this service to a list price
-					$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn($serviceId, $stundensatz, $nonBlockingErrorsArray);
+						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
-					if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
+						// List price
+						$companyId = '';
+						// If the root organization unit is GMBH then add this service to the GMBH list price
+						if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+						{
+							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
+						}
+						else // otherwise to the FHTW list price
+						{
+							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::FHTW_CONFIG_INDX];
+						}
+
+						// Add a new list price that links this service to a list price
+						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
+							$companyId,
+							$serviceId,
+							$stundensatz,
+							$nonBlockingErrorsArray
+						);
+
+						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
+					}
+					else
+					{
+						$nonBlockingErrorsArray[] = 'Was not possible to find the root organization unit for this service: '.$serviceId;
+					}
 				}
 				// otherwise non blocking error and continue with the next one
 			}
@@ -327,23 +377,59 @@ class SyncServicesLib
 							if (isError($valuationResult)) return $valuationResult; // if fatal error
 						}
 
-						// Link this service to a price list
-						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->manageSalesPriceListIn(
-							$serviceId,
-							$stundensatz,
-							$nonBlockingErrorsArray
-						);
+						// Price list & list price
+						// If root_organization_unit is not null then it is possible to add this service to a price list and to a list price
+						if ($serviceData->root_organization_unit != null)
+						{
+							// Price list
+							$priceListId = '';
+							// If the root organization unit is GMBH then add this service to the FHTW price list
+							// NOTE: for price list the logic is inverted!
+							if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+							{
+								$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
+							}
+							else // otherwise to the GMBH price list
+							{
+								$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::GMBH_CONFIG_INDX];
+							}
 
-						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
+							// Finally add this service to a price list
+							$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
+								$priceListId,
+								$serviceId,
+								$stundensatz,
+								$nonBlockingErrorsArray
+							);
 
-						// Add a new list price that links this service to a list price
-						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
-							$serviceId,
-							$stundensatz,
-							$nonBlockingErrorsArray
-						);
+							if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
 
-						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
+							// List price
+							$companyId = '';
+							// If the root organization unit is GMBH then add this service to the GMBH list price
+							if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+							{
+								$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
+							}
+							else // otherwise to the FHTW list price
+							{
+								$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::FHTW_CONFIG_INDX];
+							}
+
+							// Add a new list price that links this service to a list price
+							$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
+								$companyId,
+								$serviceId,
+								$stundensatz,
+								$nonBlockingErrorsArray
+							);
+
+							if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
+						}
+						else
+						{
+							$nonBlockingErrorsArray[] = 'Was not possible to find the root organization unit for this service: '.$serviceId;
+						}
 					}
 					else // ...otherwise store a non blocking error and continue with the next user
 					{
@@ -466,18 +552,16 @@ class SyncServicesLib
 				p.nachname AS surname,
 				p.vorname AS name,
 				m.personalnummer AS personalnumber,
-				CASE WHEN EXISTS (
-					SELECT 1
+				(
+					SELECT bf.oe_kurzbz
 				 	  FROM public.tbl_benutzerfunktion bf
 					 WHERE bf.uid = b.uid
 					   AND bf.funktion_kurzbz = \'oezuordnung\'
 					   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
 					   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
-					   AND bf.oe_kurzbz = \'gmbh\'
-				)
-				THEN \''.$this->_ci->config->item(self::CATEGORY_GMBH).'\'
-				ELSE \''.$this->_ci->config->item(self::CATEGORY_NOT_GMBH).'\'
-				END AS category,
+				      ORDER BY bf.insertamum DESC
+					 LIMIT 1
+				) AS organization_unit,
 				(
 					SELECT s.sap_kalkulatorischer_stundensatz
 					  FROM sync.tbl_sap_stundensatz s
@@ -504,6 +588,30 @@ class SyncServicesLib
 				$userPersonalData->surname,
 				$userPersonalData->personalnumber
 			);
+
+			// Set category and root_organization_unit properties for this user
+			// Get root organization unit for this user
+			$rootOUResult = $this->_ci->MessageTokenModel->getOERoot($userPersonalData->organization_unit);
+
+			if (isError($rootOUResult)) return $rootOUResult;
+
+			// Default category is GMBH
+			$userPersonalData->category = $this->_ci->config->item(self::CATEGORY_GMBH);
+			if (hasData($rootOUResult))
+			{
+				// Store the root organization unit for this user
+				$userPersonalData->root_organization_unit = getData($rootOUResult)[0]->oe_kurzbz;
+
+				// If the root organisation unit of this user is not GMBH then set category as not gmbh
+				if ($userPersonalData->root_organization_unit != $this->_ci->config->item(self::CATEGORY_GMBH))
+				{
+					$userPersonalData->category = $this->_ci->config->item(self::CATEGORY_NOT_GMBH);
+				}
+			}
+			else // otherwise set root_organization_unit as null
+			{
+				$userPersonalData->root_organization_unit = null;
+			}
 
 			// Stores all data for the current user
 			$servicesAllDataArray[] = $userPersonalData;

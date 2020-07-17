@@ -51,7 +51,7 @@ class SyncListPricesLib
 	/**
 	 * Once the service is created the service is linked to a list price
 	 */
-	public function manageProcurementPriceSpecificationIn($sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
+	public function manageProcurementPriceSpecificationIn($companyId, $sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
 	{
 		// Calls SAP to find a price list with the given supplier id
 		$manageProcurementPriceSpecificationInResult = $this->_ci->ManageProcurementPriceSpecificationInModel->maintainBundle(
@@ -84,7 +84,7 @@ class SyncListPricesLib
 								'PriceSpecificationElementPropertyID' => 'CND_SUPPL_ID'
 							),
 							'PriceSpecificationElementPropertyValue' => array(
-								'ID' => 'GMBH',
+								'ID' => $companyId,
 								'IntegerValue' => 0
 							)
 						),

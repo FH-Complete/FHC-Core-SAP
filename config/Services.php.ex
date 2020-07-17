@@ -2,8 +2,8 @@
 
 // Services valuation company ids (required)
 $config['services_valuation_company_ids'] = array(
-	'fhtw' => 'GST',	// company id for fhtw
-	'gmbh' => 'GMBH'	// company id for gmbh
+	'fhtw' => '100000',	// company id for fhtw
+	'gmbh' => '200000'	// company id for gmbh
 );
 
 // Services AccountDeterminationGroupCode value (required)
@@ -14,8 +14,8 @@ $config['services_set_of_books_id'] = 'FHT1';
 
 // Services Sales Organisation IDs (required)
 $config['services_sales_organisation_id'] = array(
-	'fhtw' => 'GST',	// company id for fhtw
-	'gmbh' => 'GMBH'	// company id for gmbh
+	'fhtw' => '100003',	// company id for fhtw
+	'gmbh' => '200000'	// company id for gmbh
 );
 
 // Services ItemGroupCode value (required)
