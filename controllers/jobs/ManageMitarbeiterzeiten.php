@@ -32,7 +32,26 @@ class ManageMitarbeiterzeiten extends JQW_Controller
 		$allowedTypcodes = array('AT0001', 'AT0031');
         $results['workinghours'] = array();
         $results['absences'] = array();
-	    $entries = $this->syncmitarbeiterzeitenlib->getMitarbeiterzeiten();
+        $person_arr = array();
+
+	    // check Job queue
+        $jobType = 'SyncTimesheetFromSAP';
+        $this->logInfo('Start data synchronization with SAP ByD: Mitarbeiterzeiten');
+
+        // get the latest jobs
+		$lastJobs = $this->getLastJobs($jobType);
+		if (isError($lastJobs))
+        {
+            $this->logError('An error occurred while creating working hour entries in SAP', getError($lastJobs));
+        }
+        else
+        {
+            $person_arr = $this->_getPersonIdArray(getData($lastJobs));
+        }
+
+        // get working hours from ByD
+        // TODO: use $person_arr as input
+        $entries = $this->syncmitarbeiterzeitenlib->getMitarbeiterzeiten();
 
 		foreach ($entries->retval as $entry)
         {
@@ -87,6 +106,26 @@ class ManageMitarbeiterzeiten extends JQW_Controller
 	private function _sanitizeTime($value)
     {
         return substr(str_replace(['H', 'M'], ':', $value), 2, 8);
+    }
+
+    private function _getPersonIdArray($jobs)
+    {
+        $mergedUsersArray = array();
+
+        if (count($jobs) == 0) return $mergedUsersArray;
+
+        foreach ($jobs as $job)
+        {
+            $decodedInput = json_decode($job->input);
+            if ($decodedInput != null)
+            {
+                foreach ($decodedInput as $el)
+                {
+                    $mergedUsersArray[] = $el->person_id;
+                }
+            }
+        }
+        return $mergedUsersArray;
     }
 }
 
