@@ -18,6 +18,9 @@ class SyncEmployeeIDsLib
 
 		// Loads model EmployeeModel
         $this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Employee_model', 'EmployeeModel');
+
+        // Loads model SAPMitarbeiterModel
+        $this->_ci->load->model('extensions/FHC-Core-SAP/SAPMitarbeiter_model', 'SAPMitarbeiterModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -37,6 +40,11 @@ class SyncEmployeeIDsLib
     public function getEmployeeUUIDs($arrayUids)
     {
         return $this->_ci->EmployeeModel->getEmployeesByUIDs($arrayUids);
+    }
+
+    public function saveID($data)
+    {
+        return $this->_ci->SAPMitarbeiterModel->insert($data);
     }
 }
 

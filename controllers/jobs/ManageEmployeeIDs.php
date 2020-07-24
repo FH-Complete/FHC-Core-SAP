@@ -52,8 +52,8 @@ class ManageEmployeeIDs extends JQW_Controller
                     foreach($employeeUuids->retval as $uuid)
                     {
                         $results[] = array(
-                            'uid' => strtolower($uuid->C_BusinessUserId),
-                            'uuid' => $uuid->C_EeId
+                            'mitarbeiter_uid' => strtolower($uuid->C_BusinessUserId),
+                            'sap_eeid' => $uuid->C_EeId
                         );
                     }
                 }
@@ -65,7 +65,11 @@ class ManageEmployeeIDs extends JQW_Controller
         }
         while ($moreData);
 
-        var_dump($results);
+        // save results in DB
+        foreach ($results as $id)
+        {
+            $this->syncemployeeidslib->saveID($id);
+        }
     }
 }
 
