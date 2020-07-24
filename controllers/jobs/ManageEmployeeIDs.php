@@ -31,7 +31,7 @@ class ManageEmployeeIDs extends JQW_Controller
     {
         $results = array();
         $offset = 0;
-        $moreData = true;
+        $maxOffset = 5000;
 
         do
         {
@@ -57,13 +57,11 @@ class ManageEmployeeIDs extends JQW_Controller
                         );
                     }
                 }
-
-                $offset += 50;
             }
-            else
-                $moreData = false;
+
+            $offset += 50;
         }
-        while ($moreData);
+        while ($offset <= $maxOffset);
 
         // save results in DB
         foreach ($results as $id)

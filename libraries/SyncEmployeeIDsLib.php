@@ -33,6 +33,10 @@ class SyncEmployeeIDsLib
         return $dbModel->execReadOnlyQuery('
 			SELECT m.mitarbeiter_uid
 			FROM public.tbl_mitarbeiter m
+			WHERE m.mitarbeiter_uid NOT IN (
+			    SELECT mitarbeiter_uid
+			    FROM sync.tbl_sap_mitarbeiter
+			)
 			LIMIT ? OFFSET ?
 		', array($limit, $offset));
     }
