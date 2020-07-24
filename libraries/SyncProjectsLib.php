@@ -18,6 +18,8 @@ class SyncProjectsLib
 	const PROJECT_PERSON_RESPONSIBLES = 'project_person_responsibles';
 	const PROJECT_TYPES = 'project_types';
 	const PROJECT_MAX_NUMBER_COST_CENTERS = 'project_max_number_cost_centers';
+	const PROJECT_PERSON_RESPONSIBLE_CUSTOM = 'project_person_responsible_custom';
+	const PROJECT_TYPE_CUSTOM = 'project_type_custom';
 
 	// Project types
 	const ADMIN_PROJECT = 'admin';
@@ -157,6 +159,14 @@ class SyncProjectsLib
 				$projectUnitResponsibles,
 				$projectPersonResponsibles,
 				$projectTypes,
+				$studySemesterStartDateTS,
+				$studySemesterEndDateTS
+			);
+			if (isError($createResult)) return $createResult;
+
+			// Create custom projects
+			$createResult = $this->_syncCustomProject(
+				$lastOrCurrentStudySemester,
 				$studySemesterStartDateTS,
 				$studySemesterEndDateTS
 			);
@@ -856,4 +866,220 @@ class SyncProjectsLib
 
 		return success('Project admin synchronization ended succesfully');
 	}
+
+	/**
+	 *
+	 */
+	private function _syncCustomProject(
+		$studySemester,
+		$studySemesterStartDateTS,
+		$studySemesterEndDateTS
+	)
+	{
+		// Project person responsible
+		$personResponsible = $this->_ci->config->item(self::PROJECT_PERSON_RESPONSIBLE_CUSTOM);
+		// Project type
+		$type = $this->_ci->config->item(self::PROJECT_TYPE_CUSTOM);
+
+		$dbModel = new DB_Model();
+
+		// Loads all the custom projects
+		$customResult = $dbModel->execReadOnlyQuery('
+			SELECT s0.bezeichnung AS project_id,
+        			UPPER(s0.typ || s0.kurzbz) AS name,
+			        (
+					SELECT so.oe_kurzbz_sap
+					  FROM sync.tbl_sap_organisationsstruktur so
+					 WHERE so.oe_kurzbz = \'tlc\'
+				) AS unit_responsible,
+				s0.studiengang_kz
+			  FROM public.tbl_studiengang s0
+			 WHERE s0.studiengang_kz IN(10002, 10026, 10005, 10025)
+			 UNION
+			SELECT s1.bezeichnung AS project_id,
+				UPPER(s1.typ || s1.kurzbz) AS name,
+			        (
+					SELECT so.oe_kurzbz_sap
+					  FROM sync.tbl_sap_organisationsstruktur so
+					 WHERE so.oe_kurzbz = \'Auslandsbuero\'
+				) AS unit_responsible,
+				s1.studiengang_kz
+			  FROM public.tbl_studiengang s1
+			 WHERE s1.studiengang_kz IN(10006)
+		');
+
+		// If error occurred while retrieving custom projects from database the return the error
+		if (isError($customResult)) return $customResult;
+		if (!hasData($customResult)) return success('No custom projects found in database');
+
+		// For each custom project found in database
+		foreach (getData($customResult) as $customProject)
+		{
+			$projectId = strtoupper(str_replace(' ', '-', $customProject->project_id)); // project id
+
+			// Create the project on ByD
+			$createProjectResult = $this->_ci->ProjectsModel->create(
+				$projectId,
+				$type,
+				$customProject->unit_responsible,
+				$personResponsible,
+				$studySemesterStartDateTS,
+				$studySemesterEndDateTS
+			);
+
+			// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+			if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+
+			$projectObjectId = null;
+
+			// If the projects is not alredy present it is _not_ needed to sync the database
+			if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+			{
+				// Add entry database into sync table for projects
+				$insertResult = $this->_ci->SAPProjectsCoursesModel->insert(
+					array(
+						'project_id' => $projectId,
+						'project_object_id' => getData($createProjectResult)->ObjectID,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $customProject->studiengang_kz
+					)
+				);
+
+				// If error occurred during insert return database error
+				if (isError($insertResult)) return $insertResult;
+
+				$projectObjectId = getData($createProjectResult)->ObjectID;
+			}
+			else
+			{
+				$projectResult = $this->_ci->SAPProjectsCoursesModel->loadWhere(
+					array(
+						'project_id' => $projectId,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $customProject->studiengang_kz
+					)
+				);
+
+				// If an error occurred while getting project info from database return the error itself
+				if (isError($projectResult)) return $projectResult;
+				// If no data found with these parameters
+				if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects_courses');
+
+				$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+			}
+
+			// If was not possible to find a valid project object id
+			if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid lehrgaenge project object id');
+
+			// Update project ProjectTaskCollection name
+			$projectName = sprintf('%s %s', $customProject->name, $studySemester);
+			$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
+				$projectObjectId,
+				$projectName
+			);
+
+			// If an error occurred while creating the project on ByD return the error
+			if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+			// Set the project as active
+			$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+			// If an error occurred while setting the project as active on ByD
+			// and not because the project was alredy released then return the error
+			if (isError($setActiveResult)
+				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			{
+				return $setActiveResult;
+			}
+
+			// Loads employees for this custom project
+			$customEmployeesResult = $dbModel->execReadOnlyQuery('
+				SELECT lm.mitarbeiter_uid,
+					b.person_id,
+					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
+					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
+					\'0\' AS ma_soll_stunden,
+					\'0\' AS lehre_grobplanung
+				  FROM lehre.tbl_lehreinheitmitarbeiter lm
+				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+				  JOIN public.tbl_studiengang s USING(studiengang_kz)
+				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+				 WHERE l.studiensemester_kurzbz = ?
+				   AND s.studiengang_kz = ?
+			   	   AND m.fixangestellt = TRUE
+			      GROUP BY lm.mitarbeiter_uid, b.person_id
+			      ORDER BY lm.mitarbeiter_uid
+			', array($studySemester, $customProject->studiengang_kz));
+
+			// If error occurred while retrieving csutom project employee from database the return the error
+			if (isError($customEmployeesResult)) return $customEmployeesResult;
+
+			// If employees are present for this custom project
+			if (hasData($customEmployeesResult))
+			{
+				// For each employee
+				foreach (getData($customEmployeesResult) as $customEmployee)
+				{
+					// Get the service id for this employee
+					$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $customEmployee->person_id));
+
+					if (isError($serviceResult)) return $serviceResult;
+
+					// If the service is present for this employee
+					if (hasData($serviceResult))
+					{
+						// Get the employee from SAP
+						$sapEmployeeResult = $this->_ci->EmployeeModel->getEmployeesByUIDs(
+							array(
+								strtoupper($customEmployee->mitarbeiter_uid)
+							)
+						);
+
+						// If an error occurred return it
+						if (isError($sapEmployeeResult)) return $sapEmployeeResult;
+
+						// If an employee was found in SAP
+						if (hasData($sapEmployeeResult))
+						{
+							// Add employee to project team
+							$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
+								$projectObjectId,
+								getData($sapEmployeeResult)[0]->C_EeId,
+								$studySemesterStartDateTS,
+								$studySemesterEndDateTS,
+								$customEmployee->commited_work
+							);
+
+							// If an error occurred and it is not because of an already existing employee in this project
+							if (isError($addEmployeeResult)
+								&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
+							{
+								return $addEmployeeResult;
+							}
+
+							// Add employee to project work
+							$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
+								$projectObjectId,
+								getData($sapEmployeeResult)[0]->C_EeId,
+								getData($serviceResult)[0]->sap_service_id,
+								$customEmployee->planned_work
+							);
+
+							// If an error occurred and it is not because of an already existing employee in this project
+							if (isError($addEmployeeToTaskResult)
+								&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+							{
+								return $addEmployeeToTaskResult;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return success('Custom projects synchronization ended succesfully');
+	}
 }
+

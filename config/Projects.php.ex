@@ -38,9 +38,16 @@ $config['project_person_responsibles'] = array(
 	'lehrgaenge' => '9'	// lehrgaenge project person responsible
 );
 
+// Project person responsible for custom projects (required)
+$config['project_person_responsible_custom'] = '9';
+
 // Project types (required)
 $config['project_types'] = array(
 	'admin' => 'Z7',	// admin project type
 	'lehre' => 'Z3',	// lehre project type
 	'lehrgaenge' => 'Z2'	// lehrgaenge project type
 );
+
+// Project type for custom projects (required)
+$config['project_type_custom'] = 'Z3';
+
