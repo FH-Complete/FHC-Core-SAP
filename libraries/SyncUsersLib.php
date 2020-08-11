@@ -28,9 +28,6 @@ class SyncUsersLib
 	const SAP_GENDER_FEMALE = 2;
 	const SAP_GENDER_NON_BINARY = 3;
 
-	// Config entries for messaging
-	const CFG_OU_RECEIVERS_PRIVATE = 'ou_receivers_private';
-
 	// Prestundet statuses
 	const PS_STUDENT = 'Student';
 	const PS_BEWERBER = 'Bewerber';
@@ -51,8 +48,12 @@ class SyncUsersLib
 	// SAP default address value
 	const DEFAULT_ADDRESS = 'XXDEFAULT';
 
+	// Config entries for messaging
+	const CFG_OU_RECEIVERS_PRIVATE = 'ou_receivers_private';
+
 	// Config entries name
 	const USERS_PAYMENT_COMPANY_IDS = 'users_payment_company_ids';
+	const USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE = 'users_account_determination_debtor_group_code';
 
 	private $_ci; // Code igniter instance
 
@@ -907,10 +908,11 @@ class SyncUsersLib
 		{
 			$paymentCompanyIdsArray[] = array(
 				'CompanyID' => $paymentCompanyId,
-				'AccountDeterminationDebtorGroupCode' => '4010'
+				'AccountDeterminationDebtorGroupCode' => $this->_ci->config->item(self::USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE)
 			);
 		}
 
 		return $paymentCompanyIdsArray;
 	}
 }
+
