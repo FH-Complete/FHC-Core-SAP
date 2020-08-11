@@ -22,13 +22,18 @@ class SyncServicesLib
 	const SERVICES_VALUATION_COMPANY_IDS = 'services_valuation_company_ids';
 	const ACCOUNT_DETERMINATION_GROUP_CODE = 'services_account_determination_group_code';
 	const SET_OF_BOOKS_ID = 'services_set_of_books_id';
-	const SALES_ORGANISATION_ID = 'services_sales_organisation_id';
+	const SALES_ORGANISATION_ID = 'services_sales_organization_id';
 	const ITEM_GROUP_CODE = 'services_item_group_code';
 	const CATEGORY_GMBH = 'services_category_gmbh';
 	const CATEGORY_NOT_GMBH = 'services_category_not_gmbh';
+	const START_DATE = 'services_start_date';
 
 	const GMBH_CONFIG_INDX = 'gmbh';
 	const FHTW_CONFIG_INDX = 'fhtw';
+
+	// Database oe values for FHTW and GMBH
+	const GMBH_OE_VALUE = 'gmbh';
+	const FHTW_OE_VALUE = 'gst';
 
 	private $_ci; // Code igniter instance
 
@@ -162,6 +167,7 @@ class SyncServicesLib
 					$serviceData->description,
 					$serviceData->person_id,
 					$serviceData->category,
+					$serviceData->root_organization_unit,
 					$nonBlockingErrorsArray
 				);
 
@@ -199,7 +205,7 @@ class SyncServicesLib
 						$priceListId = '';
 						// If the root organization unit is GMBH then add this service to the FHTW price list
 						// NOTE: for price list the logic is inverted!
-						if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
 						{
 							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
 						}
@@ -221,7 +227,7 @@ class SyncServicesLib
 						// List price
 						$companyId = '';
 						// If the root organization unit is GMBH then add this service to the GMBH list price
-						if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
 						{
 							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
 						}
@@ -385,7 +391,7 @@ class SyncServicesLib
 							$priceListId = '';
 							// If the root organization unit is GMBH then add this service to the FHTW price list
 							// NOTE: for price list the logic is inverted!
-							if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+							if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
 							{
 								$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
 							}
@@ -407,7 +413,7 @@ class SyncServicesLib
 							// List price
 							$companyId = '';
 							// If the root organization unit is GMBH then add this service to the GMBH list price
-							if ($serviceData->root_organization_unit == $this->_ci->config->item(self::CATEGORY_GMBH))
+							if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
 							{
 								$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
 							}
@@ -602,8 +608,8 @@ class SyncServicesLib
 				// Store the root organization unit for this user
 				$userPersonalData->root_organization_unit = getData($rootOUResult)[0]->oe_kurzbz;
 
-				// If the root organisation unit of this user is not GMBH then set category as not gmbh
-				if ($userPersonalData->root_organization_unit != $this->_ci->config->item(self::CATEGORY_GMBH))
+				// If the root organization unit of this user is not GMBH then set category as not gmbh
+				if ($userPersonalData->root_organization_unit != self::GMBH_OE_VALUE)
 				{
 					$userPersonalData->category = $this->_ci->config->item(self::CATEGORY_NOT_GMBH);
 				}
@@ -693,7 +699,7 @@ class SyncServicesLib
 	/**
 	 *
 	 */
-	private function _manageServiceProductIn($description, $person_id, $category, &$nonBlockingErrorsArray)
+	private function _manageServiceProductIn($description, $person_id, $category, $rootOU, &$nonBlockingErrorsArray)
 	{
 		// Then create it!
 		$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
@@ -746,7 +752,7 @@ class SyncServicesLib
 							'listID' => 'AT'
 						)
 					),
-					'Valuation' => $this->_getValuationArray()
+					'Valuation' => $this->_getValuationArray($rootOU)
 				)
 			)
 		);
@@ -827,7 +833,7 @@ class SyncServicesLib
 					'CostRate' => array(
 						'actionCode' => '04',
 						'SetOfBooksID' => $this->_ci->config->item(self::SET_OF_BOOKS_ID),
-						'StartDate' => date('Y-m-d'),
+						'StartDate' => $this->_ci->config->item(self::START_DATE),
 						'Amount' => array(
 							'_' => $amount,
 							'currencyCode' => 'EUR'
@@ -896,17 +902,27 @@ class SyncServicesLib
 	/**
 	 * Generate valuation array
 	 */
-	private function _getValuationArray()
+	private function _getValuationArray($rootOU)
 	{
 		$valuationArray = [];
 
 		// Get all company ids
 		$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
-		// Activate valuation for each company
-		foreach ($companyIdsArray as $companyId)
+
+		// If the organization unit is GMBH then return the GMBH valuation
+		if ($rootOU == self::GMBH_OE_VALUE && isset($companyIdsArray[self::GMBH_CONFIG_INDX]))
 		{
 			$valuationArray[] = array(
-				'CompanyID' => $companyId,
+				'CompanyID' => $companyIdsArray[self::GMBH_CONFIG_INDX],
+				'LifeCycleStatusCode' => 1
+			);
+		}
+
+		// If the organization unit is FHTW then return the FHTW valuation
+		if ($rootOU == self::FHTW_OE_VALUE && isset($companyIdsArray[self::FHTW_CONFIG_INDX]))
+		{
+			$valuationArray[] = array(
+				'CompanyID' => $companyIdsArray[self::FHTW_CONFIG_INDX],
 				'LifeCycleStatusCode' => 1
 			);
 		}
