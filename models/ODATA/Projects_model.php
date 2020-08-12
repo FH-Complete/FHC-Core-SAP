@@ -215,5 +215,20 @@ class Projects_model extends ODATAClientModel
 			)
 		);
 	}
+
+	/**
+	 * 
+	 */
+	public function setTimeRecordingOff($projectObjectId)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$projectObjectId.'\')',
+			ODATAClientLib::HTTP_MERGE_METHOD,
+			array(
+				'ObjectID' => $projectObjectId,
+				'TimeConfirmationProfileCode' => '1'
+			)
+		);
+	}
 }
 

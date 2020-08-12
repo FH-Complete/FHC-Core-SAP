@@ -675,6 +675,12 @@ class SyncProjectsLib
 		// If an error occurred while creating the project on ByD return the error
 		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
 
+		// Update the time recording attribute of the project
+		$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+
+		// If an error occurred while setting the project time recording as not allowed
+		if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+
 		// Set the project as active
 		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
 
