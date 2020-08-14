@@ -7,6 +7,9 @@ $config['project_id_formats'] = array(
 	'lehrgaenge' => 'LG-%s-%s'	// lehrgaenge project id format
 );
 
+// Custom projects id format
+$config['project_custom_id_format'] = '%s-%s';
+
 // Project name formats for each study semester (required)
 $config['project_name_formats'] = array(
 	'admin' => 'Admin %s',		// admin project

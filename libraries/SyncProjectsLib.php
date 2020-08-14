@@ -20,6 +20,7 @@ class SyncProjectsLib
 	const PROJECT_MAX_NUMBER_COST_CENTERS = 'project_max_number_cost_centers';
 	const PROJECT_PERSON_RESPONSIBLE_CUSTOM = 'project_person_responsible_custom';
 	const PROJECT_TYPE_CUSTOM = 'project_type_custom';
+	const PROJECT_CUSTOM_ID_FORMAT = 'project_custom_id_format';
 
 	// Project types
 	const ADMIN_PROJECT = 'admin';
@@ -891,7 +892,7 @@ class SyncProjectsLib
 
 		// Loads all the custom projects
 		$customResult = $dbModel->execReadOnlyQuery('
-			SELECT s0.bezeichnung AS project_id,
+			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
         			UPPER(s0.typ || s0.kurzbz) AS name,
 			        (
 					SELECT so.oe_kurzbz_sap
@@ -902,7 +903,7 @@ class SyncProjectsLib
 			  FROM public.tbl_studiengang s0
 			 WHERE s0.studiengang_kz IN(10002, 10026, 10005, 10025)
 			 UNION
-			SELECT s1.bezeichnung AS project_id,
+			SELECT UPPER(s1.typ || s1.kurzbz) AS project_id,
 				UPPER(s1.typ || s1.kurzbz) AS name,
 			        (
 					SELECT so.oe_kurzbz_sap
@@ -921,7 +922,14 @@ class SyncProjectsLib
 		// For each custom project found in database
 		foreach (getData($customResult) as $customProject)
 		{
-			$projectId = strtoupper(str_replace(' ', '-', $customProject->project_id)); // project id
+			// Project id
+			$projectId = strtoupper(
+				sprintf(
+					$this->_ci->config->item(self::PROJECT_CUSTOM_ID_FORMAT),
+					str_replace(' ', '-', $customProject->project_id), // replace blanks with scores
+					$studySemester
+				)
+			);
 
 			// Create the project on ByD
 			$createProjectResult = $this->_ci->ProjectsModel->create(
