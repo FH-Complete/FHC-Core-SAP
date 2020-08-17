@@ -49,7 +49,7 @@ class ManageProjects extends JOB_Controller
 	}
 
 	/**
-	 * 
+	 * Updates and creates projects on SAP side
 	 */
 	public function sync()
 	{
