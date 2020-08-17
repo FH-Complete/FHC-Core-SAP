@@ -737,25 +737,7 @@ class SyncServicesLib
 						'LifeCycleStatusCode' => 2,
 						'PurchasingMeasureUnitCode' => 'HUR'
 					),
-					'DeviantTaxClassification' => array(
-						'CountryCode' => 'AT',
-						'RegionCode' => array(
-							0 => '',
-							'listID' => 'AT'
-						),
-						'TaxTypeCode' => array(
-							'_' => 1,
-							'listID' => 'AT'
-						),
-						'TaxRateTypeCode' => array(
-							'_' => 1,
-							'listID' => 'AT'
-						),
-						'TaxExemptionReasonCode' => array(
-							'_' => 1,
-							'listID' => 'AT'
-						)
-					),
+					'DeviantTaxClassification' => $this->_getTaxesArray($rootOU),
 					'Sales' => $this->_getSalesArray($rootOU),
 					'Valuation' => $this->_getValuationArray()
 				)
@@ -961,6 +943,40 @@ class SyncServicesLib
 		}
 
 		return $salesArray;
+	}
+
+	/**
+	 * Generate taxes array
+	 */
+	private function _getTaxesArray($rootOU)
+	{
+		$taxesArray = [];
+
+		// If the organization unit is FHTW then return the FHTW taxes
+		if ($rootOU == self::FHTW_OE_VALUE)
+		{
+			$taxesArray = array(
+				'CountryCode' => 'AT',
+				'RegionCode' => array(
+					0 => '',
+					'listID' => 'AT'
+				),
+				'TaxTypeCode' => array(
+					'_' => 1,
+					'listID' => 'AT'
+				),
+				'TaxRateTypeCode' => array(
+					'_' => 1,
+					'listID' => 'AT'
+				),
+				'TaxExemptionReasonCode' => array(
+					'_' => 1,
+					'listID' => 'AT'
+				)
+			);
+		}
+
+		return $taxesArray;
 	}
 }
 

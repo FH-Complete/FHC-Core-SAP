@@ -7,9 +7,6 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class SyncProjectsLib
 {
-	// Jobs types used by this lib
-	const SAP_PROJECTS_SYNC = 'SAPProjectsSync';
-
 	// Indexes used to access to the configuration array
 	const PROJECT_ID_FORMATS = 'project_id_formats';
 	const PROJECT_NAME_FORMATS = 'project_name_formats';

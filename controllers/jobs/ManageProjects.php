@@ -3,9 +3,9 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * Job Queue Worker to create or update projects in SAP Business by Design
+ * Job to create or update projects in SAP Business by Design
  */
-class ManageProjects extends JQW_Controller
+class ManageProjects extends JOB_Controller
 {
 	/**
 	 * Controller initialization
@@ -55,49 +55,32 @@ class ManageProjects extends JQW_Controller
 	{
 		$this->logInfo('Start projects synchronization with SAP ByD');
 
-		// Gets the latest jobs
-		$lastJobs = $this->getLastJobs(SyncProjectsLib::SAP_PROJECTS_SYNC);
-		if (isError($lastJobs))
-		{
-			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncProjectsLib::SAP_PROJECTS_SYNC);
-		}
-		elseif (hasData($lastJobs))
-		{
-			$syncResult = $this->syncprojectslib->sync();
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync();
 
-			// If an error occurred then log it
-			if (isError($syncResult))
+		// If an error occurred then log it
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			// If non blocking errors are present...
+			if (hasData($syncResult))
 			{
-				$this->logError(getCode($syncResult).': '.getError($syncResult));
-			}
-			else // otherwise
-			{
-				// If non blocking errors are present...
-				if (hasData($syncResult))
+				if (!isEmptyArray(getData($syncResult)))
 				{
-					if (!isEmptyArray(getData($syncResult)))
+					// ...then log them all as warnings
+					foreach (getData($syncResult) as $nonBlockingError)
 					{
-						// ...then log them all as warnings
-						foreach (getData($syncResult) as $nonBlockingError)
-						{
-							$this->logWarning($nonBlockingError);
-						}
-					}
-					// Else if it a single message log it as info
-					elseif (!isEmptyString(getData($syncResult)))
-					{
-						$this->logInfo(getData($syncResult));
+						$this->logWarning($nonBlockingError);
 					}
 				}
-
-				// Update jobs properties values
-				$this->updateJobs(
-					getData($lastJobs), // Jobs to be updated
-					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
-					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
-				);
-				
-				if (hasData($lastJobs)) $this->updateJobsQueue(SyncProjectsLib::SAP_PROJECTS_SYNC, getData($lastJobs));
+				// Else if it a single message log it as info
+				elseif (!isEmptyString(getData($syncResult)))
+				{
+					$this->logInfo(getData($syncResult));
+				}
 			}
 		}
 
