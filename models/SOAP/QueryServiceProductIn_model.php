@@ -5,9 +5,9 @@ require_once 'CoreAPIModel.php';
 /**
  * This implements all the calls for:
  * API set name SAPCoreAPI
- * Service name QueryServiceProductValuationDataIn
+ * Service name QueryServiceProductIn
  */
-class QueryServiceProductValuationDataIn_model extends CoreAPIModel
+class QueryServiceProductIn_model extends CoreAPIModel
 {
 	/**
 	 * Set the properties to perform SOAP calls
@@ -16,7 +16,7 @@ class QueryServiceProductValuationDataIn_model extends CoreAPIModel
 	{
 		parent::__construct();
 
-		$this->_serviceName = 'QueryServiceProductValuationDataIn'; // service name
+		$this->_serviceName = 'QueryServiceProductIn'; // service name
 	}
 
 	// --------------------------------------------------------------------------------------------

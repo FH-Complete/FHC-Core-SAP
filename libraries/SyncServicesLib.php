@@ -44,8 +44,9 @@ class SyncServicesLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
-		// Loads QueryServiceProductValuationDataInModel
-		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryServiceProductValuationDataIn_model', 'QueryServiceProductValuationDataInModel');
+		// Loads QueryServiceProductIn
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryServiceProductIn_model', 'QueryServiceProductInModel');
+
 		// Loads ManageServiceProductInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageServiceProductIn_model', 'ManageServiceProductInModel');
 		// Loads ManageServiceProductValuationDataInModel
@@ -70,12 +71,12 @@ class SyncServicesLib
 	// Public methods
 
 	/**
-	 * Return the raw result of SAP->QueryServiceProductValuationDataIn->SelectionByDescription->LowerBoundaryDescription
+	 * Return the raw result of SAP->QueryServiceProductIn->SelectionByDescription->LowerBoundaryDescription
 	 */
 	public function getServiceByDescription($description)
 	{
 		// Calls SAP to find a service with the given description
-		return $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
+		return $this->_ci->QueryServiceProductInModel->findByElements(
 			array(
 				'ServiceProductSelectionByElements' => array(
 					'SelectionByDescription' => array(
@@ -92,12 +93,12 @@ class SyncServicesLib
 	}
 
 	/**
-	 * Return the raw result of SAP->QueryServiceProductValuationDataIn->SelectionByDescription->LowerBoundaryInternalID
+	 * Return the raw result of SAP->QueryServiceProductIn->SelectionByDescription->LowerBoundaryInternalID
 	 */
 	public function getServiceById($id)
 	{
 		// Calls SAP to find a service with the given service id
-		return $this->_ci->QueryServiceProductValuationDataInModel->findByElements(
+		return $this->_ci->QueryServiceProductInModel->findByElements(
 			array(
 				'ServiceProductSelectionByElements' => array(
 					'SelectionByInternalID' => array(
@@ -736,7 +737,6 @@ class SyncServicesLib
 						'LifeCycleStatusCode' => 2,
 						'PurchasingMeasureUnitCode' => 'HUR'
 					),
-					'Sales' => $this->_getSalesArray(),
 					'DeviantTaxClassification' => array(
 						'CountryCode' => 'AT',
 						'RegionCode' => array(
@@ -750,9 +750,14 @@ class SyncServicesLib
 						'TaxRateTypeCode' => array(
 							'_' => 1,
 							'listID' => 'AT'
+						),
+						'TaxExemptionReasonCode' => array(
+							'_' => 1,
+							'listID' => 'AT'
 						)
 					),
-					'Valuation' => $this->_getValuationArray($rootOU)
+					'Sales' => $this->_getSalesArray($rootOU),
+					'Valuation' => $this->_getValuationArray()
 				)
 			)
 		);
@@ -902,27 +907,18 @@ class SyncServicesLib
 	/**
 	 * Generate valuation array
 	 */
-	private function _getValuationArray($rootOU)
+	private function _getValuationArray()
 	{
 		$valuationArray = [];
 
 		// Get all company ids
 		$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
 
-		// If the organization unit is GMBH then return the GMBH valuation
-		if ($rootOU == self::GMBH_OE_VALUE && isset($companyIdsArray[self::GMBH_CONFIG_INDX]))
+		// Activate valuation for each company
+		foreach ($companyIdsArray as $companyId)
 		{
 			$valuationArray[] = array(
-				'CompanyID' => $companyIdsArray[self::GMBH_CONFIG_INDX],
-				'LifeCycleStatusCode' => 1
-			);
-		}
-
-		// If the organization unit is FHTW then return the FHTW valuation
-		if ($rootOU == self::FHTW_OE_VALUE && isset($companyIdsArray[self::FHTW_CONFIG_INDX]))
-		{
-			$valuationArray[] = array(
-				'CompanyID' => $companyIdsArray[self::FHTW_CONFIG_INDX],
+				'CompanyID' => $companyId,
 				'LifeCycleStatusCode' => 1
 			);
 		}
@@ -933,17 +929,30 @@ class SyncServicesLib
 	/**
 	 * Generate sales array
 	 */
-	private function _getSalesArray()
+	private function _getSalesArray($rootOU)
 	{
 		$salesArray = [];
 
 		// Get all company ids
 		$companyIdsArray = $this->_ci->config->item(self::SALES_ORGANISATION_ID);
-		// Activate valuation for each company
-		foreach ($companyIdsArray as $companyId)
+
+		// If the organization unit is GMBH then return the GMBH sales
+		if ($rootOU == self::GMBH_OE_VALUE && isset($companyIdsArray[self::GMBH_CONFIG_INDX]))
 		{
 			$salesArray[] = array(
-				'SalesOrganisationID' => $companyId,
+				'SalesOrganisationID' => $companyIdsArray[self::GMBH_CONFIG_INDX],
+				'DistributionChannelCode' => array('_' => '01'),
+				'LifeCycleStatusCode' => 2,
+				'SalesMeasureUnitCode' => 'HUR',
+				'ItemGroupCode' => $this->_ci->config->item(self::ITEM_GROUP_CODE)
+			);
+		}
+
+		// If the organization unit is FHTW then return the FHTW sales
+		if ($rootOU == self::FHTW_OE_VALUE && isset($companyIdsArray[self::FHTW_CONFIG_INDX]))
+		{
+			$salesArray[] = array(
+				'SalesOrganisationID' => $companyIdsArray[self::FHTW_CONFIG_INDX],
 				'DistributionChannelCode' => array('_' => '01'),
 				'LifeCycleStatusCode' => 2,
 				'SalesMeasureUnitCode' => 'HUR',
