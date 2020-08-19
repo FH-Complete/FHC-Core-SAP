@@ -37,6 +37,7 @@ class SyncEmployeeIDsLib
 			    SELECT mitarbeiter_uid
 			    FROM sync.tbl_sap_mitarbeiter
 			)
+			ORDER BY mitarbeiter_uid
 			LIMIT ? OFFSET ?
 		', array($limit, $offset));
     }

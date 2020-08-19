@@ -45,19 +45,24 @@ class ManageEmployeeIDs extends JQW_Controller
                     $arrayUids[] = $uid->mitarbeiter_uid;
                 }
 
-                $employeeUuids = $this->syncemployeeidslib->getEmployeeUUIDs($arrayUids);
+			    $employeeUuids = $this->syncemployeeidslib->getEmployeeUUIDs($arrayUids);
 
-                if (is_array($employeeUuids->retval))
-                {
-                    foreach($employeeUuids->retval as $uuid)
-                    {
-                        $results[] = array(
-                            'mitarbeiter_uid' => strtolower($uuid->C_BusinessUserId),
-                            'sap_eeid' => $uuid->C_EeId
-                        );
-                    }
-                }
+	            if (is_array($employeeUuids->retval))
+	            {
+	                foreach($employeeUuids->retval as $uuid)
+	                {
+	                    $results[] = array(
+	                        'mitarbeiter_uid' => strtolower($uuid->C_BusinessUserId),
+	                        'sap_eeid' => $uuid->C_EeId
+	                    );
+	                }
+	            }
             }
+			else
+			{
+				// no more data - stop working
+				break;
+			}
 
             $offset += 50;
         }
