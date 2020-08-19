@@ -13,9 +13,8 @@ COMMENT ON COLUMN sync.tbl_sap_projects_courses.studiengang_kz IS 'FH Course ID'
 
 DO $$
 BEGIN
-	ALTER TABLE sync.tbl_sap_projects_courses
-	ADD CONSTRAINT tbl_sap_projects_courses_pkey
-	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, project_task_id, project_task_object_id, studiengang_kz);
+	ALTER TABLE sync.tbl_sap_projects_courses ADD CONSTRAINT tbl_sap_projects_courses_pkey
+	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, studiengang_kz);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
