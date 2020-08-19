@@ -11,6 +11,7 @@ class JQMSchedulerLib
 
 	const JOB_TYPE_SAP_NEW_USERS = 'SAPUsersCreate';
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
+	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
 
 	/**
 	 * Object initialization
@@ -135,6 +136,40 @@ class JQMSchedulerLib
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
 		$jobInput = json_encode(array_merge($persons, $contacts, $addresses));
+
+		return success($jobInput);
+	}
+
+	/**
+	 * Looks for new users that have been created in FHC and stores their person id into a services job input
+	 */
+	public function newServices()
+	{
+		$jobInput = null;
+
+		$dbModel = new DB_Model();
+
+		// 
+		$newUsersResult = $dbModel->execReadOnlyQuery('
+			SELECT b.person_id
+			  FROM public.tbl_benutzer b
+			  JOIN public.tbl_mitarbeiter m ON(m.mitarbeiter_uid = b.uid)
+			 WHERE NOW() - m.insertamum::timestamptz <= INTERVAL \'42 hours\'
+			   AND m.fixangestellt = TRUE
+			   AND b.aktiv = TRUE
+			   AND b.person_id NOT IN (
+				SELECT ss.person_id FROM sync.tbl_sap_services ss
+			   )
+		');
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($newUsersResult)) return $newUsersResult;
+
+		// If new users are present
+		if (hasData($newUsersResult))
+		{
+			$jobInput = json_encode(getData($newUsersResult));
+		}
 
 		return success($jobInput);
 	}
