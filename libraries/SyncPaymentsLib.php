@@ -26,7 +26,7 @@ class SyncPaymentsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QuerySalesOrderIn_model', 'QuerySalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesOrderIn_model', 'ManageSalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerInvoiceRequestIn_model', 'ManageCustomerInvoiceRequestInModel');
-
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/SORelease_model', 'SOReleaseModel');
 		$this->_ci->load->model('crm/Konto_model', 'KontoModel');
 
 		// Loads SAPSalesOrderModel
@@ -274,8 +274,13 @@ class SyncPaymentsLib
 					{
 						if ($last_stg != '')
 						{
+							if($last_stg < 0)
+								$release = false;
+							else
+								$release = true;
+
 							// Create Sales Order for previous Degree Programm
-							$this->_CreateSalesOrder($data, $buchungsnr_arr);
+							$this->_CreateSalesOrder($data, $buchungsnr_arr, $release);
 						}
 						$last_stg = $row_payment->studiengang_kz;
 						$buchungsnr_arr = array();
@@ -405,7 +410,12 @@ class SyncPaymentsLib
 
 			if (count($data) > 0)
 			{
-				$result = $this->_CreateSalesOrder($data, $buchungsnr_arr);
+				if($last_stg < 0)
+					$release = false;
+				else
+					$release = true;
+
+				$result = $this->_CreateSalesOrder($data, $buchungsnr_arr, $release);
 				if(hasData($result))
 					$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($result));
 			}
@@ -417,7 +427,7 @@ class SyncPaymentsLib
 	/**
 	 * Create a SalesOrder and writes the Sync Table entry
 	 */
-	private function _CreateSalesOrder($data, $buchungsnr_arr)
+	private function _CreateSalesOrder($data, $buchungsnr_arr, $release)
 	{
 
 		$nonBlockingErrorsArray = array();
@@ -433,6 +443,13 @@ echo print_r($manageSalesOrderResult,true);
 			// If data structure is ok...
 			if (isset($manageSalesOrder->SalesOrder) && isset($manageSalesOrder->SalesOrder->ID) && isset($manageSalesOrder->SalesOrder->ID->_))
 			{
+
+				if($release)
+				{
+					// If FH then Release SO that Invoice is created
+					$this->_releaseSO($manageSalesOrder->SalesOrder->ID);
+				}
+
 				foreach ($buchungsnr_arr as $buchungsnr)
 				{
 					// Store in database the couple buchungsnr sales_order_id
@@ -473,6 +490,39 @@ echo print_r($manageSalesOrderResult,true);
 			}
 		}
 		return success($nonBlockingErrorsArray);
+	}
+
+	/**
+	 * Release SalesOrder and set Fullfillment
+	 * After this Invoices are created automatically at 5am for this SalesOrders
+	 */
+	private function _releaseSO($salesorderid)
+	{
+		$data = array(
+			'BasicMessageHeader' => array(
+				'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+				'UUID' => generateUUID()
+			),
+			 'SalesOrder'  => array(
+				 'ID' => $salesorderid
+			 )
+		 );
+
+		// Release a sales Order
+		$releaseResult = $this->_ci->SOReleaseModel->Release($data);
+
+		$data = array(
+			'BasicMessageHeader' => array(
+				'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+				'UUID' => generateUUID()
+			),
+			 'SalesOrder'  => array(
+				 'ID' => $salesorderid
+			 )
+		 );
+		$fullfillmentResult = $this->_ci->SOReleaseModel->FinishFulfilmentProcessingOfAllItems($data);
+
+		return true;
 	}
 
 	/**
