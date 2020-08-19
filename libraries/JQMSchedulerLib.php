@@ -149,7 +149,7 @@ class JQMSchedulerLib
 
 		$dbModel = new DB_Model();
 
-		// 
+		// Gets new permanent employees created in the last 42 hours
 		$newUsersResult = $dbModel->execReadOnlyQuery('
 			SELECT b.person_id
 			  FROM public.tbl_benutzer b
