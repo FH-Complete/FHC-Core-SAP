@@ -83,7 +83,7 @@ class SyncProjectsLib
 		else // otherwise get the last or current one
 		{
 			// Get the last or current studysemester
-			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getLastOrAktSemester();
+			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
 		}
 
 		// If an error occurred while getting the study semester return it
@@ -741,6 +741,8 @@ class SyncProjectsLib
 				   AND b.aktiv
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+				   AND so.oe_kurzbz_sap not like \'2%\'
+				   AND so.oe_kurzbz_sap not in(\'100000\',\'LPC\',\'LEHRGANG\')
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
@@ -777,7 +779,7 @@ class SyncProjectsLib
 						// Create a task for this project
 						$createTaskResult = $this->_ci->ProjectsModel->createTask(
 							$projectObjectId,
-							sprintf($taskFormatName, $costCenter->oe_kurzbz),
+							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz),0,40),
 							$costCenter->oe_kurzbz_sap
 						);
 
