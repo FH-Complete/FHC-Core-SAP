@@ -224,9 +224,9 @@ class SyncProjectsLib
 
 		if (hasData($projectsResult))
 		{
-			foreach (getData($projectResult) as $project)
+			foreach (getData($projectsResult) as $project)
 			{
-
+				var_dump($project);exit;
 			}
 		}
 		else

@@ -1,5 +1,7 @@
 <?php
 
+$config['odata_max_number_results'] = 99999; // max number of results provided by the odata api
+
 $config['odata_active_connection'] = 'DEFAULT'; // the used configuration set of the chosen connection
 
 // Example of a configuration set. All parameters are required!

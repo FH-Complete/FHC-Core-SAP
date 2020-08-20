@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_timesheets (
 	project_id character varying(42) NOT NULL,
 	project_object_id character varying(42) NOT NULL,
 	project_task_id character varying(42),
-	project_task_object_id character varying(42)
+	project_task_object_id character varying(42),
+	start_date timestamp DEFAULT NULL,
+	end_date timestamp DEFAULT NULL
 );
 
 COMMENT ON TABLE sync.tbl_sap_projects_timesheets IS 'Table to save SAP ByD Poject IDs';

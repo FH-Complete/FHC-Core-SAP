@@ -25,6 +25,7 @@ class ODATAClientLib
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'odata_active_connection';
 	const CONNECTIONS = 'odata_connections';
+	const MAX_NUMBER_RESULTS = 'odata_max_number_results';
 
 	// HTTP codes
 	const HTTP_OK = 200; // HTTP success code
@@ -42,6 +43,8 @@ class ODATAClientLib
 	const PATH = 'path';
 	const USERNAME = 'username';
 	const PASSWORD = 'password';
+
+	const TOP_ODATA_NAME = '$top'; // $top odata name
 
 	private $_connectionsArray;	// contains the connection parameters configuration array
 	private $_apiSetName;		// contains the api set name parameter
@@ -117,6 +120,12 @@ class ODATAClientLib
 	    	if (is_array($callParametersArray))
 	    	{
 			$this->_callParametersArray = $callParametersArray;
+
+			// If the config MAX_NUMBER_RESULTS is set then use it in any HTTP GET call
+			if ($this->_isGET() && $this->_ci->config->item(self::MAX_NUMBER_RESULTS) != null)
+			{
+				$this->_callParametersArray[self::TOP_ODATA_NAME] = $this->_ci->config->item(self::MAX_NUMBER_RESULTS);
+			}
 	    	}
 	    	else
 	    	{
