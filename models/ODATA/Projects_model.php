@@ -32,6 +32,17 @@ class Projects_model extends ODATAClientModel
 			ODATAClientLib::HTTP_GET_METHOD
 		);
 	}
+
+	/**
+	 * 
+	 */
+	public function getProjectsAndTasks()
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectCollection?$expand=ProjectTask',
+			ODATAClientLib::HTTP_GET_METHOD
+		);
+	}
 	
 	/**
 	 * 

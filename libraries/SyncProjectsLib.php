@@ -188,6 +188,14 @@ class SyncProjectsLib
 	}
 
 	/**
+	 * Return the raw result of projekt/ProjectCollection and all projects tasks
+	 */
+	public function getProjectsAndTasks()
+	{
+		return $this->_ci->ProjectsModel->getProjectsAndTasks();
+	}
+
+	/**
 	 * Return the raw result of projekt/ProjectCollection('$id')
 	 */
 	public function getProjectById($id)
@@ -201,6 +209,32 @@ class SyncProjectsLib
 	public function getProjectTasks($id)
 	{
 		return $this->_ci->ProjectsModel->getProjectTasks($id);
+	}
+
+	/**
+	 * Get all projects and their tasks from SAP Business by Design and store their ids in FHC database
+	 */
+	public function import()
+	{
+		// Get all projects and related tasks
+		$projectsResult = $this->_ci->ProjectsModel->getProjectsAndTasks();
+
+		// If an error occurred then return the error
+		if (isError($projectsResult)) return $projectsResult;
+
+		if (hasData($projectsResult))
+		{
+			foreach (getData($projectResult) as $project)
+			{
+
+			}
+		}
+		else
+		{
+			return success('No projects are present on SAP ByD');
+		}
+
+		return success('All project have been imported successfully');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -388,7 +422,7 @@ class SyncProjectsLib
 			}
 		}
 
-		return success('Project lehre synchronization ended succesfully');
+		return success('Project lehre synchronization ended successfully');
 	}
 
 	/**
@@ -591,7 +625,7 @@ class SyncProjectsLib
 			}
 		}
 
-		return success('Project lehrgaenge synchronization ended succesfully');
+		return success('Project lehrgaenge synchronization ended successfully');
 	}
 
 	/**
@@ -868,7 +902,7 @@ class SyncProjectsLib
 			}
 		}
 
-		return success('Project admin synchronization ended succesfully');
+		return success('Project admin synchronization ended successfully');
 	}
 
 	/**
@@ -1090,7 +1124,7 @@ class SyncProjectsLib
 			}
 		}
 
-		return success('Custom projects synchronization ended succesfully');
+		return success('Custom projects synchronization ended successfully');
 	}
 }
 

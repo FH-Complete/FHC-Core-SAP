@@ -33,6 +33,14 @@ class ManageProjects extends JOB_Controller
 	}
 	
 	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to get all projects and their tasks
+	 */
+	public function getProjectsAndTasks()
+	{
+		var_dump($this->syncprojectslib->getProjectsAndTasks());
+	}
+
+	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to get a project with the given ID
 	 */
 	public function getProjectById($id)

@@ -28,6 +28,13 @@ BEGIN
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+DO $$
+BEGIN
+	ALTER TABLE sync.tbl_sap_projects_timesheets ADD CONSTRAINT uk_sap_projects_timesheets
+	UNIQUE (project_id, project_object_id, project_task_id, project_task_object_id);
+	EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sync.tbl_sap_projects_timesheets TO vilesci;
 GRANT SELECT ON TABLE sync.tbl_sap_projects_timesheets TO web;
 
