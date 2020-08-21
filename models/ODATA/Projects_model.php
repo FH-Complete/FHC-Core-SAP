@@ -45,7 +45,8 @@ class Projects_model extends ODATAClientModel
 				'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode',
 				'$filter' => filter(array('3'), 'ProjectLifeCycleStatusCode', 'eq', 'or'),
 				'$orderby' => 'ProjectID',
-				'$expand' => 'ProjectTask'
+				'$expand' => 'ProjectTask',
+				'$top' => 999999
 			)
 		);
 	}
@@ -68,6 +69,17 @@ class Projects_model extends ODATAClientModel
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection(\''.$id.'\')/ProjectTask',
+			ODATAClientLib::HTTP_GET_METHOD
+		);
+	}
+
+	/**
+	 * 
+	 */
+	public function getProjectTaskService($id)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$id.'\')/ProjectTaskService',
 			ODATAClientLib::HTTP_GET_METHOD
 		);
 	}

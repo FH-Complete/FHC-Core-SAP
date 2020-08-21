@@ -55,6 +55,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPProjectsCostcenters_model', 'SAPProjectsCostcentersModel');
 		// Loads model SAPProjectsCoursesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPProjectsCourses_model', 'SAPProjectsCoursesModel');
+		// Loads model SAPProjectsTimesheets_model
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPProjectsTimesheets_model', 'SAPProjectsTimesheetsModel');
 
 		// Loads Projects configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
@@ -212,6 +214,14 @@ class SyncProjectsLib
 	}
 
 	/**
+	 * Return the raw result of projekt/ProjectTaskCollection('$id')/ProjectTaskService
+	 */
+	public function getProjectTaskService($id)
+	{
+		return $this->_ci->ProjectsModel->getProjectTaskService($id);
+	}
+
+	/**
 	 * Get all projects and their tasks from SAP Business by Design and store their ids in FHC database
 	 */
 	public function import()
@@ -222,11 +232,62 @@ class SyncProjectsLib
 		// If an error occurred then return the error
 		if (isError($projectsResult)) return $projectsResult;
 
+		// If projects are present
 		if (hasData($projectsResult))
 		{
+			// For each project found
 			foreach (getData($projectsResult) as $project)
 			{
-				var_dump($project);exit;
+				$startDate = $project->PlannedStartDateTime;
+				if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
+
+				$endDate = $project->PlannedEndDateTime;
+				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
+
+				// Add entry database into sync table for projects timesheets
+				$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
+					array(
+						'project_id' => $project->ProjectID,
+						'project_object_id' => $project->ObjectID,
+						'start_date' => $startDate,
+						'end_date' => $endDate
+					)
+				);
+
+				// If error occurred during insert return database error
+				if (isError($insertResult)) return $insertResult;
+
+				// If this project has tasks and more then one
+				// NOTE: the first task it's the project itself
+				if (!isEmptyArray($project->ProjectTask) && count($project->ProjectTask) > 1)
+				{
+					// For each task found except the firt one -> project itself
+					for ($tc = 1; $tc < count($project->ProjectTask); $tc++)
+					{
+						$projectTask = $project->ProjectTask[$tc];
+
+						$startDate = $projectTask->StartDateTime;
+						if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
+		
+						$endDate = $projectTask->EndDateTime;
+						if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
+
+						// Add entry database into sync table for projects timesheets
+						$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
+							array(
+								'project_id' => $project->ProjectID,
+								'project_object_id' => $project->ObjectID,
+								'project_task_id' => $projectTask->ID,
+								'project_task_object_id' => $projectTask->ObjectID,
+								'start_date' => $startDate,
+								'end_date' => $endDate
+							)
+						);
+		
+						// If error occurred during insert return database error
+						if (isError($insertResult)) return $insertResult;
+					}
+				}
 			}
 		}
 		else

@@ -57,7 +57,22 @@ function mergeUsersPersonIdArray($jobs)
  */
 function toDate($phpTimestamp)
 {
+	if ($phpTimestamp) return null;
+
 	return '/Date('.$phpTimestamp.'000)/';
+}
+
+/**
+ * Convert a SAP ODATA date to a PHP timestamp date
+ */
+function toTimestamp($sapTimestamp)
+{
+	if ($sapTimestamp == null) return null;
+
+	$phpTimestamp = str_replace('/Date(', '', $sapTimestamp);
+	$phpTimestamp = str_replace(')/', '', $phpTimestamp);
+
+	return substr($phpTimestamp, 0, 10);
 }
 
 /**
