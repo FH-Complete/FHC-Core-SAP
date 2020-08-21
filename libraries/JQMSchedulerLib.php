@@ -35,16 +35,16 @@ class JQMSchedulerLib
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
 
 		// Get the last or current studysemester
-		$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getLastOrAktSemester();
+		$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
 
 		// If an error occurred while getting the study semester return it
-		if (isError($lastOrCurrentStudySemesterResult)) return $lastOrCurrentStudySemesterResult;
+		if (isError($currentOrNextStudySemesterResult)) return $currentOrNextStudySemesterResult;
 
 		// If a study semester is configured in database
-		if (hasData($lastOrCurrentStudySemesterResult))
+		if (hasData($currentOrNextStudySemesterResult))
 		{
 			// Last or current study semester
-			$lastOrCurrentStudySemester = getData($lastOrCurrentStudySemesterResult)[0]->studiensemester_kurzbz;
+			$currentOrNextStudySemester = getData($currentOrNextStudySemesterResult)[0]->studiensemester_kurzbz;
 
 			$dbModel = new DB_Model();
 
@@ -56,7 +56,7 @@ class JQMSchedulerLib
 				 WHERE pss.studiensemester_kurzbz = ?
 				   AND pss.status_kurzbz IN (\'Aufgenommener\', \'Student\', \'Incoming\', \'Diplomand\')
 			      GROUP BY ps.person_id
-			', array($lastOrCurrentStudySemester));
+			', array($currentOrNextStudySemester));
 
 			// If error occurred while retrieving new users from database then return the error
 			if (isError($newUsersResult)) return $newUsersResult;

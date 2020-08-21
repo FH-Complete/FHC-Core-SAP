@@ -70,13 +70,13 @@ class SyncProjectsLib
 	 */
 	public function sync($studySemester = null)
 	{
-		$lastOrCurrentStudySemesterResult = null;
+		$currentOrNextStudySemesterResult = null;
 
 		// If a study semester was given as parameter
 		if (!isEmptyString($studySemester))
 		{
 			// Get info about the provided study semester
-			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->loadWhere(
+			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->loadWhere(
 				array(
 					'studiensemester_kurzbz' => $studySemester
 				)
@@ -85,17 +85,17 @@ class SyncProjectsLib
 		else // otherwise get the last or current one
 		{
 			// Get the last or current studysemester
-			$lastOrCurrentStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
+			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
 		}
 
 		// If an error occurred while getting the study semester return it
-		if (isError($lastOrCurrentStudySemesterResult)) return $lastOrCurrentStudySemesterResult;
+		if (isError($currentOrNextStudySemesterResult)) return $currentOrNextStudySemesterResult;
 
 		// If a study semester was found
-		if (hasData($lastOrCurrentStudySemesterResult))
+		if (hasData($currentOrNextStudySemesterResult))
 		{
 			// Last or current study semester
-			$lastOrCurrentStudySemester = getData($lastOrCurrentStudySemesterResult)[0]->studiensemester_kurzbz;
+			$currentOrNextStudySemester = getData($currentOrNextStudySemesterResult)[0]->studiensemester_kurzbz;
 
 			// Project structures are optionals and are used to create tasks for a project
 			$projectStructures = $this->_ci->config->item(self::PROJECT_STRUCTURES);
@@ -111,20 +111,20 @@ class SyncProjectsLib
 			$projectTypes = $this->_ci->config->item(self::PROJECT_TYPES);
 
 			// Get study semester start date
-			$studySemesterStartDate = getData($lastOrCurrentStudySemesterResult)[0]->start;
+			$studySemesterStartDate = getData($currentOrNextStudySemesterResult)[0]->start;
 			// Get study semester start date in timestamp format
-			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($lastOrCurrentStudySemesterResult)[0]->start.' 00:00:00');
+			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterStartDateTS = $dateTime->getTimestamp(); // project start date
 
 			// Get study semester end date
-			$studySemesterEndDate = getData($lastOrCurrentStudySemesterResult)[0]->ende;
+			$studySemesterEndDate = getData($currentOrNextStudySemesterResult)[0]->ende;
 			// Get study semester end date in timestamp format
-			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($lastOrCurrentStudySemesterResult)[0]->ende.' 00:00:00');
+			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
 			// Create admin project
 			$createResult = $this->_syncAdminProject(
-				$lastOrCurrentStudySemester,
+				$currentOrNextStudySemester,
 				$projectStructures,
 				$projectIdFormats,
 				$projectNameFormats,
@@ -140,7 +140,7 @@ class SyncProjectsLib
 
 			// Create lehre project
 			$createResult = $this->_syncLehreProject(
-				$lastOrCurrentStudySemester,
+				$currentOrNextStudySemester,
 				$projectIdFormats,
 				$projectNameFormats,
 				$projectUnitResponsibles,
@@ -153,7 +153,7 @@ class SyncProjectsLib
 
 			// Create lehrgaenge projects
 			$createResult = $this->_syncLehrgaengeProject(
-				$lastOrCurrentStudySemester,
+				$currentOrNextStudySemester,
 				$projectIdFormats,
 				$projectNameFormats,
 				$projectUnitResponsibles,
@@ -166,7 +166,7 @@ class SyncProjectsLib
 
 			// Create custom projects
 			$createResult = $this->_syncCustomProject(
-				$lastOrCurrentStudySemester,
+				$currentOrNextStudySemester,
 				$studySemesterStartDateTS,
 				$studySemesterEndDateTS
 			);
@@ -802,8 +802,8 @@ class SyncProjectsLib
 				   AND b.aktiv
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-				   AND so.oe_kurzbz_sap not like \'2%\'
-				   AND so.oe_kurzbz_sap not in(\'100000\',\'LPC\',\'LEHRGANG\')
+				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
+				   AND so.oe_kurzbz_sap NOT IN (\'100000\',\'LPC\',\'LEHRGANG\')
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
@@ -874,27 +874,25 @@ class SyncProjectsLib
 
 					// Loads employees for this cost center
 					$costCenterEmployeesResult = $dbModel->execReadOnlyQuery('
-						SELECT
-							m.mitarbeiter_uid,
+						SELECT m.mitarbeiter_uid,
 							b.person_id,
 							(
-								SELECT sum(wochenstunden) * 15
-								FROM public.tbl_benutzerfunktion bfws
-								WHERE
-								bfws.uid=m.mitarbeiter_uid
-								AND (bfws.datum_von IS NULL OR bfws.datum_von <= ?)
-								AND (bfws.datum_bis IS NULL OR bfws.datum_bis >= ?)
+								SELECT SUM(wochenstunden) * 15
+								  FROM public.tbl_benutzerfunktion bfws
+								 WHERE bfws.uid = m.mitarbeiter_uid
+								   AND (bfws.datum_von IS NULL OR bfws.datum_von <= ?)
+								   AND (bfws.datum_bis IS NULL OR bfws.datum_bis >= ?)
 							) as planned_work
-						FROM public.tbl_mitarbeiter m
-							JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
-							JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-							JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-						WHERE bf.funktion_kurzbz = \'oezuordnung\'
-							AND b.aktiv
-							AND m.fixangestellt = TRUE
-							AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
-							AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-							AND so.oe_kurzbz_sap = ?
+						  FROM public.tbl_mitarbeiter m
+						  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
+						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
+						   AND b.aktiv
+						   AND m.fixangestellt = TRUE
+						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+						   AND so.oe_kurzbz_sap = ?
 					', array($studySemesterEndDate, $studySemesterStartDate,$studySemesterEndDate, $studySemesterStartDate, $costCenter->oe_kurzbz_sap));
 
 					// If error occurred while retrieving const center employee from database the return the error
