@@ -55,6 +55,7 @@ class JQMSchedulerLib
 				  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 				 WHERE pss.studiensemester_kurzbz = ?
 				   AND pss.status_kurzbz IN (\'Aufgenommener\', \'Student\', \'Incoming\', \'Diplomand\')
+				   AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_students WHERE person_id=ps.person_id)
 			      GROUP BY ps.person_id
 			', array($currentOrNextStudySemester));
 
