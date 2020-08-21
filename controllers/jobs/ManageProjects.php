@@ -67,12 +67,12 @@ class ManageProjects extends JOB_Controller
 	/**
 	 * Updates and creates projects on SAP side
 	 */
-	public function sync()
+	public function sync($studySemester = null)
 	{
 		$this->logInfo('Start projects synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync();
+		$syncResult = $this->syncprojectslib->sync($studySemester);
 
 		// If an error occurred then log it
 		if (isError($syncResult))
