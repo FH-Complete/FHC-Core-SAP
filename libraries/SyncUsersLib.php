@@ -725,6 +725,10 @@ class SyncUsersLib
 			{
 				$userAllData->email = getData($kontaktResult)[0]->kontakt;
 			}
+			else // otherwise set the email as null, it should be checked later every time before using it
+			{
+				$userAllData->email = null;
+			}
 
 			// Get the prestudentstatus for the just obtained prestudent
 			$this->_ci->load->model('crm/Prestudentstatus_model', 'PrestudentstatusModel');
