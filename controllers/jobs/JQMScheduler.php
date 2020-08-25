@@ -24,12 +24,12 @@ class JQMScheduler extends JQW_Controller
 	/**
 	 *
 	 */
-	public function newUsers()
+	public function newUsers($studySemester = null)
 	{
 		$this->logInfo('Start job queue scheduler FHC-Core-SAP->newUsers');
 
 		// Generates the input for the new job
-		$jobInputResult = $this->jqmschedulerlib->newUsers();
+		$jobInputResult = $this->jqmschedulerlib->newUsers($studySemester);
 
 		// If an error occured then log it
 		if (isError($jobInputResult))

@@ -27,15 +27,29 @@ class JQMSchedulerLib
 	/**
 	 * Looks for new users that have been created in FHC and stores their person id into a job input
 	 */
-	public function newUsers()
+	public function newUsers($studySemester = null)
 	{
 		$jobInput = null;
+		$currentOrNextStudySemesterResult = null;
 
 		// Loads the StudiensemesterModel
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
 
-		// Get the last or current studysemester
-		$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
+		// If a study semester was given as parameter
+		if (!isEmptyString($studySemester))
+		{
+			// Get info about the provided study semester
+			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->loadWhere(
+				array(
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+		}
+		else // otherwise get the last or current one
+		{
+			// Get the last or current studysemester
+			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
+		}
 
 		// If an error occurred while getting the study semester return it
 		if (isError($currentOrNextStudySemesterResult)) return $currentOrNextStudySemesterResult;
