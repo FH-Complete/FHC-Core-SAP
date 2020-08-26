@@ -43,7 +43,6 @@ class Projects_model extends ODATAClientModel
 			ODATAClientLib::HTTP_GET_METHOD,
 			array(
 				'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode',
-				'$filter' => filter(array('3'), 'ProjectLifeCycleStatusCode', 'eq', 'or'),
 				'$orderby' => 'ProjectID',
 				'$expand' => 'ProjectTask',
 				'$top' => 999999

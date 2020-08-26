@@ -238,24 +238,83 @@ class SyncProjectsLib
 			// For each project found
 			foreach (getData($projectsResult) as $project)
 			{
-				$startDate = $project->PlannedStartDateTime;
-				if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
-
-				$endDate = $project->PlannedEndDateTime;
-				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
-
-				// Add entry database into sync table for projects timesheets
-				$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
+				// Check if the project is already present with the SAP project object id
+				// NOTE: project_task_object_id have to be null to retrieve a single record
+				$sapProjectsTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
 					array(
-						'project_id' => $project->ProjectID,
 						'project_object_id' => $project->ObjectID,
-						'start_date' => $startDate,
-						'end_date' => $endDate
+						'project_task_object_id' => null
 					)
 				);
 
-				// If error occurred during insert return database error
-				if (isError($insertResult)) return $insertResult;
+				// If error occurred return database error
+                                if (isError($sapProjectsTimesheetsResult)) return $sapProjectsTimesheetsResult;
+
+				// Convert the start date from SAP date to timestamp
+				$startDate = $project->PlannedStartDateTime;
+				if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
+
+				// Convert the end date from SAP date to timestamp
+				$endDate = $project->PlannedEndDateTime;
+				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
+
+				// If already present then update
+				if (hasData($sapProjectsTimesheetsResult))
+				{
+					// Data from dabase
+					$sapProjectTimesheet = getData($sapProjectsTimesheetsResult)[0];
+
+					// Updates the already present record with data from SAP only if they differ
+					if ($project->ProjectID != $sapProjectTimesheet->project_id
+						|| $startDate != $sapProjectTimesheet->start_date
+						|| $endDate != $sapProjectTimesheet->end_date
+						|| $project->ProjectLifeCycleStatusCode != $sapProjectTimesheet->status)
+					{
+						// If the project id changed, then update all the records where the old project id is present
+						if ($project->ProjectID != $sapProjectTimesheet->project_id)
+						{
+							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->renameProjectId(
+								$sapProjectTimesheet->project_id,
+								$project->ProjectID
+							);
+
+                                        		// If error occurred during update return database error
+                                        		if (isError($updateResult)) return $updateResult;
+						}
+
+						// Updates everything except obejcts id and sets updateamum with the current date
+						// NOTE: there is no need to update the project id because was update before
+                                        	$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+							$sapProjectTimesheet->projects_timesheet_id,
+                                        	        array(
+                                        	                'start_date' => $startDate,
+                                        	                'end_date' => $endDate,
+								'status' => $project->ProjectLifeCycleStatusCode,
+								'updateamum' => 'NOW()'
+                                        	        )
+                                        	);
+
+                                        	// If error occurred during update return database error
+                                        	if (isError($updateResult)) return $updateResult;
+					}
+					// else continue to the next one
+				}
+				else // otherwise insert
+				{
+					// Add entry database into sync table for projects timesheets
+					$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
+						array(
+							'project_id' => $project->ProjectID,
+							'project_object_id' => $project->ObjectID,
+							'start_date' => $startDate,
+							'end_date' => $endDate,
+							'status' => $project->ProjectLifeCycleStatusCode
+						)
+					);
+
+					// If error occurred during insert return database error
+					if (isError($insertResult)) return $insertResult;
+				}
 
 				// If this project has tasks and more then one
 				// NOTE: the first task it's the project itself
@@ -264,28 +323,75 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					for ($tc = 1; $tc < count($project->ProjectTask); $tc++)
 					{
-						$projectTask = $project->ProjectTask[$tc];
+						$projectTask = $project->ProjectTask[$tc]; // get the current task
 
+						// Check if the task is already present with the SAP project object id and SAP task object id
+						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+							array(
+								'project_object_id' => $project->ObjectID,
+								'project_task_object_id' => $projectTask->ObjectID
+							)
+						);
+
+						// If error occurred return database error
+                        		        if (isError($sapProjectsTaskTimesheetsResult)) return $sapProjectsTaskTimesheetsResult;
+
+						// Convert the start date from SAP date to timestamp
 						$startDate = $projectTask->StartDateTime;
 						if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
 		
+						// Convert the end date from SAP date to timestamp
 						$endDate = $projectTask->EndDateTime;
 						if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
 
-						// Add entry database into sync table for projects timesheets
-						$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
-							array(
-								'project_id' => $project->ProjectID,
-								'project_object_id' => $project->ObjectID,
-								'project_task_id' => $projectTask->ID,
-								'project_task_object_id' => $projectTask->ObjectID,
-								'start_date' => $startDate,
-								'end_date' => $endDate
-							)
-						);
-		
-						// If error occurred during insert return database error
-						if (isError($insertResult)) return $insertResult;
+						// If already present then update
+						if (hasData($sapProjectsTaskTimesheetsResult))
+						{
+							// Data from database
+							$sapProjectTaskTimesheet = getData($sapProjectsTaskTimesheetsResult)[0];
+
+							// Updates the already present record with data from SAP only if they differ
+							if ($projectTask->ID != $sapProjectTaskTimesheet->project_task_id
+								|| $startDate != $sapProjectTaskTimesheet->start_date
+								|| $endDate != $sapProjectTaskTimesheet->end_date
+								|| $projectTask->LifeCycleStatusCode != $sapProjectTaskTimesheet->status)
+							{
+								// Updates everything except obejcts id and sets updateamum with the current date
+								// NOTE: there is no need to update the project id because was update before
+                                		        	$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+									$sapProjectTaskTimesheet->projects_timesheet_id,
+                                		        	        array(
+										'project_task_id' => $projectTask->ID,
+                                		        	                'start_date' => $startDate,
+                                		        	                'end_date' => $endDate,
+										'status' => $projectTask->LifeCycleStatusCode,
+										'updateamum' => 'NOW()'
+                                		        	        )
+                                		        	);
+
+                                		        	// If error occurred during update return database error
+                                		        	if (isError($updateResult)) return $updateResult;
+							}
+							// else continue with the next one
+						}
+						else // otherwise insert
+						{
+							// Add entry database into sync table for projects timesheets
+							$insertResult = $this->_ci->SAPProjectsTimesheetsModel->insert(
+								array(
+									'project_id' => $project->ProjectID,
+									'project_object_id' => $project->ObjectID,
+									'project_task_id' => $projectTask->ID,
+									'project_task_object_id' => $projectTask->ObjectID,
+									'start_date' => $startDate,
+									'end_date' => $endDate,
+									'status' => $projectTask->LifeCycleStatusCode
+								)
+							);
+
+							// If error occurred during insert return database error
+							if (isError($insertResult)) return $insertResult;
+						}
 					}
 				}
 			}
