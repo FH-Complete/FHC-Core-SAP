@@ -55,6 +55,11 @@ class SyncUsersLib
 	const USERS_PAYMENT_COMPANY_IDS = 'users_payment_company_ids';
 	const USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE = 'users_account_determination_debtor_group_code';
 
+	// Address info
+	const STRASSE_LENGHT = 60;
+	const ORT_LENGHT = 40;
+	const PLZ_LENGHT = 4;
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -148,7 +153,7 @@ class SyncUsersLib
 		if (isError($usersAllData)) return $usersAllData;
 		if (!hasData($usersAllData)) return error('No data available for the given users');
 
-				// Loops through users data
+		// Loops through users data
 		foreach (getData($usersAllData) as $userData)
 		{
 			// If an email address was not found for this user...
@@ -166,7 +171,6 @@ class SyncUsersLib
 			// If the current user is not present in SAP
 			if (!hasData($userDataSAP))
 			{
-
 				$data = array(
 					'BasicMessageHeader' => array(
 						'ID' => generateUID(self::CREATE_USER_PREFIX),
@@ -244,15 +248,8 @@ class SyncUsersLib
 					)
 				);
 
-				if(isset($userData->strasse))
-				{
-					$data['Customer']['AddressInformation']['Address']['PostalAddress'] = array(
-						'CountryCode' => $userData->country,
-						'CityName' => $userData->ort,
-						'StreetPostalCode' => $userData->plz,
-						'StreetName' => $userData->strasse
-					);
-				}
+				// Get the correct address info
+				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData, $nonBlockingErrorsArray);
 
 				// Then create it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
@@ -487,15 +484,8 @@ class SyncUsersLib
 					)
 				);
 
-				if(isset($userData->strasse))
-				{
-					$data['Customer']['AddressInformation']['Address']['PostalAddress'] = array(
-						'CountryCode' => $userData->country,
-						'CityName' => $userData->ort,
-						'StreetPostalCode' => $userData->plz,
-						'StreetName' => $userData->strasse
-					);
-				}
+				// Get the correct address info
+				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData, $nonBlockingErrorsArray);
 
 				// Then update it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
@@ -917,6 +907,52 @@ class SyncUsersLib
 		}
 
 		return $paymentCompanyIdsArray;
+	}
+
+	/**
+	 * Generate correct info address using the user data, if data do not match SAP requirements then they are shortened and
+	 * a warning message is generated
+	 */
+	private function _getAddressInformations($userData, &$nonBlockingErrorsArray)
+	{
+		$addressInformationArray = array(); // in case is not possible to generate address info
+
+		// If address info are present in database
+		if (isset($userData->strasse) && isset($userData->country) && isset($userData->plz) && isset($userData->ort))
+		{
+			// ORT
+			$ort = $userData->ort;
+			if (mb_strlen($userData->ort) >= self::ORT_LENGHT)
+			{
+				$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
+				$nonBlockingErrorsArray[] = 'Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id;
+			}
+
+			// Strasse
+			$strasse = $userData->strasse;
+			if (mb_strlen($userData->strasse) >= self::STRASSE_LENGHT)
+			{
+				$strasse = mb_substr($userData->strasse, 0, self::STRASSE_LENGHT);
+				$nonBlockingErrorsArray[] = 'Strasse is longer then '.self::STRASSE_LENGHT.' chars for user: '.$userData->person_id;
+			}
+
+			// PLZ
+			$plz = $userData->plz;
+			if (mb_strlen($userData->plz) >= self::PLZ_LENGHT)
+			{
+				$plz = mb_substr($userData->plz, 0, self::PLZ_LENGHT);
+				$nonBlockingErrorsArray[] = 'Plz is longer then '.self::PLZ_LENGHT.' chars for user: '.$userData->person_id;
+			}
+
+			$addressInformationArray = array(
+				'CountryCode' => $userData->country,
+				'CityName' => $ort,
+				'StreetPostalCode' => $plz,
+				'StreetName' => $strasse
+			);
+		}
+
+		return $addressInformationArray;
 	}
 }
 
