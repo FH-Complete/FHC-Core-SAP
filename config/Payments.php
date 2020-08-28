@@ -13,3 +13,4 @@ $config['payments_personal_ressource'] = array(
 );
 
 $config['payments_sales_unit_gmbh'] = '200000';
+$config['payments_sales_unit_custom'] = '100003';

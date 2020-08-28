@@ -29,6 +29,37 @@ class ManagePayments extends JQW_Controller
 		echo print_r($this->syncpaymentslib->getPaymentById($id), true);
 	}
 
+	/**
+	 * Check if a SalesOrder is already payed
+	 */
+	public function checkIfPaid($salesOrderId, $studentId)
+	{
+		$result = $this->syncpaymentslib->isSalesOrderPaid($salesOrderId,$studentId);
+
+		if(isSuccess($result) && hasData($result))
+		{
+			if(getData($result) === true)
+			{
+				echo "SalesOrder is paid";
+			}
+			else
+			{
+				echo "SalesOrder is NOT paid";
+			}
+		}
+		else
+			echo print_r($result, true);
+	}
+
+	/**
+	 * Check all open Payments and set them as paid
+	 *
+	 */
+	public function setPaid()
+	{
+		$this->syncpaymentslib->setPaid();
+	}
+
 	public function createGutschrift()
 	{
 		$jobType = 'SAPPaymentGutschrift';

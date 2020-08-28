@@ -27,6 +27,7 @@ class SyncPaymentsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesOrderIn_model', 'ManageSalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerInvoiceRequestIn_model', 'ManageCustomerInvoiceRequestInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/SORelease_model', 'SOReleaseModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/RPFINGLAU08_Q0002_model', 'RPFINGLAU08_Q0002Model');
 		$this->_ci->load->model('crm/Konto_model', 'KontoModel');
 
 		// Loads SAPSalesOrderModel
@@ -38,6 +39,157 @@ class SyncPaymentsLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
+
+	/**
+	 * Check if a SalesOrder is already fully paid
+	 * @param $salesOrderId ID of the SalesOrder
+	 * @param $studentId SAP ID of the Student / Customer
+	 * @return success true if SalesOrder is cleard, success false if not
+	 */
+	public function isSalesOrderPaid($salesOrderId, $studentId)
+	{
+		// Get Invoices for Sales Order
+		$invoiceResult = $this->_getInvoiceIDFromSalesOrder($salesOrderId);
+
+		if (isSuccess($invoiceResult))
+		{
+			if (hasData($invoiceResult))
+			{
+				// If there are Invoices, check if there are open amounts for this invoices
+				$id_arr = getData($invoiceResult);
+				foreach ($id_arr as $invoiceId)
+				{
+					// if there are open Amounts, its not cleared
+					$isInvoiceClearedResult = $this->_isInvoiceCleared($studentId, $invoiceId);
+					if (isSuccess($isInvoiceClearedResult))
+					{
+						if (!$isInvoiceClearedResult->retval)
+						{
+							echo "Offene Posten für Rechnung $invoiceId gefunden -> Nicht bezahlt";
+							return success(false);
+						}
+					}
+					else
+					{
+						return error('Invoice Clearance check failed');
+					}
+				}
+
+				// PAID
+				// If all invoices are cleared the SalesOrder is paid
+				return success(true);
+			}
+			else
+			{
+				// If no Invoice is available its not paid;
+				echo "Keine Rechnung gefunden -> nicht bezahlt";
+				return success(false);
+			}
+		}
+		else
+		{
+			return error("Failed to get Invoices for SalesOrder");
+		}
+
+		return error("isSalesOrderPaid in SyncPaymentsLib exited unexpected");
+	}
+
+	/**
+	 * Check if there are open Amounts for that Invoice/Student that are not paid yet
+	 * @param $studentId SAP ID of the Student/Customer
+	 * @param $invocieId Id of the Invoice to be checked
+	 * @return success true if cleared, success false if open or error if something failed
+	 */
+	private function _isInvoiceCleared($studentId, $invoiceId)
+	{
+		$result = $this->_ci->RPFINGLAU08_Q0002Model->getByCustomer($studentId);
+
+		if (isSuccess($result))
+		{
+			if (hasData($result))
+			{
+				$data = getData($result);
+				foreach ($data as $row)
+				{
+					if ($row->CCINHUUID == $invoiceId)
+					{
+						// Invoice found in the List, means there are open amounts, means not fully paid
+
+						// TODO Maybe this is partially paid, so we can set some items of the invoice
+						// as paid if we find a solid solution for doing that
+						//echo "Rechnung gefunden in offenen posten -> nicht bezahlt";
+						return success(false);
+					}
+				}
+
+				// There are open Invoices for the Customer, but not for that specific Invoice
+				// so this is set as paid
+				//echo "Offene posten für student aber nicht für diese Rechnung -> bezahlt";
+				return success(true);
+			}
+			else
+			{
+				// No Data found, means no open amounts for this customer, means everything paid
+				//echo "keine Offenen Posten für den Studenten -> bezahlt";
+				return success(true);
+			}
+		}
+		else
+		{
+			return error('Invoice Request failed');
+		}
+
+		return error('_isInvoiceCleared in SyncPaymentsLib exited unexpected');
+	}
+
+	/**
+	 * Get all Invoices that are connected to that salesOrder
+	 * @param $salesOrderId ID of the SalesOrder
+	 * @return Result Array with all invoice IDs
+	 */
+	private function _getInvoiceIDFromSalesOrder($salesOrderId)
+	{
+		$id_arr = array();
+		$result = $this->getPaymentById($salesOrderId);
+
+		if (isSuccess($result))
+		{
+		 	if (hasData($result))
+			{
+				if (isset($result->retval->SalesOrder)
+				 && isset($result->retval->SalesOrder->BusinessTransactionDocumentReference))
+				{
+					if (is_array($result->retval->SalesOrder->BusinessTransactionDocumentReference))
+					{
+						foreach ($result->retval->SalesOrder->BusinessTransactionDocumentReference as $invoice)
+						{
+							// Check if it is an Invoice (can also be an reference to a project)
+							if (isset($invoice->BusinessTransactionDocumentReference->TypeCode)
+							 && $invoice->BusinessTransactionDocumentReference->TypeCode->_ == 28)
+							{
+								$id_arr[] = $invoice->BusinessTransactionDocumentReference->ID->_;
+							}
+						}
+					}
+					else
+					{
+						// Check if it is an Invoice (can also be an reference to a project)
+						if (isset($result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->TypeCode)
+						 && $result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->TypeCode->_ == 28)
+						{
+							$id_arr[] = $result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->ID->_;
+						}
+					}
+				}
+			}
+		}
+		else
+			return error("Failed to Load SalesOrder");
+
+		return success($id_arr);
+	}
+
+
 
 	/**
 	 * Return the raw result of SAP->QuerySalesOrderIn->FindByElements->SalesOrderSelectionByElements
@@ -74,7 +226,7 @@ class SyncPaymentsLib
 		foreach ($person_arr as $person_id)
 		{
 			$UserPartyID_Result = $this->_getUserPartyID($person_id);
-			if(isError($UserPartyID_Result) || !hasData($UserPartyID_Result))
+			if (isError($UserPartyID_Result) || !hasData($UserPartyID_Result))
 			{
 				// Person not found in sync Table
 				$nonBlockingErrorsArray[] = 'PersonID '.$person_id.' not found in SAP';
@@ -147,7 +299,7 @@ class SyncPaymentsLib
 					);
 
 					$position = array(
-						'Description' => $row_payment->buchungstext,
+						'Description' => mb_substr($row_payment->buchungstext,0,40),
 						'Product' => array(
 							'InternalID' => $service_id,
 							'TypeCode' => '2' // = Service
@@ -231,6 +383,38 @@ class SyncPaymentsLib
 	}
 
 	/**
+	 * Check all open Payments if they are already paid
+	 * and set them as paid if so
+	 */
+	public function setPaid()
+	{
+		$openPaymentsResult = $this->_ci->SAPSalesOrderModel->getOpenPayments();
+
+		if (isSuccess($openPaymentsResult))
+		{
+			$openPayments = getData($openPaymentsResult);
+
+			foreach ($openPayments as $row)
+			{
+				$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
+				if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
+				{
+					// paid
+					$this->_ci->KontoModel->setPaid($row->buchungsnr);
+				}
+				else
+				{
+					// not paid yet
+				}
+			}
+		}
+		else
+		{
+			return error("Cannot get Open Payments");
+		}
+	}
+
+	/**
 	 * Creates new SalesOrders in SAP using the array of person ids given as parameter
 	 */
 	public function create($person_arr)
@@ -250,7 +434,7 @@ class SyncPaymentsLib
 
 			// Get SAP ID of the Student
 			$UserPartyID_Result = $this->_getUserPartyID($person_id);
-			if(isError($UserPartyID_Result) || !hasData($UserPartyID_Result))
+			if (isError($UserPartyID_Result) || !hasData($UserPartyID_Result))
 			{
 				// Person not found in sync Table
 				$nonBlockingErrorsArray[] = 'PersonID '.$person_id.' not found in SAP';
@@ -274,7 +458,7 @@ class SyncPaymentsLib
 					{
 						if ($last_stg != '')
 						{
-							if($last_stg < 0)
+							if ($last_stg < 0)
 								$release = false;
 							else
 								$release = true;
@@ -289,7 +473,17 @@ class SyncPaymentsLib
 						$task_id = '';
 						$name = $row_payment->studiengang_kurzbz;
 						$externeReferenz = $row_payment->studiengang_kurzbz;
-						$wunschtermin = $row_payment->studiensemester_start.'T00:00:00Z';
+						if($row_payment->studiensemester_start < date('Y-m-d'))
+						{
+							// If it is an entry for a old semester set the date to tommorow
+							$date = new DateTime();
+							$date->modify('+1 day');
+							$wunschtermin = $date->format('Y-m-d').'T00:00:00Z';
+						}
+						else
+						{
+							$wunschtermin = $row_payment->studiensemester_start.'T00:00:00Z';
+						}
 
 						if ($row_payment->studiengang_kz < 0 || $row_payment->studiengang_kz > 10000)
 						{
@@ -302,13 +496,24 @@ class SyncPaymentsLib
 							else
 							{
 								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.$row_payment->studiengang_kz.' and studysemester '.$row_payment->studiensemester_kurzbz;
-								continue;
+								continue 2;
 							}
 
 							// TODO Speziallehrgänge die in der FH sein sollen statt in der GMBH!
-							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];
-							$personalressource = $this->_ci->config->item('payments_personal_ressource')['gmbh'];
-						 	$SalesUnitPartyID = $this->_ci->config->item('payments_sales_unit_gmbh');
+							if($row_payment->studiengang_kz<0)
+							{
+								// Lehrgaenge
+								$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];
+								$personalressource = $this->_ci->config->item('payments_personal_ressource')['gmbh'];
+							 	$SalesUnitPartyID = $this->_ci->config->item('payments_sales_unit_gmbh');
+							}
+							else
+							{
+								// Custom Courses
+								$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
+								$personalressource = $this->_ci->config->item('payments_personal_ressource')['fh'];
+							 	$SalesUnitPartyID = $this->_ci->config->item('payments_sales_unit_custom');
+							}
 						}
 						else
 						{
@@ -371,7 +576,7 @@ class SyncPaymentsLib
 					$buchungsnr_arr[] = $row_payment->buchungsnr;
 
 					$position = array(
-						'Description' => $row_payment->buchungstext,
+						'Description' => mb_substr($row_payment->buchungstext,0,40),
 						'ItemProduct' => array(
 							'ProductID' => $service_id,
 							'UnitOfMeasure' => 'EA'
@@ -410,13 +615,13 @@ class SyncPaymentsLib
 
 			if (count($data) > 0)
 			{
-				if($last_stg < 0)
+				if ($last_stg < 0)
 					$release = false;
 				else
 					$release = true;
 
 				$result = $this->_CreateSalesOrder($data, $buchungsnr_arr, $release);
-				if(hasData($result))
+				if (hasData($result))
 					$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($result));
 			}
 		}
@@ -444,7 +649,7 @@ echo print_r($manageSalesOrderResult,true);
 			if (isset($manageSalesOrder->SalesOrder) && isset($manageSalesOrder->SalesOrder->ID) && isset($manageSalesOrder->SalesOrder->ID->_))
 			{
 
-				if($release)
+				if ($release)
 				{
 					// If FH then Release SO that Invoice is created
 					$this->_releaseSO($manageSalesOrder->SalesOrder->ID);
@@ -627,7 +832,7 @@ echo print_r($manageSalesOrderResult,true);
 				AND (studiengang_kz = ? OR studiengang_kz is null)
 		', array($buchungstyp_kurzbz, $studiensemester_kurzbz, $studiengang_kz));
 
-		if(hasData($dbUserData))
+		if (hasData($dbUserData))
 		{
 			$service = getData($dbUserData);
 			return $service[0]->service_id;
