@@ -473,7 +473,7 @@ class SyncPaymentsLib
 						$task_id = '';
 						$name = $row_payment->studiengang_kurzbz;
 						$externeReferenz = $row_payment->studiengang_kurzbz;
-						if($row_payment->studiensemester_start < date('Y-m-d'))
+						if ($row_payment->studiensemester_start < date('Y-m-d'))
 						{
 							// If it is an entry for a old semester set the date to tommorow
 							$date = new DateTime();
@@ -499,8 +499,8 @@ class SyncPaymentsLib
 								continue 2;
 							}
 
-							// TODO Speziallehrgänge die in der FH sein sollen statt in der GMBH!
-							if($row_payment->studiengang_kz<0)
+							// Speziallehrgänge die in der FH sind statt in der GMBH!
+							if ($row_payment->studiengang_kz < 0)
 							{
 								// Lehrgaenge
 								$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];
@@ -588,7 +588,7 @@ class SyncPaymentsLib
 						'PriceAndTaxCalculationItem' => array(
 							'ItemMainPrice'=> array(
 								'Rate' => array(
-									'DecimalValue' => $row_payment->betrag*(-1),
+									'DecimalValue' => $row_payment->betrag * (-1),
 									'CurrencyCode' => 'EUR',
 									'BaseMeasureUnitCode' => 'EA'
 								)
@@ -639,7 +639,9 @@ class SyncPaymentsLib
 
 		// Create the Entry
 		$manageSalesOrderResult = $this->_ci->ManageSalesOrderInModel->MaintainBundle($data);
-echo print_r($manageSalesOrderResult,true);
+
+		//echo print_r($manageSalesOrderResult,true);
+
 		// If no error occurred...
 		if (!isError($manageSalesOrderResult))
 		{
@@ -652,7 +654,11 @@ echo print_r($manageSalesOrderResult,true);
 				if ($release)
 				{
 					// If FH then Release SO that Invoice is created
-					$this->_releaseSO($manageSalesOrder->SalesOrder->ID);
+					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID);
+					if (isError($releaseResult))
+					{
+						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($releaseResult));
+					}
 				}
 
 				foreach ($buchungsnr_arr as $buchungsnr)
@@ -715,19 +721,33 @@ echo print_r($manageSalesOrderResult,true);
 
 		// Release a sales Order
 		$releaseResult = $this->_ci->SOReleaseModel->Release($data);
+		// returns with Notice "Action Release not possible; action is disabled"
+		// But thats ok
 
-		$data = array(
-			'BasicMessageHeader' => array(
-				'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
-				'UUID' => generateUUID()
-			),
-			 'SalesOrder'  => array(
-				 'ID' => $salesorderid
-			 )
-		 );
-		$fullfillmentResult = $this->_ci->SOReleaseModel->FinishFulfilmentProcessingOfAllItems($data);
+		if (isSuccess($releaseResult))
+		{
+			$data = array(
+				'BasicMessageHeader' => array(
+					'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+					'UUID' => generateUUID()
+				),
+				 'SalesOrder'  => array(
+					 'ID' => $salesorderid
+				 )
+			 );
+			$fullfillmentResult = $this->_ci->SOReleaseModel->FinishFulfilmentProcessingOfAllItems($data);
 
-		return true;
+			if (!isSuccess($fullfillmentResult))
+			{
+				return error('Failed to FinishFulfilmentProcessingOfAllItems for SalesOrder:'.$salesorderid);
+			}
+		}
+		else
+		{
+			return error('Failed to Release SalesOrder '.$salesorderid);
+		}
+
+		return success();
 	}
 
 	/**
