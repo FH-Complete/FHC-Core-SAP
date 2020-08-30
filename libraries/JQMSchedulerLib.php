@@ -12,6 +12,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_USERS = 'SAPUsersCreate';
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
+	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
 
 	/**
 	 * Object initialization
@@ -23,7 +24,7 @@ class JQMSchedulerLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
-	
+
 	/**
 	 * Looks for new users that have been created in FHC and stores their person id into a job input
 	 */
@@ -62,7 +63,7 @@ class JQMSchedulerLib
 
 			$dbModel = new DB_Model();
 
-			// 
+			//
 			$newUsersResult = $dbModel->execReadOnlyQuery('
 				SELECT ps.person_id
 				  FROM public.tbl_prestudent ps
@@ -188,5 +189,41 @@ class JQMSchedulerLib
 
 		return success($jobInput);
 	}
-}
 
+	/**
+	 * Looks for new payments that have been created in FHC and stores their person id into a payment job input
+	 */
+	public function newPayments()
+	{
+		$jobInput = null;
+
+		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
+
+		$dbModel = new DB_Model();
+
+		// Gets new permanent employees created in the last 42 hours
+		$newPaymentsResult = $dbModel->execReadOnlyQuery('
+		SELECT
+			distinct person_id
+		FROM
+			public.tbl_konto bk
+		WHERE
+			betrag < 0
+			AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
+			AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+			AND buchungsnr_verweis is null
+			AND buchungsdatum >= ?
+		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($newPaymentsResult)) return $newPaymentsResult;
+
+		// If new users are present
+		if (hasData($newPaymentsResult))
+		{
+			$jobInput = json_encode(getData($newPaymentsResult));
+		}
+
+		return success($jobInput);
+	}
+}
