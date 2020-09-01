@@ -211,6 +211,15 @@ class JQMSchedulerLib
 			betrag < 0
 			AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
 			AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+			AND EXISTS(SELECT
+				1
+				FROM
+					public.tbl_prestudent
+				WHERE
+					person_id = bk.person_id
+					AND studiengang_kz = bk.studiengang_kz
+					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Aufgenommener\',\'Incoming\',\'Diplomand\')
+				)
 			AND buchungsnr_verweis is null
 			AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
