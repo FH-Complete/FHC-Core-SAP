@@ -311,7 +311,7 @@ class SyncPaymentsLib
 							'PriceComponent'=> array(
 								'TypeCode' => '7PR1', // = List Price
 								'Rate' => array(
-									'DecimalValue' => $row_payment->betrag * (-1),
+									'DecimalValue' => str_replace(',','.',$row_payment->betrag * (-1)),
 									'CurrencyCode' => 'EUR',
 									'BaseMeasureUnitCode' => 'EA'
 								)
@@ -325,9 +325,6 @@ class SyncPaymentsLib
 
 					// Create the Entry
 					$manageCustomerInvoiceRequestInResult = $this->_ci->ManageCustomerInvoiceRequestInModel->MaintainBundle($data);
-
-					// TODO: REMOVE DEBUG OUTPUT
-					echo print_r($manageCustomerInvoiceRequestInResult,true);
 
 					// If no error occurred...
 					if (!isError($manageCustomerInvoiceRequestInResult))
@@ -588,7 +585,7 @@ class SyncPaymentsLib
 						'PriceAndTaxCalculationItem' => array(
 							'ItemMainPrice'=> array(
 								'Rate' => array(
-									'DecimalValue' => $row_payment->betrag * (-1),
+									'DecimalValue' => str_replace(',','.',$row_payment->betrag * (-1)),
 									'CurrencyCode' => 'EUR',
 									'BaseMeasureUnitCode' => 'EA'
 								)
@@ -639,8 +636,6 @@ class SyncPaymentsLib
 
 		// Create the Entry
 		$manageSalesOrderResult = $this->_ci->ManageSalesOrderInModel->MaintainBundle($data);
-
-		//echo print_r($manageSalesOrderResult,true);
 
 		// If no error occurred...
 		if (!isError($manageSalesOrderResult))
