@@ -58,7 +58,7 @@ class SyncUsersLib
 	// Address info
 	const STRASSE_LENGHT = 60;
 	const ORT_LENGHT = 40;
-	const PLZ_LENGHT = 10;
+	const PLZ_LENGHT = 11;
 
 	private $_ci; // Code igniter instance
 
