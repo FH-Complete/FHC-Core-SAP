@@ -25,10 +25,34 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function getProjects()
+	public function getProjects($projectObjectIds = null)
 	{
+		// ODATA call parameters
+		$odataParameters = array(
+			'$orderby' => 'ProjectID',
+			'$top' => 999999
+		);
+
+		// If the given parameter is a valid not empty array
+		if (!isEmptyArray($projectObjectIds))
+		{
+			$odataParameters['$filter'] = filter($projectObjectIds, 'ObjectID', 'eq', 'or');
+		}
+
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection',
+			ODATAClientLib::HTTP_GET_METHOD,
+			$odataParameters
+		);
+	}
+
+	/**
+	 * 
+	 */
+	public function getTask($projectTaskObjectId)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$projectTaskObjectId.'\')',
 			ODATAClientLib::HTTP_GET_METHOD
 		);
 	}
@@ -36,20 +60,56 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function getProjectsAndTasks()
+	public function getProjectsAndTasks($projectObjectIds = null)
 	{
+		// ODATA call parameters
+		$odataParameters = array(
+			'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode',
+			'$orderby' => 'ProjectID',
+			'$expand' => 'ProjectTask',
+			'$top' => 999999
+		);
+
+		// If the given parameter is a valid not empty array
+		if (!isEmptyArray($projectObjectIds))
+		{
+			$odataParameters['$filter'] = filter($projectObjectIds, 'ObjectID', 'eq', 'or');
+		}
+
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection',
 			ODATAClientLib::HTTP_GET_METHOD,
-			array(
-				'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode',
-				'$orderby' => 'ProjectID',
-				'$expand' => 'ProjectTask',
-				'$top' => 999999
-			)
+			$odataParameters
 		);
 	}
 	
+	/**
+	 * 
+	 */
+	public function getProjectsAndPartecipants($projectObjectIds)
+	{
+		// ODATA call parameters
+		$odataParameters = array(
+			'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectParticipant,ProjectLifeCycleStatusCode',
+			'$filter' => filter($projectObjectIds, 'ObjectID', 'eq', 'or'),
+			'$orderby' => 'ProjectID',
+			'$expand' => 'ProjectParticipant',
+			'$top' => 999999
+		);
+
+		// If the given parameter is a valid not empty array
+		if (!isEmptyArray($projectObjectIds))
+		{
+			$odataParameters['$filter'] = filter($projectObjectIds, 'ObjectID', 'eq', 'or');
+		}
+
+		return $this->_call(
+			self::URI_PREFIX.'ProjectCollection',
+			ODATAClientLib::HTTP_GET_METHOD,
+			$odataParameters
+		);
+	}
+
 	/**
 	 * 
 	 */

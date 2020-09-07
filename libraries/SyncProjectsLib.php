@@ -46,6 +46,10 @@ class SyncProjectsLib
 
 		// Loads the StudiensemesterModel
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
+		// Loads the Projekt_model
+		$this->_ci->load->model('project/Projekt_model', 'ProjektModel');
+		// Loads the Projekt_ressource_model
+		$this->_ci->load->model('project/Projekt_ressource_model', 'ProjektRessourceModel');
 
 		// Loads model SAPServicesModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPServices_model', 'SAPServicesModel');
@@ -402,6 +406,307 @@ class SyncProjectsLib
 		}
 
 		return success('All project have been imported successfully');
+	}
+
+
+	/**
+	 * 
+	 */
+	public function importEmployees()
+	{
+		$dbModel = new DB_Model();
+
+		// Loads all the linked projects and tasks
+		$linkedProjectsResult = $dbModel->execReadOnlyQuery('
+			SELECT ptp.projekt_id,
+				ptp.projektphase_id,
+				pt.project_object_id,
+				pt.project_task_object_id
+			  FROM sync.tbl_projects_timesheets_project ptp
+			  JOIN sync.tbl_sap_projects_timesheets pt USING(projects_timesheet_id)
+		      ORDER BY pt.project_object_id, pt.project_task_object_id
+		');
+
+		// If error occurred then return the error
+		if (isError($linkedProjectsResult)) return $linkedProjectsResult;
+
+		// If linked projects are presents
+		if (hasData($linkedProjectsResult))
+		{
+			// For each linked project found
+			foreach (getData($linkedProjectsResult) as $linkedProject)
+			{
+				// If the task was linked
+				if ($linkedProject->project_task_object_id != null)
+				{
+					// Gets the task service from SAP for the given task object id
+					$taskServiceResult = $this->_ci->ProjectsModel->getProjectTaskService($linkedProject->project_task_object_id);
+
+					// If an error occurred then return the error
+					if (isError($taskServiceResult)) return $taskServiceResult;
+
+					// If there are no data then skip to the next one
+					if (!hasData($taskServiceResult)) continue;
+					// else should be logged
+
+					// For each retrived task service. One for each employee assigned to this task
+					foreach (getData($taskServiceResult) as $task)
+					{
+						// Loads the resource id that should be added in fue.tbl_projektphase
+						// Employee service id -> person id -> uid -> mitarbeiter uid -> resource id
+						$ressourceResult = $dbModel->execReadOnlyQuery('
+							SELECT r.ressource_id
+							  FROM fue.tbl_ressource r
+							  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+							  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+							  JOIN sync.tbl_sap_services ss USING(person_id)
+							 WHERE ss.sap_service_id = ?
+						', array($task->ProductID));
+
+						// If error occurred then return the error
+						if (isError($ressourceResult)) return $ressourceResult;
+
+						// If data are present
+						if (hasData($ressourceResult))
+						{
+							// Resource id
+							$ressource_id = getData($ressourceResult)[0]->ressource_id;
+
+							// Get the projekt_kurzbz from fue.tbl_projekt
+							$projektResult = $this->_ci->ProjektModel->loadWhere(array('projekt_id' => $linkedProject->projekt_id));
+
+							// If error occurred then return the error
+							if (isError($projektResult)) return $projektResult;
+
+							// If the project is present in database
+							if (hasData($projektResult))
+							{
+								// FHC Project pk
+								$projekt_kurzbz = getData($projektResult)[0]->projekt_kurzbz;
+
+								// Check if not already present in fue.tbl_projekt_ressource for project phase
+								$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
+									array(
+										'projektphase_id' => $linkedProject->projektphase_id,
+										'ressource_id' => $ressource_id,
+										'funktion_kurzbz' => 'Mitarbeiter'
+									)
+								);
+
+								// If error occurred then return the error
+								if (isError($checkResult)) return $checkResult;
+
+								// If _not_ present then is possible to insert without errors
+								if (!hasData($checkResult))
+								{
+									// Gets the task from SAP for the given task object id
+									$taskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
+
+									// If an error occurred then return the error
+									if (isError($taskResult)) return $taskResult;
+
+									// If this task exists in SAP, should not happen because was previously checked
+									if (hasData($taskResult))
+									{
+										// Insert data into fue.tbl_projekt_ressource for project phase
+										$insertResult = $this->_ci->ProjektRessourceModel->insert(
+											array(
+												'projektphase_id' => $linkedProject->projektphase_id,
+												'beschreibung' => 'Assigned via SAP to this phase',
+												'ressource_id' => $ressource_id,
+												'funktion_kurzbz' => 'Mitarbeiter'
+											)
+										);
+
+										// If error occurred then return the error
+										if (isError($insertResult)) return $intertResult;
+
+										// Check if not already present in fue.tbl_projekt_ressource for projects
+										$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
+											array(
+												'projekt_kurzbz' => $projekt_kurzbz,
+												'ressource_id' => $ressource_id,
+												'funktion_kurzbz' => 'Mitarbeiter'
+											)
+										);
+
+										// If error occurred then return the error
+										if (isError($checkResult)) return $checkResult;
+
+										// If _not_ present then is possible to insert without errors
+										if (!hasData($checkResult))
+										{
+											// Insert data into fue.tbl_projekt_ressource for project
+											$insertResult = $this->_ci->ProjektRessourceModel->insert(
+												array(
+													'projekt_kurzbz' => $projekt_kurzbz,
+													'beschreibung' => 'Assigned via SAP to this project',
+													'ressource_id' => $ressource_id,
+													'funktion_kurzbz' => 'Mitarbeiter'
+												)
+											);
+
+											// If error occurred then return the error
+											if (isError($insertResult)) return $intertResult;
+										}
+										// else skip to the next one
+									}
+									// else should be logged
+								}
+								// else skip to the next one
+							}
+							// else should be logged that the project does not exist
+						}
+						// else should be logged. It means that the service does not exist in sync table
+					}
+				}
+				else // otherwise the entire projects was linked
+				{
+					// Get all synched tasks for this project
+					$syncdTasksResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(array('project_object_id' => $linkedProject->project_object_id));
+
+					// If an error occurred then return the error
+					if (isError($syncdTasksResult)) return $syncdTasksResult;
+
+					// If the project and its tasks have been found
+					if (hasData($syncdTasksResult))
+					{
+						// For each task retrieved
+						foreach (getData($syncdTasksResult) as $syncdTasks)
+						{
+							// Gets the task service from SAP for the given task object id
+							$taskServiceResult = $this->_ci->ProjectsModel->getProjectTaskService($syncdTasks->project_task_object_id);
+
+							// If an error occurred then return the error
+							if (isError($taskServiceResult)) return $taskServiceResult;
+
+							// If there are no data then skip to the next one
+							if (!hasData($taskServiceResult)) continue;
+							// else should be logged
+							
+							// For each retrived task service. One for each employee assigned to this task
+							foreach (getData($taskServiceResult) as $task)
+							{
+								// Loads the resource id that should be added in fue.tbl_projektphase
+								// Employee service id -> person id -> uid -> mitarbeiter uid -> resource id
+								$ressourceResult = $dbModel->execReadOnlyQuery('
+									SELECT r.ressource_id
+									  FROM fue.tbl_ressource r
+									  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+									  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+									  JOIN sync.tbl_sap_services ss USING(person_id)
+									 WHERE ss.sap_service_id = ?
+								', array($task->ProductID));
+
+								// If error occurred then return the error
+								if (isError($ressourceResult)) return $ressourceResult;
+
+								// If data are present
+								if (hasData($ressourceResult))
+								{
+									// Resource id
+									$ressource_id = getData($ressourceResult)[0]->ressource_id;
+
+									// Get the projekt_kurzbz from fue.tbl_projekt
+									$projektResult = $this->_ci->ProjektModel->loadWhere(array('projekt_id' => $linkedProject->projekt_id));
+
+									// If error occurred then return the error
+									if (isError($projektResult)) return $projektResult;
+
+									// If the project is present in database
+									if (hasData($projektResult))
+									{
+										// FHC Project pk
+										$projekt_kurzbz = getData($projektResult)[0]->projekt_kurzbz;
+
+										// Check if not already present in fue.tbl_projekt_ressource for project phase
+										$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
+											array(
+												'projektphase_id' => $linkedProject->projektphase_id,
+												'ressource_id' => $ressource_id,
+												'funktion_kurzbz' => 'Mitarbeiter'
+											)
+										);
+
+										// If error occurred then return the error
+										if (isError($checkResult)) return $checkResult;
+
+										// If _not_ present then is possible to insert without errors
+										if (!hasData($checkResult))
+										{
+											// Gets the task from SAP for the given task object id
+											$taskResult = $this->_ci->ProjectsModel->getTask($syncdTasks->project_task_object_id);
+
+											// If an error occurred then return the error
+											if (isError($taskResult)) return $taskResult;
+
+											// If this task exists in SAP, should not happen because was previously checked
+											if (hasData($taskResult))
+											{
+												// Insert data into fue.tbl_projekt_ressource for project phase
+												$insertResult = $this->_ci->ProjektRessourceModel->insert(
+													array(
+														'projektphase_id' => $linkedProject->projektphase_id,
+														'beschreibung' => 'Assigned via SAP to this phase',
+														'ressource_id' => $ressource_id,
+														'funktion_kurzbz' => 'Mitarbeiter'
+													)
+												);
+
+												// If error occurred then return the error
+												if (isError($insertResult)) return $intertResult;
+
+												// Check if not already present in fue.tbl_projekt_ressource for projects
+												$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
+													array(
+														'projekt_kurzbz' => $projekt_kurzbz,
+														'ressource_id' => $ressource_id,
+														'funktion_kurzbz' => 'Mitarbeiter'
+													)
+												);
+
+												// If error occurred then return the error
+												if (isError($checkResult)) return $checkResult;
+
+												// If _not_ present then is possible to insert without errors
+												if (!hasData($checkResult))
+												{
+													// Insert data into fue.tbl_projekt_ressource for project
+													$insertResult = $this->_ci->ProjektRessourceModel->insert(
+														array(
+															'projekt_kurzbz' => $projekt_kurzbz,
+															'beschreibung' => 'Assigned via SAP to this project',
+															'ressource_id' => $ressource_id,
+															'funktion_kurzbz' => 'Mitarbeiter'
+														)
+													);
+
+													// If error occurred then return the error
+													if (isError($insertResult)) return $intertResult;
+												}
+												// else skip to the next one
+											}
+											// else should be logged
+										}
+										// else skip to the next one
+									}
+									// else should be logged that the project does not exist
+								}
+								// else should be logged. It means that the service does not exist in sync table
+							}
+						}
+					}
+					// else should be logged that the given project was not synched
+				}
+			}
+		}
+		else // otherwise return a success
+		{
+			return success('No projects are linked');
+		}
+
+		// If everything was fine
+		return success('All employees for linked project have been imported successfully');
 	}
 
 	// --------------------------------------------------------------------------------------------
