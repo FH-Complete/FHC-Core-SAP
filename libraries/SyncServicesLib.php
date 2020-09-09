@@ -141,10 +141,11 @@ class SyncServicesLib
 		// Loops through services data
 		foreach (getData($servicesAllData) as $serviceData)
 		{
+			// If the stundensatz is not set for this user...
 			$stundensatz = $serviceData->stundensatz;
-			if ($stundensatz == '')
+			if (isEmptyString($stundensatz))
 			{
-				$nonBlockingErrorsArray[] = 'No Stundensatz set for user: '.$serviceData->person_id;
+				$nonBlockingErrorsArray[] = 'No stundensatz set for user: '.$serviceData->person_id;
 				continue; // ...and continue to the next one
 			}
 
@@ -152,6 +153,13 @@ class SyncServicesLib
 			if (isEmptyString($serviceData->name))
 			{
 				$nonBlockingErrorsArray[] = 'No surname set for user: '.$serviceData->person_id;
+				continue; // ...and continue to the next one
+			}
+
+			// If the organization unit is null then skip this user...
+			if (isEmptyString($serviceData->organization_unit))
+			{
+				$nonBlockingErrorsArray[] = 'No organization unit set for user: '.$serviceData->person_id;
 				continue; // ...and continue to the next one
 			}
 
@@ -291,10 +299,11 @@ class SyncServicesLib
 		// Loops through users data
 		foreach (getData($servicesAllData) as $serviceData)
 		{
+			// If the stundensatz is not set for this user...
 			$stundensatz = $serviceData->stundensatz;
-			if ($stundensatz == '')
+			if (isEmptyString($stundensatz))
 			{
-				$nonBlockingErrorsArray[] = 'No Stundensatz set for user: '.$serviceData->person_id;
+				$nonBlockingErrorsArray[] = 'No stundensatz set for user: '.$serviceData->person_id;
 				continue; // ...and continue to the next one
 			}
 
@@ -302,6 +311,13 @@ class SyncServicesLib
 			if (isEmptyString($serviceData->name))
 			{
 				$nonBlockingErrorsArray[] = 'No surname set for user: '.$serviceData->person_id;
+				continue; // ...and continue to the next one
+			}
+
+			// If the organization unit is null then skip this user...
+			if (isEmptyString($serviceData->organization_unit))
+			{
+				$nonBlockingErrorsArray[] = 'No organization unit set for user: '.$serviceData->person_id;
 				continue; // ...and continue to the next one
 			}
 
