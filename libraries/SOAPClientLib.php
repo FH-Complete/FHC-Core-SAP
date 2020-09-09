@@ -157,8 +157,6 @@ class SOAPClientLib
 
 		try
 		{
-			var_dump(self::WSDL_FULL_NAME);exit;
-
 			// Call the SoapClient giving the path in the file system to the WSDL file and the options needed to connect
 			$soapClient = new SoapClient(
 				sprintf(self::WSDL_FULL_NAME, $this->_activeConnectionName, $apiSetName, $serviceName),
