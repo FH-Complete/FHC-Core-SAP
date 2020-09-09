@@ -15,7 +15,7 @@ class SOAPClientLib
 
 	const ERROR_STR = '%s: %s'; // Error message format
 
-	const WSDL_FULL_NAME = APPPATH.'config/extensions/FHC-Core-SAP/WSDLs/%s/%s/%s.wsdl'; // Full name to the WSDL
+	const WSDL_FULL_NAME = APPPATH.'config/'.ENVIRONMENT.'/extensions/FHC-Core-SAP/WSDLs/%s/%s/%s.wsdl'; // Full name to the WSDL
 
 	// Configs parameters names
 	const ACTIVE_CONNECTION = 'soap_active_connection';
@@ -157,6 +157,8 @@ class SOAPClientLib
 
 		try
 		{
+			var_dump(self::WSDL_FULL_NAME);exit;
+
 			// Call the SoapClient giving the path in the file system to the WSDL file and the options needed to connect
 			$soapClient = new SoapClient(
 				sprintf(self::WSDL_FULL_NAME, $this->_activeConnectionName, $apiSetName, $serviceName),
