@@ -137,9 +137,6 @@ class SyncUsersLib
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($users)) return success('No users to be created');
 
-		// Array used to store non blocking error messages to be returned back and then logged
-		$nonBlockingErrorsArray = array();
-
 		// Remove the already created users performing a diff between the given person ids and those present
 		// in the sync table. If no errors and the diff array is not empty then continues, otherwise a message
 		// is returned
@@ -159,7 +156,7 @@ class SyncUsersLib
 			// If an email address was not found for this user...
 			if (isEmptyString($userData->email))
 			{
-				$nonBlockingErrorsArray[] = 'Was not possible to find a valid email address for user: '.$userData->person_id;
+				$this->_ci->loglib->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -249,7 +246,7 @@ class SyncUsersLib
 				);
 
 				// Get the correct address info
-				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData, $nonBlockingErrorsArray);
+				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
 
 				// Then create it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
@@ -284,18 +281,18 @@ class SyncUsersLib
 							{
 								foreach ($manageCustomer->Log->Item as $item)
 								{
-									if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$userData->person_id;
+									if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_idi);
 								}
 							}
 							elseif ($manageCustomer->Log->Item->Note)
 							{
-								$nonBlockingErrorsArray[] = $manageCustomer->Log->Item->Note.' for user: '.$userData->person_id;
+								$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
 							}
 						}
 						else
 						{
 							// Default non blocking error
-							$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$userData->person_id;
+							$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
 						}
 						continue;
 					}
@@ -322,7 +319,7 @@ class SyncUsersLib
 			}
 		}
 
-		return success($nonBlockingErrorsArray);
+		return success('Users data created successfully');
 	}
 
 	/**
@@ -331,9 +328,6 @@ class SyncUsersLib
 	public function update($users)
 	{
 		if (isEmptyArray($users)) return success('No users to be updated');
-
-		// Array used to store non blocking error messages to be returned back and then logged
-		$nonBlockingErrorsArray = array();
 
 		// Remove the already created users
 		$diffUsers = $this->_removeNotCreatedUsers($users);
@@ -355,7 +349,7 @@ class SyncUsersLib
 			// If an email address was not found for this user...
 			if (isEmptyString($userData->email))
 			{
-				$nonBlockingErrorsArray[] = 'Was not possible to find a valid email address for user: '.$userData->person_id;
+				$this->_ci->loglib->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -410,7 +404,7 @@ class SyncUsersLib
 				// better to skip to the next user
 				if ($userData->addressInformationUUID == null)
 				{
-					$nonBlockingErrorsArray[] = 'Was no possible to retrieve the AddressInformation UUID for user '.$userData->person_id;
+					$this->_ci->loglib->logWarningDB('Was no possible to retrieve the AddressInformation UUID for user '.$userData->person_id);
 					continue;
 				}
 
@@ -485,7 +479,7 @@ class SyncUsersLib
 				);
 
 				// Get the correct address info
-				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData, $nonBlockingErrorsArray);
+				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
 
 				// Then update it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
@@ -511,18 +505,18 @@ class SyncUsersLib
 							{
 								foreach ($manageCustomer->Log->Item as $item)
 								{
-									if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$userData->person_id;
+									if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
 								}
 							}
 							elseif ($manageCustomer->Log->Item->Note)
 							{
-								$nonBlockingErrorsArray[] = $manageCustomer->Log->Item->Note.' for user: '.$userData->person_id;
+								$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
 							}
 						}
 						else
 						{
 							// Default non blocking error
-							$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$userData->person_id;
+							$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
 						}
 						continue;
 					}
@@ -534,7 +528,7 @@ class SyncUsersLib
 			}
 		}
 
-		return success($nonBlockingErrorsArray);
+		return success('Users data updated successfully');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -913,7 +907,7 @@ class SyncUsersLib
 	 * Generate correct info address using the user data, if data do not match SAP requirements then they are shortened and
 	 * a warning message is generated
 	 */
-	private function _getAddressInformations($userData, &$nonBlockingErrorsArray)
+	private function _getAddressInformations($userData)
 	{
 		$addressInformationArray = array(); // in case is not possible to generate address info
 
@@ -925,7 +919,7 @@ class SyncUsersLib
 			if (mb_strlen($userData->ort) >= self::ORT_LENGHT)
 			{
 				$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
-				$nonBlockingErrorsArray[] = 'Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id;
+				$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
 			}
 
 			// Strasse
@@ -933,7 +927,7 @@ class SyncUsersLib
 			if (mb_strlen($userData->strasse) >= self::STRASSE_LENGHT)
 			{
 				$strasse = mb_substr($userData->strasse, 0, self::STRASSE_LENGHT);
-				$nonBlockingErrorsArray[] = 'Strasse is longer then '.self::STRASSE_LENGHT.' chars for user: '.$userData->person_id;
+				$this->_ci->loglib->logWarningDB('Strasse is longer then '.self::STRASSE_LENGHT.' chars for user: '.$userData->person_id);
 			}
 
 			// PLZ
@@ -941,7 +935,7 @@ class SyncUsersLib
 			if (mb_strlen($userData->plz) >= self::PLZ_LENGHT)
 			{
 				$plz = mb_substr($userData->plz, 0, self::PLZ_LENGHT);
-				$nonBlockingErrorsArray[] = 'Plz is longer then '.self::PLZ_LENGHT.' chars for user: '.$userData->person_id;
+				$this->_ci->loglib->logWarningDB('Plz is longer then '.self::PLZ_LENGHT.' chars for user: '.$userData->person_id);
 			}
 
 			$addressInformationArray = array(
