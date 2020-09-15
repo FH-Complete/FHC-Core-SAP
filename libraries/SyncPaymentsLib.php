@@ -781,6 +781,8 @@ class SyncPaymentsLib
 	 */
 	private function _getUnsyncedPayments($person_id)
 	{
+		$studiensemesterStartMaxDate = $this->_ci->config->item('payments_studiensemester_start_max_date');
+
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
@@ -799,9 +801,10 @@ class SyncPaymentsLib
 				AND buchungsnr_verweis is null
 				AND person_id = ?
 				AND buchungsdatum >= ?
+				AND tbl_studiensemester.start <= ?
 			ORDER BY
 				studiengang_kz
-		', array($person_id, self::BUCHUNGSDATUM_SYNC_START));
+		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
 
 		return $dbPaymentData;
 	}
