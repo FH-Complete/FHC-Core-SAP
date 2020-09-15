@@ -81,46 +81,21 @@ class ManageUsers extends JQW_Controller
 			// Create/update users on SAP side
 			if ($jobType == SyncUsersLib::SAP_USERS_CREATE)
 			{
-				$syncResult = $this->syncuserslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
+				$this->syncuserslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 			else
 			{
-				$syncResult = $this->syncuserslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
+				$this->syncuserslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 
-			if (isError($syncResult))
-			{
-				$this->logError(getCode($syncResult).': '.getError($syncResult));
-			}
-			else
-			{
-				// If non blocking errors are present...
-				if (hasData($syncResult))
-				{
-					if (!isEmptyArray(getData($syncResult)))
-					{
-						// ...then log them all as warnings
-						foreach (getData($syncResult) as $nonBlockingError)
-						{
-							$this->logWarning($nonBlockingError);
-						}
-					}
-					// Else if it a single message log it as info
-					elseif (!isEmptyString(getData($syncResult)))
-					{
-						$this->logInfo(getData($syncResult));
-					}
-				}
-
-				// Update jobs properties values
-				$this->updateJobs(
-					getData($lastJobs), // Jobs to be updated
-					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
-					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
-				);
-				
-				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
-			}
+			// Update jobs properties values
+			$this->updateJobs(
+				getData($lastJobs), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+				array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+			);
+			
+			if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
 		}
 
 		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
