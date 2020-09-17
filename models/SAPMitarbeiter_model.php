@@ -1,7 +1,7 @@
 <?php
+
 class SAPMitarbeiter_model extends DB_Model
 {
-
 	/**
 	 * Constructor
 	 */
@@ -12,5 +12,5 @@ class SAPMitarbeiter_model extends DB_Model
 		$this->pk = array('mitarbeiter_uid');
 		$this->hasSequence = false;
 	}
-
 }
+

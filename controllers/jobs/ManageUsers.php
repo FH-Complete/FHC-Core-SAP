@@ -81,11 +81,21 @@ class ManageUsers extends JQW_Controller
 			// Create/update users on SAP side
 			if ($jobType == SyncUsersLib::SAP_USERS_CREATE)
 			{
-				$this->syncuserslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncuserslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
 			}
 			else
 			{
-				$this->syncuserslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
+				$syncResult = $this->syncuserslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
+			}
+
+			// Log the result
+			if (isError($syncResult))
+			{
+				$this->logError(getCode($syncResult).': '.getError($syncResult));
+			}
+			else
+			{
+				$this->logInfo(getData($syncResult));
 			}
 
 			// Update jobs properties values
