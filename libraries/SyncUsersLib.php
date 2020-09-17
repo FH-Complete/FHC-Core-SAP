@@ -163,6 +163,7 @@ class SyncUsersLib
 			// Checks if the current user is already present in SAP
 			$userDataSAP = $this->_userExistsByEmailSAP($userData->email);
 
+			// If an error occurred the return it
 			if (isError($userDataSAP)) return $userDataSAP;
 
 			// If the current user is not present in SAP
@@ -251,55 +252,50 @@ class SyncUsersLib
 				// Then create it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
-				// If no error occurred...
-				if (!isError($manageCustomerResult))
+				// If an error occurred then return it
+				if (isError($manageCustomerResult)) return $manageCustomerResult;
+
+				// SAP data
+				$manageCustomer = getData($manageCustomerResult);
+
+				// If data structure is ok...
+				if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
 				{
-					// SAP data
-					$manageCustomer = getData($manageCustomerResult);
+					// Store in database the couple person_id sap_user_id
+					$insert = $this->_ci->SAPStudentsModel->insert(
+						array(
+							'person_id' => $userData->person_id,
+							'sap_user_id' => $manageCustomer->Customer->InternalID
+						)
+					);
 
-					// If data structure is ok...
-					if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
-					{
-						// Store in database the couple person_id sap_user_id
-						$insert = $this->_ci->SAPStudentsModel->insert(
-							array(
-								'person_id' => $userData->person_id,
-								'sap_user_id' => $manageCustomer->Customer->InternalID
-							)
-						);
-
-						// If database error occurred then return it
-						if (isError($insert)) return $insert;
-					}
-					else // ...otherwise store a non blocking error and continue with the next user
-					{
-						// If it is present a description from SAP then use it
-						if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
-							&& isset($manageCustomer->Log->Item))
-						{
-							if (!isEmptyArray($manageCustomer->Log->Item))
-							{
-								foreach ($manageCustomer->Log->Item as $item)
-								{
-									if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_idi);
-								}
-							}
-							elseif ($manageCustomer->Log->Item->Note)
-							{
-								$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
-							}
-						}
-						else
-						{
-							// Default non blocking error
-							$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
-						}
-						continue;
-					}
+					// If database error occurred then return it
+					if (isError($insert)) return $insert;
 				}
-				else // ...otherwise return it
+				else // ...otherwise store a non blocking error and continue with the next user
 				{
-					return $manageCustomerResult;
+					// If it is present a description from SAP then use it
+					if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
+						&& isset($manageCustomer->Log->Item))
+					{
+						if (!isEmptyArray($manageCustomer->Log->Item))
+						{
+							foreach ($manageCustomer->Log->Item as $item)
+							{
+								if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
+							}
+						}
+						elseif ($manageCustomer->Log->Item->Note)
+						{
+							$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
+						}
+					}
+					else
+					{
+						// Default non blocking error
+						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
+					}
+					continue;
 				}
 			}
 			else // Add the already present user to the sync table
@@ -366,6 +362,7 @@ class SyncUsersLib
 			// Checks if the current user is already present in SAP
 			$userDataSAP = $this->_userExistsByIdSAP(getData($sapIdResult)[0]->sap_user_id);
 
+			// If an error occurred then return it
 			if (isError($userDataSAP)) return $userDataSAP;
 
 			// If the current user is present in SAP
@@ -484,46 +481,41 @@ class SyncUsersLib
 				// Then update it!
 				$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
-				// If no error occurred...
-				if (!isError($manageCustomerResult))
-				{
-					// SAP data
-					$manageCustomer = getData($manageCustomerResult);
+				// If an error occurred then return it
+				if (isError($manageCustomerResult)) return $manageCustomerResult;
 
-					// If data structure is ok...
-					if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
-					{
-						// Everything is fine!
-					}
-					else // ...otherwise store a non blocking error and continue with the next user
-					{
-						// If it is present a description from SAP then use it
-						if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
-							&& isset($manageCustomer->Log->Item))
-						{
-							if (!isEmptyArray($manageCustomer->Log->Item))
-							{
-								foreach ($manageCustomer->Log->Item as $item)
-								{
-									if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
-								}
-							}
-							elseif ($manageCustomer->Log->Item->Note)
-							{
-								$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
-							}
-						}
-						else
-						{
-							// Default non blocking error
-							$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
-						}
-						continue;
-					}
-				}
-				else // ...otherwise return it
+				// SAP data
+				$manageCustomer = getData($manageCustomerResult);
+
+				// If data structure is ok...
+				if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
 				{
-					return $manageCustomerResult;
+					// Everything is fine!
+				}
+				else // ...otherwise store a non blocking error and continue with the next user
+				{
+					// If it is present a description from SAP then use it
+					if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
+						&& isset($manageCustomer->Log->Item))
+					{
+						if (!isEmptyArray($manageCustomer->Log->Item))
+						{
+							foreach ($manageCustomer->Log->Item as $item)
+							{
+								if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
+							}
+						}
+						elseif ($manageCustomer->Log->Item->Note)
+						{
+							$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
+						}
+					}
+					else
+					{
+						// Default non blocking error
+						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
+					}
+					continue;
 				}
 			}
 		}

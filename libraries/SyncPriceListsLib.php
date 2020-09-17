@@ -70,8 +70,6 @@ class SyncPriceListsLib
 	 */
 	public function create()
 	{
-		$nonBlockingErrorsArray = array();
-
 		// Get price lists id formats from config
 		$priceListsIdFormats = $this->_ci->config->item(self::PRICE_LISTS_ID_FORMATS);
 		// Get price lists account ids from config
@@ -124,18 +122,21 @@ class SyncPriceListsLib
 						{
 							foreach ($manageSalesPriceListIn->Log->Item as $item)
 							{
-								if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note;
+								if (isset($item->Note))
+								{
+									$this->_ci->loglib->logWarningDB($item->Note);
+								}
 							}
 						}
 						elseif ($manageSalesPriceListIn->Log->Item->Note)
 						{
-							$nonBlockingErrorsArray[] = $manageSalesPriceListIn->Log->Item->Note;
+							$this->_ci->loglib->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: '.$priceListId;
+						$this->_ci->loglib->logWarningDB('SAP did not return ID for price list: '.$priceListId);
 					}
 				}
 			}
@@ -145,13 +146,13 @@ class SyncPriceListsLib
 			}
 		}
 
-		return success($nonBlockingErrorsArray);
+		return success('Price lists created successfully');
 	}
 
 	/**
 	 * Add service to the current price list
 	 */
-	public function addServiceToPriceList($priceListId, $sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
+	public function addServiceToPriceList($priceListId, $sap_service_id, $stundensatz)
 	{
 		$manageSalesPriceListInResult = $this->_ci->ManageSalesPriceListInModel->maintainBundle(
 			array(
@@ -180,52 +181,49 @@ class SyncPriceListsLib
 			)
 		);
 
-		// If no error occurred...
-		if (!isError($manageSalesPriceListInResult))
-		{
-			// SAP data
-			$manageSalesPriceListIn = getData($manageSalesPriceListInResult);
+		// If an error occurred then return it
+		if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult;
 
-			// If data structure is ok...
-			if (isset($manageSalesPriceListIn->SalesPriceList)
-				&& isset($manageSalesPriceListIn->SalesPriceList->ID)
-				&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
-			{
-				// Returns the result from SAP
-				return $manageSalesPriceListInResult;
-			}
-			else // ...otherwise store a non blocking error...
-			{
-				// If it is present a description from SAP then use it
-				if (isset($manageSalesPriceListIn->Log) && isset($manageSalesPriceListIn->Log->Item)
-					&& isset($manageSalesPriceListIn->Log->Item))
-				{
-					if (!isEmptyArray($manageSalesPriceListIn->Log->Item))
-					{
-						foreach ($manageSalesPriceListIn->Log->Item as $item)
-						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note;
-						}
-					}
-					elseif ($manageSalesPriceListIn->Log->Item->Note)
-					{
-						$nonBlockingErrorsArray[] = $manageSalesPriceListIn->Log->Item->Note;
-					}
-				}
-				else
-				{
-					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return ID for price list: '.$priceListId;
-				}
+		// SAP data
+		$manageSalesPriceListIn = getData($manageSalesPriceListInResult);
 
-				// ...and return an empty success
-				return success();
-			}
-		}
-		else // ...otherwise return it
+		// If data structure is ok...
+		if (isset($manageSalesPriceListIn->SalesPriceList)
+			&& isset($manageSalesPriceListIn->SalesPriceList->ID)
+			&& isset($manageSalesPriceListIn->SalesPriceList->ID->_))
 		{
+			// Returns the result from SAP
 			return $manageSalesPriceListInResult;
 		}
+		else // ...otherwise log a non blocking error...
+		{
+			// If it is present a description from SAP then use it
+			if (isset($manageSalesPriceListIn->Log) && isset($manageSalesPriceListIn->Log->Item)
+				&& isset($manageSalesPriceListIn->Log->Item))
+			{
+				if (!isEmptyArray($manageSalesPriceListIn->Log->Item))
+				{
+					foreach ($manageSalesPriceListIn->Log->Item as $item)
+					{
+						if (isset($item->Note))
+						{
+							$this->_ci->loglib->logWarningDB($item->Note);
+						}
+					}
+				}
+				elseif ($manageSalesPriceListIn->Log->Item->Note)
+				{
+					$this->_ci->loglib->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
+				}
+			}
+			else
+			{
+				// Default non blocking error
+				$this->_ci->loglib->logWarningDB('SAP did not return ID for price list: '.$priceListId);
+			}
+		}
+
+		return success('Service added successfully to the price list');
 	}
 }
 

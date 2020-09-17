@@ -122,9 +122,6 @@ class SyncServicesLib
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($users)) return success('No services to be created');
 
-		// Array used to store non blocking error messages to be returned back and then logged
-		$nonBlockingErrorsArray = array();
-
 		// Remove the already created services performing a diff between the given person ids and those present
 		// in the sync table. If no errors and the diff array is not empty then continues, otherwise a message
 		// is returned
@@ -145,21 +142,21 @@ class SyncServicesLib
 			$stundensatz = $serviceData->stundensatz;
 			if (isEmptyString($stundensatz))
 			{
-				$nonBlockingErrorsArray[] = 'No stundensatz set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the name is not set for this user...
 			if (isEmptyString($serviceData->name))
 			{
-				$nonBlockingErrorsArray[] = 'No surname set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No surname set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the organization unit is null then skip this user...
 			if (isEmptyString($serviceData->organization_unit))
 			{
-				$nonBlockingErrorsArray[] = 'No organization unit set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -176,8 +173,7 @@ class SyncServicesLib
 					$serviceData->description,
 					$serviceData->person_id,
 					$serviceData->category,
-					$serviceData->root_organization_unit,
-					$nonBlockingErrorsArray
+					$serviceData->root_organization_unit
 				);
 
 				if (isError($createResult)) return $createResult; // if fatal error
@@ -199,8 +195,7 @@ class SyncServicesLib
 						$valuationResult = $this->_manageServiceProductValuationDataIn(
 							$serviceId,
 							$companyId,
-							$stundensatz,
-							$nonBlockingErrorsArray
+							$stundensatz
 						);
 
 						if (isError($valuationResult)) return $valuationResult; // if fatal error
@@ -227,8 +222,7 @@ class SyncServicesLib
 						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
 							$priceListId,
 							$serviceId,
-							$stundensatz,
-							$nonBlockingErrorsArray
+							$stundensatz
 						);
 
 						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
@@ -249,27 +243,26 @@ class SyncServicesLib
 						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
 							$companyId,
 							$serviceId,
-							$stundensatz,
-							$nonBlockingErrorsArray
+							$stundensatz
 						);
 
 						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
 					}
 					else
 					{
-						$nonBlockingErrorsArray[] = 'Was not possible to find the root organization unit for this service: '.$serviceId;
+						$this->_ci->loglib->logWarningDB('Was not possible to find the root organization unit for this service: '.$serviceId);
 					}
 				}
 				// otherwise non blocking error and continue with the next one
 			}
 			else // if the service is already present in SAP
 			{
-				$nonBlockingErrorsArray[] = 'Service already present: '.$serviceData->description;
+				$this->_ci->loglib->logWarningDB('Service already present: '.$serviceData->description);
 				continue;
 			}
 		}
 
-		return success($nonBlockingErrorsArray);
+		return success('Services successfully created');
 	}
 
 	/**
@@ -278,9 +271,6 @@ class SyncServicesLib
 	public function update($users)
 	{
 		if (isEmptyArray($users)) return success('No services to be updated');
-
-		// Array used to store non blocking error messages to be returned back and then logged
-		$nonBlockingErrorsArray = array();
 
 		// Remove the already created services
 		$diffUsers = $this->_removeNotCreatedUsers($users);
@@ -303,21 +293,21 @@ class SyncServicesLib
 			$stundensatz = $serviceData->stundensatz;
 			if (isEmptyString($stundensatz))
 			{
-				$nonBlockingErrorsArray[] = 'No stundensatz set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the name is not set for this user...
 			if (isEmptyString($serviceData->name))
 			{
-				$nonBlockingErrorsArray[] = 'No surname set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No surname set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the organization unit is null then skip this user...
 			if (isEmptyString($serviceData->organization_unit))
 			{
-				$nonBlockingErrorsArray[] = 'No organization unit set for user: '.$serviceData->person_id;
+				$this->_ci->loglib->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -334,6 +324,7 @@ class SyncServicesLib
 			// Checks if the current service is already present in SAP
 			$serviceDataSAP = $this->_serviceExistsByIdSAP(getData($sapIdResult)[0]->sap_service_id);
 
+			// If an error occurred then return it
 			if (isError($serviceDataSAP)) return $serviceDataSAP;
 
 			// If the current service is present in SAP
@@ -370,129 +361,126 @@ class SyncServicesLib
 					)
 				);
 
-				// If no error occurred...
-				if (!isError($manageServiceResult))
+				// If an error occurred then return it
+				if (isError($manageServiceResult)) return $manageServiceResult;
+
+				// SAP data
+				$manageService = getData($manageServiceResult);
+
+				// If data structure is ok...
+				if (isset($manageService->ServiceProduct)
+					&& isset($manageService->ServiceProduct->InternalID)
+					&& isset($manageService->ServiceProduct->InternalID->_))
 				{
-					// SAP data
-					$manageService = getData($manageServiceResult);
+					// Get the previously created service id
+					$serviceId = $manageService->ServiceProduct->InternalID->_;
 
-					// If data structure is ok...
-					if (isset($manageService->ServiceProduct)
-						&& isset($manageService->ServiceProduct->InternalID)
-						&& isset($manageService->ServiceProduct->InternalID->_))
+					// Get all company ids
+					$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
+					// Activate valuation for each company
+					foreach ($companyIdsArray as $companyId)
 					{
-						// Get the previously created service id
-						$serviceId = $manageService->ServiceProduct->InternalID->_;
+						// Activate valuation
+						$valuationResult = $this->_manageServiceProductValuationDataIn(
+							$serviceId,
+							$companyId,
+							$stundensatz
+						);
 
-						// Get all company ids
-						$companyIdsArray = $this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS);
-						// Activate valuation for each company
-						foreach ($companyIdsArray as $companyId)
-						{
-							// Activate valuation
-							$valuationResult = $this->_manageServiceProductValuationDataIn(
-								$serviceId,
-								$companyId,
-								$stundensatz,
-								$nonBlockingErrorsArray
-							);
-
-							if (isError($valuationResult)) return $valuationResult; // if fatal error
-						}
-
-						// Price list & list price
-						// If root_organization_unit is not null then it is possible to add this service to a price list and to a list price
-						if ($serviceData->root_organization_unit != null)
-						{
-							// Price list
-							$priceListId = '';
-							// If the root organization unit is GMBH then add this service to the FHTW price list
-							// NOTE: for price list the logic is inverted!
-							if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
-							{
-								$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
-							}
-							else // otherwise to the GMBH price list
-							{
-								$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::GMBH_CONFIG_INDX];
-							}
-
-							// Finally add this service to a price list
-							$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
-								$priceListId,
-								$serviceId,
-								$stundensatz,
-								$nonBlockingErrorsArray
-							);
-
-							if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
-
-							// List price
-							$companyId = '';
-							// If the root organization unit is GMBH then add this service to the GMBH list price
-							if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
-							{
-								$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
-							}
-							else // otherwise to the FHTW list price
-							{
-								$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::FHTW_CONFIG_INDX];
-							}
-
-							// Add a new list price that links this service to a list price
-							$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
-								$companyId,
-								$serviceId,
-								$stundensatz,
-								$nonBlockingErrorsArray
-							);
-
-							if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
-						}
-						else
-						{
-							$nonBlockingErrorsArray[] = 'Was not possible to find the root organization unit for this service: '.$serviceId;
-						}
+						if (isError($valuationResult)) return $valuationResult; // if fatal error
 					}
-					else // ...otherwise store a non blocking error and continue with the next user
+
+					// Price list & list price
+					// If root_organization_unit is not null then it is possible to add this service to a price list and to a list price
+					if ($serviceData->root_organization_unit != null)
 					{
-						// If it is present a description from SAP then use it
-						if (isset($manageService->Log) && isset($manageService->Log->Item)
-							&& isset($manageService->Log->Item))
+						// Price list
+						$priceListId = '';
+						// If the root organization unit is GMBH then add this service to the FHTW price list
+						// NOTE: for price list the logic is inverted!
+						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
 						{
-							if (!isEmptyArray($manageService->Log->Item))
-							{
-								foreach ($manageService->Log->Item as $item)
-								{
-									if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$serviceData->person_id;
-								}
-							}
-							elseif ($manageService->Log->Item->Note)
-							{
-								$nonBlockingErrorsArray[] = $manageService->Log->Item->Note.' for user: '.$serviceData->person_id;
-							}
+							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
 						}
-						else
+						else // otherwise to the GMBH price list
 						{
-							// Default non blocking error
-							$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$serviceData->person_id;
+							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::GMBH_CONFIG_INDX];
 						}
-						continue;
+
+						// Finally add this service to a price list
+						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
+							$priceListId,
+							$serviceId,
+							$stundensatz
+						);
+
+						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
+
+						// List price
+						$companyId = '';
+						// If the root organization unit is GMBH then add this service to the GMBH list price
+						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
+						{
+							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
+						}
+						else // otherwise to the FHTW list price
+						{
+							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::FHTW_CONFIG_INDX];
+						}
+
+						// Add a new list price that links this service to a list price
+						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
+							$companyId,
+							$serviceId,
+							$stundensatz
+						);
+
+						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
+					}
+					else
+					{
+						$this->_ci->loglib->logWarningDB(
+							'Was not possible to find the root organization unit for this service: '.$serviceId
+						);
 					}
 				}
-				else // ...otherwise return it
+				else // ...otherwise store a non blocking error and continue with the next user
 				{
-					return $manageServiceResult;
+					// If it is present a description from SAP then use it
+					if (isset($manageService->Log) && isset($manageService->Log->Item)
+						&& isset($manageService->Log->Item))
+					{
+						if (!isEmptyArray($manageService->Log->Item))
+						{
+							foreach ($manageService->Log->Item as $item)
+							{
+								if (isset($item->Note))
+								{
+									$this->_ci->loglib->logWarningDB($item->Note.' for user: '.$serviceData->person_id);
+								}
+							}
+						}
+						elseif ($manageService->Log->Item->Note)
+						{
+							$this->_ci->loglib->logWarningDB($manageService->Log->Item->Note.' for user: '.$serviceData->person_id);
+						}
+					}
+					else
+					{
+						// Default non blocking error
+						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$serviceData->person_id);
+					}
+					continue;
 				}
 			}
 			else // if the service is already present in SAP
 			{
-				$nonBlockingErrorsArray[] = 'Service is not present: '.$serviceData->description;
+				$this->_ci->loglib->logWarningDB('Service is not present: '.$serviceData->description);
 				continue;
 			}
 		}
 
-		return success($nonBlockingErrorsArray);
+		return success('Services successfully updated');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -716,7 +704,7 @@ class SyncServicesLib
 	/**
 	 *
 	 */
-	private function _manageServiceProductIn($description, $person_id, $category, $rootOU, &$nonBlockingErrorsArray)
+	private function _manageServiceProductIn($description, $person_id, $category, $rootOU)
 	{
 		// Then create it!
 		$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
@@ -760,68 +748,65 @@ class SyncServicesLib
 			)
 		);
 
-		// If no error occurred...
-		if (!isError($manageServiceResult))
+		// If an error occurred then return it
+		if (isError($manageServiceResult)) return $manageServiceResult;
+
+		// SAP data
+		$manageService = getData($manageServiceResult);
+
+		// If data structure is ok...
+		if (isset($manageService->ServiceProduct) && isset($manageService->ServiceProduct->InternalID)
+			&& isset($manageService->ServiceProduct->InternalID->_))
 		{
-			// SAP data
-			$manageService = getData($manageServiceResult);
+			// Store in database the couple person_id sap_service_id
+			$insert = $this->_ci->SAPServicesModel->insert(
+				array(
+					'person_id' => $person_id,
+					'sap_service_id' => $manageService->ServiceProduct->InternalID->_
+				)
+			);
 
-			// If data structure is ok...
-			if (isset($manageService->ServiceProduct) && isset($manageService->ServiceProduct->InternalID)
-				&& isset($manageService->ServiceProduct->InternalID->_))
-			{
-				// Store in database the couple person_id sap_service_id
-				$insert = $this->_ci->SAPServicesModel->insert(
-					array(
-						'person_id' => $person_id,
-						'sap_service_id' => $manageService->ServiceProduct->InternalID->_
-					)
-				);
-
-				// If database error occurred then return it
-				if (isError($insert)) return $insert;
-				// Returns the result from SAP
-				return $manageServiceResult;
-			}
-			else // ...otherwise store a non blocking error...
-			{
-				// If it is present a description from SAP then use it
-				if (isset($manageService->Log) && isset($manageService->Log->Item)
-					&& isset($manageService->Log->Item))
-				{
-					if (!isEmptyArray($manageService->Log->Item))
-					{
-						foreach ($manageService->Log->Item as $item)
-						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for user: '.$person_id;
-						}
-					}
-					elseif ($manageService->Log->Item->Note)
-					{
-						$nonBlockingErrorsArray[] = $manageService->Log->Item->Note.' for user: '.$person_id;
-					}
-				}
-				else
-				{
-					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$person_id;
-				}
-
-				// ...and return an empty success
-				return success();
-			}
-		}
-		else // ...otherwise return it
-		{
+			// If database error occurred then return it
+			if (isError($insert)) return $insert;
+			// Returns the result from SAP
 			return $manageServiceResult;
 		}
+		else // ...otherwise store a non blocking error...
+		{
+			// If it is present a description from SAP then use it
+			if (isset($manageService->Log) && isset($manageService->Log->Item)
+				&& isset($manageService->Log->Item))
+			{
+				if (!isEmptyArray($manageService->Log->Item))
+				{
+					foreach ($manageService->Log->Item as $item)
+					{
+						if (isset($item->Note))
+						{
+							$this->_ci->loglib->logWarningDB($item->Note.' for user: '.$person_id);
+						}
+					}
+				}
+				elseif ($manageService->Log->Item->Note)
+				{
+					$this->_ci->loglib->logWarningDB($manageService->Log->Item->Note.' for user: '.$person_id);
+				}
+			}
+			else
+			{
+				// Default non blocking error
+				$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$person_id);
+			}
+		}
+
+		return success('Service successfully created');
 	}
 
 	/**
 	 * Once the service is created its valuations are still inactive, this method activates a single valuation
 	 * specified by service id and company id
 	 */
-	private function _manageServiceProductValuationDataIn($sap_service_id, $company_id, $amount, &$nonBlockingErrorsArray)
+	private function _manageServiceProductValuationDataIn($sap_service_id, $company_id, $amount)
 	{
 		$manageServiceProductValuationResult = $this->_ci->ManageServiceProductValuationDataInModel->MaintainBundle(
 			array(
@@ -854,52 +839,49 @@ class SyncServicesLib
 			)
 		);
 
-		// If no error occurred...
-		if (!isError($manageServiceProductValuationResult))
-		{
-			// SAP data
-			$manageServiceProductValuation = getData($manageServiceProductValuationResult);
+		// If an error occurred return it
+		if (isError($manageServiceProductValuationResult)) return $manageServiceProductValuationResult;
 
-			// If data structure is ok...
-			if (isset($manageServiceProductValuation->ServiceProductValuationData)
-				&& isset($manageServiceProductValuation->ServiceProductValuationData->ServiceProductInternalID)
-				&& isset($manageServiceProductValuation->ServiceProductValuationData->CompanyID))
-			{
-				// Returns the result from SAP
-				return $manageServiceProductValuationResult;
-			}
-			else // ...otherwise store a non blocking error...
-			{
-				// If it is present a description from SAP then use it
-				if (isset($manageServiceProductValuation->Log) && isset($manageServiceProductValuation->Log->Item)
-					&& isset($manageServiceProductValuation->Log->Item))
-				{
-					if (!isEmptyArray($manageServiceProductValuation->Log->Item))
-					{
-						foreach ($manageServiceProductValuation->Log->Item as $item)
-						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for service: '.$sap_service_id;
-						}
-					}
-					elseif ($manageServiceProductValuation->Log->Item->Note)
-					{
-						$nonBlockingErrorsArray[] = $manageServiceProductValuation->Log->Item->Note.' for service: '.$sap_service_id;
-					}
-				}
-				else
-				{
-					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return the InterlID for user: '.$sap_service_id;
-				}
+		// SAP data
+		$manageServiceProductValuation = getData($manageServiceProductValuationResult);
 
-				// ...and return an empty success
-				return success();
-			}
-		}
-		else // ...otherwise return it
+		// If data structure is ok...
+		if (isset($manageServiceProductValuation->ServiceProductValuationData)
+			&& isset($manageServiceProductValuation->ServiceProductValuationData->ServiceProductInternalID)
+			&& isset($manageServiceProductValuation->ServiceProductValuationData->CompanyID))
 		{
+			// Returns the result from SAP
 			return $manageServiceProductValuationResult;
 		}
+		else // ...otherwise store a non blocking error...
+		{
+			// If it is present a description from SAP then use it
+			if (isset($manageServiceProductValuation->Log) && isset($manageServiceProductValuation->Log->Item)
+				&& isset($manageServiceProductValuation->Log->Item))
+			{
+				if (!isEmptyArray($manageServiceProductValuation->Log->Item))
+				{
+					foreach ($manageServiceProductValuation->Log->Item as $item)
+					{
+						if (isset($item->Note))
+						{
+							$this->_ci->loglib->logWarningDB($item->Note.' for service: '.$sap_service_id);
+						}
+					}
+				}
+				elseif ($manageServiceProductValuation->Log->Item->Note)
+				{
+					$this->_ci->loglib->logWarningDB($manageServiceProductValuation->Log->Item->Note.' for service: '.$sap_service_id);
+				}
+			}
+			else
+			{
+				// Default non blocking error
+				$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$sap_service_id);
+			}
+		}
+
+		return success('Service valuation successfully activated');
 	}
 
 	/**

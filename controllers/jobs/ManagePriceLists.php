@@ -30,37 +30,22 @@ class ManagePriceLists extends JOB_Controller
 	 */
 	public function create()
 	{
-		$this->logInfo('Start data synchronization with SAP ByD: create');
+		$this->logInfo('Start price list create');
 
 		// Create a price list on SAP side
 		$syncResult = $this->syncpricelistslib->create();
 
+		// Log result
 		if (isError($syncResult))
 		{
 			$this->logError(getCode($syncResult).': '.getError($syncResult));
 		}
 		else
 		{
-			// If non blocking errors are present...
-			if (hasData($syncResult))
-			{
-				if (!isEmptyArray(getData($syncResult)))
-				{
-					// ...then log them all as warnings
-					foreach (getData($syncResult) as $nonBlockingError)
-					{
-						$this->logWarning($nonBlockingError);
-					}
-				}
-				// Else if it a single message log it as info
-				elseif (!isEmptyString(getData($syncResult)))
-				{
-					$this->logInfo(getData($syncResult));
-				}
-			}
+			$this->logInfo(getData($syncResult));
 		}
 
-		$this->logInfo('End data synchronization with SAP ByD: create');
+		$this->logInfo('End price list create');
 	}
 
 	/**
