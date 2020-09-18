@@ -23,10 +23,11 @@ class SAPSalesOrder_model extends DB_Model
 					JOIN sync.tbl_sap_students USING(person_id)
 				WHERE
 					tbl_konto.betrag < COALESCE(
-						(SELECT sum(betrag)
+						(SELECT sum(betrag)*(-1)
 						FROM public.tbl_konto
 						WHERE buchungsnr_verweis=tbl_sap_salesorder.buchungsnr
 					),0)
+				ORDER BY sap_user_id desc, sap_sales_order_id desc
 			";
 
 		$params = array();

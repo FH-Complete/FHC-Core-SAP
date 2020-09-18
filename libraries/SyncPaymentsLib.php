@@ -88,7 +88,7 @@ class SyncPaymentsLib
 		}
 		else
 		{
-			return error("Failed to get Invoices for SalesOrder");
+			return error("Failed to get Invoices for SalesOrder".print_r($invoiceResult,true));
 		}
 
 		return error("isSalesOrderPaid in SyncPaymentsLib exited unexpected");
@@ -184,7 +184,7 @@ class SyncPaymentsLib
 			}
 		}
 		else
-			return error("Failed to Load SalesOrder");
+			return error("Failed to Load SalesOrder".print_r($result,true));
 
 		return success($id_arr);
 	}
@@ -393,15 +393,25 @@ class SyncPaymentsLib
 
 			foreach ($openPayments as $row)
 			{
+				echo "Check SO: $row->sap_sales_order_id ";
 				$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
 				if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
 				{
+					echo " -> Paid";
 					// paid
 					$this->_ci->KontoModel->setPaid($row->buchungsnr);
 				}
 				else
 				{
-					// not paid yet
+					if(isError($isPaidResult))
+					{
+						echo "Error: ".print_r($isPaidResult, true);
+					}
+					else
+					{
+						echo " -> not Paid";
+						// not paid yet
+					}
 				}
 			}
 		}
