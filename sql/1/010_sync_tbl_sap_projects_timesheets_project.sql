@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS sync.tbl_projects_timesheets_project (
 	projects_timesheet_id bigint NOT NULL,
 	projekt_id integer NOT NULL,
-	projektphase_id integer NOT NULL
+	projektphase_id integer NULL
 );
 
 COMMENT ON TABLE sync.tbl_projects_timesheets_project IS 'Table to map SAP ByD projects and FHC projects';

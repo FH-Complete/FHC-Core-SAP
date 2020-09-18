@@ -51,7 +51,7 @@ class SyncListPricesLib
 	/**
 	 * Once the service is created the service is linked to a list price
 	 */
-	public function manageProcurementPriceSpecificationIn($companyId, $sap_service_id, $stundensatz, &$nonBlockingErrorsArray)
+	public function manageProcurementPriceSpecificationIn($companyId, $sap_service_id, $stundensatz)
 	{
 		// Calls SAP to find a price list with the given supplier id
 		$manageProcurementPriceSpecificationInResult = $this->_ci->ManageProcurementPriceSpecificationInModel->maintainBundle(
@@ -103,51 +103,52 @@ class SyncListPricesLib
 			)
 		);
 
-		// If no error occurred...
-		if (!isError($manageProcurementPriceSpecificationInResult))
-		{
-			// SAP data
-			$manageProcurementPriceSpecificationIn = getData($manageProcurementPriceSpecificationInResult);
+		// If an error occurred then return it
+		if (isError($manageProcurementPriceSpecificationInResult)) return $manageProcurementPriceSpecificationInResult;
 
-			// If data structure is ok...
-			if (isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification)
-				&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID)
-				&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID->_))
+		// SAP data
+		$manageProcurementPriceSpecificationIn = getData($manageProcurementPriceSpecificationInResult);
+
+		// If data structure is ok...
+		if (isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification)
+			&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID)
+			&& isset($manageProcurementPriceSpecificationIn->ProcurementPriceSpecification->UUID->_))
+		{
+			// Returns the result from SAP
+			return $manageProcurementPriceSpecificationInResult;
+		}
+		else // ...otherwise store a non blocking error...
+		{
+			// If it is present a description from SAP then use it
+			if (isset($manageProcurementPriceSpecificationIn->Log) && isset($manageProcurementPriceSpecificationIn->Log->Item)
+				&& isset($manageProcurementPriceSpecificationIn->Log->Item))
 			{
-				// Returns the result from SAP
-				return $manageProcurementPriceSpecificationInResult;
-			}
-			else // ...otherwise store a non blocking error...
-			{
-				// If it is present a description from SAP then use it
-				if (isset($manageProcurementPriceSpecificationIn->Log) && isset($manageProcurementPriceSpecificationIn->Log->Item)
-					&& isset($manageProcurementPriceSpecificationIn->Log->Item))
+				if (!isEmptyArray($manageProcurementPriceSpecificationIn->Log->Item))
 				{
-					if (!isEmptyArray($manageProcurementPriceSpecificationIn->Log->Item))
+					foreach ($manageProcurementPriceSpecificationIn->Log->Item as $item)
 					{
-						foreach ($manageProcurementPriceSpecificationIn->Log->Item as $item)
+						if (isset($item->Note))
 						{
-							if (isset($item->Note)) $nonBlockingErrorsArray[] = $item->Note.' for list price: '.$sap_service_id;
+							$this->_ci->loglib->logWarningDB($item->Note.' for list price: '.$sap_service_id);
 						}
 					}
-					elseif ($manageProcurementPriceSpecificationIn->Log->Item->Note)
-					{
-						$nonBlockingErrorsArray[] = $manageProcurementPriceSpecificationIn->Log->Item->Note.' for list price: '.$sap_service_id;
-					}
 				}
-				else
+				elseif ($manageProcurementPriceSpecificationIn->Log->Item->Note)
 				{
-					// Default non blocking error
-					$nonBlockingErrorsArray[] = 'SAP did not return ID for list price: ILV-GMBH';
+					$this->_ci->loglib->logWarningDB(
+						$manageProcurementPriceSpecificationIn->Log->Item->Note.' for list price: '.$sap_service_id
+					);
 				}
-
-				// ...and return an empty success
-				return success();
 			}
-		}
-		else // ...otherwise return it
-		{
-			return $manageProcurementPriceSpecificationInResult;
+			else
+			{
+				// Default non blocking error
+				$this->_ci->loglib->logWarningDB('SAP did not return ID for list price: ILV-GMBH');
+			}
+
+			// ...and return a success
+			return success('Service successfully linked to the list price');
 		}
 	}
 }
+

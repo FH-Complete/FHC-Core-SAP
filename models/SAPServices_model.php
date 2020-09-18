@@ -10,6 +10,7 @@ class SAPServices_model extends DB_Model
 		parent::__construct();
 		$this->dbTable = 'sync.tbl_sap_services';
 		$this->pk = array('person_id', 'sap_service_id');
+		$this->hasSequence = false;
 	}
 }
 

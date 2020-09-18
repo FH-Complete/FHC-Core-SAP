@@ -74,30 +74,14 @@ class ManageProjects extends JOB_Controller
 		// Synchronize projects!
 		$syncResult = $this->syncprojectslib->sync($studySemester);
 
-		// If an error occurred then log it
+		// Log result
 		if (isError($syncResult))
 		{
 			$this->logError(getCode($syncResult).': '.getError($syncResult));
 		}
 		else // otherwise
 		{
-			// If non blocking errors are present...
-			if (hasData($syncResult))
-			{
-				if (!isEmptyArray(getData($syncResult)))
-				{
-					// ...then log them all as warnings
-					foreach (getData($syncResult) as $nonBlockingError)
-					{
-						$this->logWarning($nonBlockingError);
-					}
-				}
-				// Else if it a single message log it as info
-				elseif (!isEmptyString(getData($syncResult)))
-				{
-					$this->logInfo(getData($syncResult));
-				}
-			}
+			$this->logInfo(getData($syncResult));
 		}
 
 		$this->logInfo('End projects synchronization with SAP ByD');
