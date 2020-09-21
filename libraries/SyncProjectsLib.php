@@ -581,7 +581,7 @@ class SyncProjectsLib
 								if (!hasData($ressourceResult))
 								{
 									$this->_ci->loglib->logWarningDB(
-										'Employee still not synched: '.$partecipant->EmployeeID
+										'Project: Employee still not synched: '.$partecipant->EmployeeID
 									);
 									continue;
 								}
@@ -698,7 +698,7 @@ class SyncProjectsLib
 						if (!hasData($ressourceResult))
 						{
 							$this->_ci->loglib->logWarningDB(
-								'Employee still not synched: '.$task->AssignedEmployeeID
+								'Task: Employee still not synched: '.$task->AssignedEmployeeID
 							);
 							continue;
 						}
