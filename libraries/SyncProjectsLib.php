@@ -327,13 +327,14 @@ class SyncProjectsLib
 				}
 
 				// If this project has tasks and more then one
-				// NOTE: the first task it's the project itself
+				// NOTE: one of the tasks it's the project itself
 				if (!isEmptyArray($project->ProjectTask) && count($project->ProjectTask) > 1)
 				{
 					// For each task found except the firt one -> project itself
-					for ($tc = 1; $tc < count($project->ProjectTask); $tc++)
+					foreach ($project->ProjectTask as $projectTask)
 					{
-						$projectTask = $project->ProjectTask[$tc]; // get the current task
+						// If the current task is the project itself then skip to the next one
+						if ($project->ProjectID == $projectTask->ID) continue;
 
 						// Check if the task is already present with the SAP project object id and SAP task object id
 						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
