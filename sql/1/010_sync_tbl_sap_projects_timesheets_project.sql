@@ -12,7 +12,7 @@ COMMENT ON COLUMN sync.tbl_projects_timesheets_project.projektphase_id IS 'FHC p
 DO $$
 BEGIN
 	ALTER TABLE sync.tbl_projects_timesheets_project ADD CONSTRAINT tbl_sap_projects_timesheets_project_pkey
-	PRIMARY KEY (projects_timesheet_id, projekt_id, projektphase_id);
+	PRIMARY KEY (projects_timesheet_id, projekt_id);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
