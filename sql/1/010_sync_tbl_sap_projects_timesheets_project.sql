@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS sync.tbl_projects_timesheets_project (
-	projects_timesheets_project bigint NOT NULL,
+	projects_timesheets_project_id bigint NOT NULL,
 	projects_timesheet_id bigint NOT NULL,
 	projekt_id integer NOT NULL,
 	projektphase_id integer
@@ -16,15 +16,14 @@ CREATE SEQUENCE IF NOT EXISTS sync.tbl_projects_timesheets_project_seq
     NO MINVALUE
     CACHE 1;
 
-
 GRANT SELECT, UPDATE ON sync.tbl_projects_timesheets_project_seq TO vilesci;
 
-ALTER TABLE sync.tbl_projects_timesheets_project ALTER COLUMN projects_timesheets_project SET DEFAULT nextval('sync.tbl_projects_timesheets_project_seq');
+ALTER TABLE sync.tbl_projects_timesheets_project ALTER COLUMN projects_timesheets_project_id SET DEFAULT nextval('sync.tbl_projects_timesheets_project_seq');
 
 DO $$
 BEGIN
 	ALTER TABLE sync.tbl_projects_timesheets_project ADD CONSTRAINT tbl_sap_projects_timesheets_project_pkey
-	PRIMARY KEY (projects_timesheets_project);
+	PRIMARY KEY (projects_timesheets_project_id);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -51,3 +50,4 @@ END $$;
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sync.tbl_projects_timesheets_project TO vilesci;
 GRANT SELECT ON TABLE sync.tbl_projects_timesheets_project TO web;
+

@@ -54,6 +54,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('project/Projekt_model', 'ProjektModel');
 		// Loads the Projekt_ressource_model
 		$this->_ci->load->model('project/Projekt_ressource_model', 'ProjektRessourceModel');
+		// Loads the Ressource_model
+		$this->_ci->load->model('project/Ressource_model', 'RessourceModel');
 
 		// Loads model SAPMitarbeiterModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPMitarbeiter_model', 'SAPMitarbeiterModel');
@@ -458,7 +460,9 @@ class SyncProjectsLib
 		$linkedProjectsResult = $dbModel->execReadOnlyQuery('
 			SELECT ptp.projekt_id,
 				ptp.projektphase_id,
+				pt.project_id,
 				pt.project_object_id,
+				pt.project_task_id,
 				pt.project_task_object_id
 			  FROM sync.tbl_projects_timesheets_project ptp
 			  JOIN sync.tbl_sap_projects_timesheets pt USING(projects_timesheet_id)
@@ -543,7 +547,7 @@ class SyncProjectsLib
 					// If no project were found in SAP log and continue to the next one, should not happen
 					if (!hasData($projectPartecipantResult))
 					{
-						$this->_ci->loglib->logWarningDB('No project found in SAP with object id: '.$linkedProject->project_object_id);
+						$this->_ci->loglib->logWarningDB('No project found in SAP with id: '.$linkedProject->project_id);
 						continue;
 					}
 
@@ -566,28 +570,17 @@ class SyncProjectsLib
 								// If it is the leader of this project
 								if ($partecipant->EmployeeID == $sapLeaderId) $userFunction = self::LEADER_VAUE;
 
-								// Loads the resource id that should be added in fue.tbl_projektphase
-								$ressourceResult = $dbModel->execReadOnlyQuery('
-									SELECT r.ressource_id
-									  FROM fue.tbl_ressource r
-									  JOIN sync.tbl_sap_mitarbeiter sm USING(mitarbeiter_uid)
-									 WHERE sm.sap_eeid = ?
-								', array($partecipant->EmployeeID));
+								// Get or create the ressource
+								$ressourceResult = $this->_getOrCreateRessource($partecipant->EmployeeID);
 
-								// If error occurred then return the error
+								// If an error occurred then return it
 								if (isError($ressourceResult)) return $ressourceResult;
+								// If was not possible to get or create the ressource then continue to the next one
+								// NOTE: warnings have been logged in _getOrCreateRessource
+								if (!hasData($ressourceResult)) continue;
 
-								// If the ressource was not found
-								if (!hasData($ressourceResult))
-								{
-									$this->_ci->loglib->logWarningDB(
-										'Project: Employee still not synched: '.$partecipant->EmployeeID
-									);
-									continue;
-								}
-
-								// Resource id
-								$ressource_id = getData($ressourceResult)[0]->ressource_id;
+								// Get the ressource_id
+								$ressource_id = getData($ressourceResult);
 
 								// Get the projekt_kurzbz from fue.tbl_projekt
 								$projektResult = $this->_ci->ProjektModel->loadWhere(
@@ -673,38 +666,34 @@ class SyncProjectsLib
 					// If an error occurred then return the error
 					if (isError($taskServiceResult)) return $taskServiceResult;
 
-					// If there are no data log it and then skip to the next one
+					// If there are no services for this task
 					if (!hasData($taskServiceResult))
 					{
-						$this->_ci->loglib->logWarningDB('Synched task '.$linkedProject->project_task_object_id.' was not found in SAP');
+						$this->_ci->loglib->logWarningDB('No services found in SAP for task: '.$linkedProject->project_task_id);
 						continue;
 					}
 
-					// For each retrived task service. One for each employee assigned to this task
+					// For each retrived task service. One for each service/employee assigned to this task
 					foreach (getData($taskServiceResult) as $task)
 					{
-						// Loads the resource id that should be added in fue.tbl_projektphase
-						$ressourceResult = $dbModel->execReadOnlyQuery('
-							SELECT r.ressource_id
-							  FROM fue.tbl_ressource r
-							  JOIN sync.tbl_sap_mitarbeiter sm USING(mitarbeiter_uid)
-							 WHERE sm.sap_eeid = ?
-						', array($task->AssignedEmployeeID));
-
-						// If error occurred then return the error
-						if (isError($ressourceResult)) return $ressourceResult;
-
-						// If the ressource was not found
-						if (!hasData($ressourceResult))
+						// If the service is present but without employee
+						if (isEmptyString($task->AssignedEmployeeID))
 						{
-							$this->_ci->loglib->logWarningDB(
-								'Task: Employee still not synched: '.$task->AssignedEmployeeID
-							);
+							$this->_ci->loglib->logWarningDB('Found a service without emplyee for task: '.$linkedProject->project_task_id);
 							continue;
 						}
 
-						// Resource id
-						$ressource_id = getData($ressourceResult)[0]->ressource_id;
+						// Get or create the ressource
+						$ressourceResult = $this->_getOrCreateRessource($task->AssignedEmployeeID);
+
+						// If an error occurred then return it
+						if (isError($ressourceResult)) return $ressourceResult;
+						// If was not possible to get or create the ressource then continue to the next one
+						// NOTE: warnings have been logged in _getOrCreateRessource
+						if (!hasData($ressourceResult)) continue;
+
+						// Get the ressource_id
+						$ressource_id = getData($ressourceResult);
 
 						// Check if not already present in fue.tbl_projekt_ressource for project phase
 						$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
@@ -761,6 +750,81 @@ class SyncProjectsLib
 
 	// --------------------------------------------------------------------------------------------
 	// Private methods
+	
+	/**
+	 *
+	 */
+	private function _getOrCreateRessource($sapEmployeeId)
+	{
+		// The ressource id to be used to link the employee to the FHC project
+		$ressource_id = null;
+
+		$dbModel = new DB_Model();
+
+		// Loads the resource id that should be added in fue.tbl_projektphase
+		$ressourceResult = $dbModel->execReadOnlyQuery('
+			SELECT r.ressource_id
+			  FROM fue.tbl_ressource r
+			  JOIN sync.tbl_sap_mitarbeiter sm USING(mitarbeiter_uid)
+			 WHERE sm.sap_eeid = ?
+		', array($sapEmployeeId));
+
+		// If error occurred then return the error
+		if (isError($ressourceResult)) return $ressourceResult;
+
+		// If the ressource was found
+		if (hasData($ressourceResult))
+		{
+			$ressource_id = getData($ressourceResult)[0]->ressource_id;
+		}
+		else // otherwise add the new ressource
+		{
+			// Loads data of the new ressource
+			$ressourceResult = $dbModel->execReadOnlyQuery('
+				SELECT p.nachname,
+					p.vorname,
+					b.uid
+				  FROM public.tbl_person p
+				  JOIN public.tbl_benutzer b USING (person_id)
+				  JOIN sync.tbl_sap_mitarbeiter sm ON (sm.mitarbeiter_uid = b.uid)
+				 WHERE sm.sap_eeid = ?
+			', array($sapEmployeeId));
+
+			// If error occurred then return the error
+			if (isError($ressourceResult)) return $ressourceResult;
+
+			// If no data have been found log it and continue to the next one
+			if (!hasData($ressourceResult))
+			{
+				$this->_ci->loglib->logWarningDB('SAP Employee '.$sapEmployeeId.' not found in database');
+			}
+			else
+			{
+				// New resource
+				$newRessource = getData($ressourceResult)[0];
+
+				// Insert the new resource in database
+				$ressourceInsertResult = $this->_ci->RessourceModel->insert(
+					array(
+						// Description format: <surname> <name>
+						'bezeichnung' => $newRessource->nachname.' '.$newRessource->vorname,
+						'beschreibung' => 'Added by SAP Project import job',
+						'mitarbeiter_uid' => $newRessource->uid,
+						'insertamum' => 'NOW()',
+						'insertvon' => 'SAP Project import job'
+					)
+				);
+
+				// If error then return it
+				if (isError($ressourceInsertResult)) return $ressourceInsertResult;
+
+				// Get the new ressource_id 
+				$ressource_id = getData($ressourceInsertResult);
+			}
+		}
+
+		return success($ressource_id);
+	}
 
 	/**
 	 *
