@@ -54,6 +54,7 @@ class SyncUsersLib
 	// Config entries name
 	const USERS_PAYMENT_COMPANY_IDS = 'users_payment_company_ids';
 	const USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE = 'users_account_determination_debtor_group_code';
+	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	// Address info
 	const STRASSE_LENGHT = 60;
@@ -607,8 +608,13 @@ class SyncUsersLib
 				p.geschlecht AS gender
 			  FROM public.tbl_person p
 		     LEFT JOIN public.tbl_sprache s USING(sprache)
+		     LEFT JOIN public.tbl_prestudent ps USING(person_id)
 			 WHERE p.person_id IN ?
-		', array(getData($users)));
+			   AND ps.studiengang_kz IN ?
+		', array(
+			getData($users),
+			$this->_ci->config->item(self::USERS_BLOCK_LIST_COURSES)
+		));
 
 		if (isError($dbUsersPersonalData)) return $dbUsersPersonalData;
 		if (!hasData($dbUsersPersonalData)) return error('The provided person ids are not present in database');
