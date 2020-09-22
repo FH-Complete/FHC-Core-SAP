@@ -67,12 +67,12 @@ class ManageProjects extends JOB_Controller
 	/**
 	 * Updates and creates projects on SAP side
 	 */
-	public function sync($studySemester = null)
+	public function syncAll($studySemester = null)
 	{
 		$this->logInfo('Start projects synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync($studySemester);
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADLL, $studySemester);
 
 		// Log result
 		if (isError($syncResult))
@@ -85,6 +85,98 @@ class ManageProjects extends JOB_Controller
 		}
 
 		$this->logInfo('End projects synchronization with SAP ByD');
+	}
+
+	/**
+	 * Updates and creates projects on SAP side only admin
+	 */
+	public function syncAdmin($studySemester = null)
+	{
+		$this->logInfo('Start projects admin synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADMIN, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects admin synchronization with SAP ByD');
+	}
+
+	/**
+	 * Updates and creates projects on SAP side only teachers
+	 */
+	public function syncLehre($studySemester = null)
+	{
+		$this->logInfo('Start projects lehre synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::LEHRE, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects lehre synchronization with SAP ByD');
+	}
+
+	/**
+	 * Updates and creates projects on SAP side only courses
+	 */
+	public function syncLehrgaenge($studySemester = null)
+	{
+		$this->logInfo('Start projects lehrgaenge synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::LEHRGAENGE, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects lehrgaenge synchronization with SAP ByD');
+	}
+
+	/**
+	 * Updates and creates projects on SAP side only customs
+	 */
+	public function syncCustoms($studySemester = null)
+	{
+		$this->logInfo('Start projects customs synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::CUSTOM, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects customs synchronization with SAP ByD');
 	}
 }
 

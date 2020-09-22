@@ -34,6 +34,13 @@ class SyncProjectsLib
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
 	const LEADER_VAUE = 'Leitung';
 
+	// Project type
+	const ALL = 'all';
+	const ADMIN = 'admin';
+	const LEHRE = 'lehre';
+	const LEHRGAENGE = 'lehrgaenge';
+	const CUSTOM = 'custom';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -80,7 +87,7 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function sync($studySemester = null)
+	public function sync($type, $studySemester = null)
 	{
 		$currentOrNextStudySemesterResult = null;
 
@@ -134,55 +141,71 @@ class SyncProjectsLib
 			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
-			// Create admin project
-			$createResult = $this->_syncAdminProject(
-				$currentOrNextStudySemester,
-				$projectStructures,
-				$projectIdFormats,
-				$projectNameFormats,
-				$projectUnitResponsibles,
-				$projectPersonResponsibles,
-				$projectTypes,
-				$studySemesterStartDate,
-				$studySemesterEndDate,
-				$studySemesterStartDateTS,
-				$studySemesterEndDateTS
-			);
-			if (isError($createResult)) return $createResult;
+			// If it is requested a full sync or only for admin
+			if ($type == self::ALL || $type == self::ADMIN)
+			{
+				// Create admin project
+				$createResult = $this->_syncAdminProject(
+					$currentOrNextStudySemester,
+					$projectStructures,
+					$projectIdFormats,
+					$projectNameFormats,
+					$projectUnitResponsibles,
+					$projectPersonResponsibles,
+					$projectTypes,
+					$studySemesterStartDate,
+					$studySemesterEndDate,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
 
-			// Create lehre project
-			$createResult = $this->_syncLehreProject(
-				$currentOrNextStudySemester,
-				$projectIdFormats,
-				$projectNameFormats,
-				$projectUnitResponsibles,
-				$projectPersonResponsibles,
-				$projectTypes,
-				$studySemesterStartDateTS,
-				$studySemesterEndDateTS
-			);
-			if (isError($createResult)) return $createResult;
+			// If it is requested a full sync or only for lehre
+			if ($type == self::ALL || $type == self::LEHRE)
+			{
+				// Create lehre project
+				$createResult = $this->_syncLehreProject(
+					$currentOrNextStudySemester,
+					$projectIdFormats,
+					$projectNameFormats,
+					$projectUnitResponsibles,
+					$projectPersonResponsibles,
+					$projectTypes,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
 
-			// Create lehrgaenge projects
-			$createResult = $this->_syncLehrgaengeProject(
-				$currentOrNextStudySemester,
-				$projectIdFormats,
-				$projectNameFormats,
-				$projectUnitResponsibles,
-				$projectPersonResponsibles,
-				$projectTypes,
-				$studySemesterStartDateTS,
-				$studySemesterEndDateTS
-			);
-			if (isError($createResult)) return $createResult;
+			// If it is requested a full sync or only for lehrgaenge
+			if ($type == self::ALL || $type == self::LEHRGAENGE)
+			{
+				// Create lehrgaenge projects
+				$createResult = $this->_syncLehrgaengeProject(
+					$currentOrNextStudySemester,
+					$projectIdFormats,
+					$projectNameFormats,
+					$projectUnitResponsibles,
+					$projectPersonResponsibles,
+					$projectTypes,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
 
-			// Create custom projects
-			$createResult = $this->_syncCustomProject(
-				$currentOrNextStudySemester,
-				$studySemesterStartDateTS,
-				$studySemesterEndDateTS
-			);
-			if (isError($createResult)) return $createResult;
+			// If it is requested a full sync or only for custom
+			if ($type == self::ALL || $type == self::CUSTOM)
+			{
+				// Create custom projects
+				$createResult = $this->_syncCustomProject(
+					$currentOrNextStudySemester,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
 
 			// If here everything went fine
 			return success('All projects were successfully synchronized');
