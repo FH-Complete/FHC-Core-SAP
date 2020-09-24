@@ -59,6 +59,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
 		// Loads the Projekt_model
 		$this->_ci->load->model('project/Projekt_model', 'ProjektModel');
+		// Loads the Projektphase_model
+		$this->_ci->load->model('project/Projektphase_model', 'ProjektphaseModel');
 		// Loads the Projekt_ressource_model
 		$this->_ci->load->model('project/Projekt_ressource_model', 'ProjektRessourceModel');
 		// Loads the Ressource_model
@@ -283,7 +285,7 @@ class SyncProjectsLib
 				);
 
 				// If error occurred return database error
-                                if (isError($sapProjectsTimesheetsResult)) return $sapProjectsTimesheetsResult;
+				if (isError($sapProjectsTimesheetsResult)) return $sapProjectsTimesheetsResult;
 
 				// Convert the start date from SAP date to timestamp
 				$startDate = $project->PlannedStartDateTime;
@@ -313,24 +315,24 @@ class SyncProjectsLib
 								$project->ProjectID
 							);
 
-                                        		// If error occurred during update return database error
-                                        		if (isError($updateResult)) return $updateResult;
+							// If error occurred during update return database error
+							if (isError($updateResult)) return $updateResult;
 						}
 
 						// Updates everything except obejcts id and sets updateamum with the current date
 						// NOTE: there is no need to update the project id because was update before
-                                        	$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+						$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 							$sapProjectTimesheet->projects_timesheet_id,
-                                        	        array(
-                                        	                'start_date' => $startDate,
-                                        	                'end_date' => $endDate,
-								'status' => $project->ProjectLifeCycleStatusCode,
-								'updateamum' => 'NOW()'
-                                        	        )
-                                        	);
+								array(
+									'start_date' => $startDate,
+									'end_date' => $endDate,
+									'status' => $project->ProjectLifeCycleStatusCode,
+									'updateamum' => 'NOW()'
+								)
+						);
 
-                                        	// If error occurred during update return database error
-                                        	if (isError($updateResult)) return $updateResult;
+						// If error occurred during update return database error
+						if (isError($updateResult)) return $updateResult;
 					}
 					// else continue to the next one
 				}
@@ -370,7 +372,7 @@ class SyncProjectsLib
 						);
 
 						// If error occurred return database error
-                        		        if (isError($sapProjectsTaskTimesheetsResult)) return $sapProjectsTaskTimesheetsResult;
+						if (isError($sapProjectsTaskTimesheetsResult)) return $sapProjectsTaskTimesheetsResult;
 
 						// Convert the start date from SAP date to timestamp
 						$startDate = $projectTask->StartDateTime;
@@ -394,19 +396,19 @@ class SyncProjectsLib
 							{
 								// Updates everything except obejcts id and sets updateamum with the current date
 								// NOTE: there is no need to update the project id because was update before
-                                		        	$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+								$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 									$sapProjectTaskTimesheet->projects_timesheet_id,
-                                		        	        array(
+									array(
 										'project_task_id' => $projectTask->ID,
-                                		        	                'start_date' => $startDate,
-                                		        	                'end_date' => $endDate,
+										'start_date' => $startDate,
+										'end_date' => $endDate,
 										'status' => $projectTask->LifeCycleStatusCode,
 										'updateamum' => 'NOW()'
-                                		        	        )
-                                		        	);
+									)
+								);
 
-                                		        	// If error occurred during update return database error
-                                		        	if (isError($updateResult)) return $updateResult;
+								// If error occurred during update return database error
+								if (isError($updateResult)) return $updateResult;
 							}
 							// else continue with the next one
 						}
@@ -621,10 +623,10 @@ class SyncProjectsLib
 									// FHC Project pk
 									$projekt_kurzbz = getData($projektResult)[0]->projekt_kurzbz;
 
-									// Check if not already present in fue.tbl_projekt_ressource for project phase
+									// Check if not already present in fue.tbl_projekt_ressource for projects
 									$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
 										array(
-											'projektphase_id' => $linkedProject->projektphase_id,
+											'projekt_kurzbz' => $projekt_kurzbz,
 											'ressource_id' => $ressource_id,
 											'funktion_kurzbz' => $userFunction
 										)
@@ -636,35 +638,18 @@ class SyncProjectsLib
 									// If _not_ present then is possible to insert without errors
 									if (!hasData($checkResult))
 									{
-										// Check if not already present in fue.tbl_projekt_ressource for projects
-										$checkResult = $this->_ci->ProjektRessourceModel->loadWhere(
+										// Insert data into fue.tbl_projekt_ressource for project
+										$insertResult = $this->_ci->ProjektRessourceModel->insert(
 											array(
 												'projekt_kurzbz' => $projekt_kurzbz,
+												'beschreibung' => 'Assigned via SAP to this project',
 												'ressource_id' => $ressource_id,
 												'funktion_kurzbz' => $userFunction
 											)
 										);
 
 										// If error occurred then return the error
-										if (isError($checkResult)) return $checkResult;
-
-										// If _not_ present then is possible to insert without errors
-										if (!hasData($checkResult))
-										{
-											// Insert data into fue.tbl_projekt_ressource for project
-											$insertResult = $this->_ci->ProjektRessourceModel->insert(
-												array(
-													'projekt_kurzbz' => $projekt_kurzbz,
-													'beschreibung' => 'Assigned via SAP to this project',
-													'ressource_id' => $ressource_id,
-													'funktion_kurzbz' => $userFunction
-												)
-											);
-
-											// If error occurred then return the error
-											if (isError($insertResult)) return $intertResult;
-										}
-										// else skip to the next one
+										if (isError($insertResult)) return $intertResult;
 									}
 									// else skip to the next one
 								}
@@ -769,6 +754,184 @@ class SyncProjectsLib
 
 		// If everything was fine
 		return success('All employees for linked project have been imported successfully');
+	}
+
+	/**
+	 * 
+	 */
+	public function importProjectsDates()
+	{
+		$dbModel = new DB_Model();
+
+		// Gets all the records from sync.tbl_projects_timesheets_project that link a project to a phase or a task to a project (rule 0)
+		$rule0BreakerResults = $dbModel->execReadOnlyQuery('
+			SELECT ptp.projects_timesheet_id,
+				ptp.projekt_id,
+				ptp.projektphase_id
+			  FROM sync.tbl_projects_timesheets_project ptp
+			  JOIN sync.tbl_sap_projects_timesheets spt USING(projects_timesheet_id)
+			 WHERE (ptp.projektphase_id IS NULL AND spt.project_task_object_id IS NOT NULL)
+			    OR (ptp.projektphase_id IS NOT NULL AND spt.project_task_object_id IS NULL)
+		');
+
+		// If an error occurred the return it
+		if (isError($rule0BreakerResults)) return $rule0BreakerResults;
+
+		// Stores link breakers id to not load them later
+		// NOTE: the -1 value is not to have the query to fail and does not exists in database
+		$breakersArray = array(-1);
+
+		// Logs the breakers and store their ids to avoid lo load them later
+		if (hasData($rule0BreakerResults))
+		{
+			// For each breaker
+			foreach (getData($rule0BreakerResults) as $breaker)
+			{
+				$this->_ci->loglib->logWarningDB(
+					'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
+				);
+				$breakersArray[] = $breaker->projects_timesheet_id;
+			}
+		}
+		// else no breakers were found
+
+		// Loads all the linked projects and tasks except the link breakers
+		$linkedProjectsResult = $dbModel->execReadOnlyQuery('
+			SELECT ptp.projekt_id,
+				ptp.projektphase_id,
+				pt.project_id,
+				pt.project_object_id,
+				pt.project_task_id,
+				pt.project_task_object_id
+			  FROM sync.tbl_projects_timesheets_project ptp
+			  JOIN sync.tbl_sap_projects_timesheets pt USING(projects_timesheet_id)
+			 WHERE ptp.projects_timesheet_id NOT IN ?
+		      ORDER BY pt.project_object_id, pt.project_task_object_id
+		', array($breakersArray));
+
+		// If error occurred then return the error
+		if (isError($linkedProjectsResult)) return $linkedProjectsResult;
+
+		// If linked projects are presents
+		if (hasData($linkedProjectsResult))
+		{
+			// For each linked project found
+			foreach (getData($linkedProjectsResult) as $linkedProject)
+			{
+				// If a FHC project was linked to a SAP project
+				if ($linkedProject->projektphase_id == null)
+				{
+					// Get the project data from SAP
+					$projectResult = $this->_ci->ProjectsModel->getProjects(array($linkedProject->project_object_id));
+
+					// If an error occurred then return it
+					if (isError($projectResult)) return $projectResult;
+
+					// If no data are found in SAP
+					if (!hasData($projectResult))
+					{
+						$this->_ci->loglib->logWarningDB('Project not found in SAP: '.$linkedProject->project_id);
+						continue;
+					}
+
+					// SAP project
+					$project = getData($projectResult)[0];
+
+					// Checks if the project exists
+					$projektResult = $this->_ci->ProjektModel->loadWhere(
+						array(
+							'projekt_id' => $linkedProject->projekt_id
+						)
+					);
+
+					// If error occurred then return the error
+					if (isError($projektResult)) return $projektResult;
+
+					// If the project is present in database, should not happen because of the foreign key
+					if (!hasData($projektResult))
+					{
+						$this->_ci->loglib->logWarningDB('Project not found in database: '.$linkedProject->project_id);
+						continue;
+					}
+
+					// FHC project
+					$projekt = getData($projektResult)[0];
+
+					// Update project start and end date
+					$updateResult = $this->_ci->ProjektModel->update(
+						array(
+							'projekt_kurzbz' => $projekt->projekt_kurzbz
+						),
+						array(
+							'beginn' => date('Y-m-d', toTimestamp($project->PlannedStartDateTime)),
+							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime))
+						)
+					);
+
+					// If error occurred then return the error
+					if (isError($updateResult)) return $updateResult;
+				}
+				else // otherwise if a SAP task was linked to a FHC phase
+				{
+					// Get the project data from SAP
+					$projectTaskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
+
+					// If an error occurred then return it
+					if (isError($projectTaskResult)) return $projectTaskResult;
+
+					// If no data are found in SAP
+					if (!hasData($projectTaskResult))
+					{
+						$this->_ci->loglib->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						continue;
+					}
+
+					// SAP project task
+					$projectTask = getData($projectTaskResult);
+
+					// Checks if the project phase exists
+					$projektPhaseResult = $this->_ci->ProjektphaseModel->loadWhere(
+						array(
+							'projektphase_id' => $linkedProject->projektphase_id
+						)
+					);
+
+					// If error occurred then return the error
+					if (isError($projektPhaseResult)) return $projektPhaseResult;
+
+					// If the project is present in database, should not happen because of the foreign key
+					if (!hasData($projektPhaseResult))
+					{
+						$this->_ci->loglib->logWarningDB('Project phase not found in database: '.$linkedProject->project_task_id);
+						continue;
+					}
+
+					// FHC project
+					$projektPhase = getData($projektPhaseResult)[0];
+
+					// Update project phase start and end date
+					$updateResult = $this->_ci->ProjektphaseModel->update(
+						array(
+							'projektphase_id' => $projektPhase->projektphase_id
+						),
+						array(
+							'start' => date('Y-m-d', toTimestamp($projectTask->StartDateTime)),
+							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime))
+						)
+					);
+
+					// If error occurred then return the error
+					if (isError($updateResult)) return $updateResult;
+				}
+			}
+		}
+		else // otherwise return a success
+		{
+			return success('No projects are linked');
+		}
+
+		// If everything was fine
+		return success('All dates for linked project have been imported successfully');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -1533,8 +1696,8 @@ class SyncProjectsLib
 		// Loads all the custom projects
 		$customResult = $dbModel->execReadOnlyQuery('
 			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
-        			UPPER(s0.typ || s0.kurzbz) AS name,
-			        (
+				UPPER(s0.typ || s0.kurzbz) AS name,
+				(
 					SELECT so.oe_kurzbz_sap
 					  FROM sync.tbl_sap_organisationsstruktur so
 					 WHERE so.oe_kurzbz = \'tlc\'
@@ -1545,7 +1708,7 @@ class SyncProjectsLib
 			 UNION
 			SELECT UPPER(s1.typ || s1.kurzbz) AS project_id,
 				UPPER(s1.typ || s1.kurzbz) AS name,
-			        (
+				(
 					SELECT so.oe_kurzbz_sap
 					  FROM sync.tbl_sap_organisationsstruktur so
 					 WHERE so.oe_kurzbz = \'Auslandsbuero\'
