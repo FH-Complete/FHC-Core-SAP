@@ -54,3 +54,6 @@ $config['project_types'] = array(
 // Project type for custom projects (required)
 $config['project_type_custom'] = 'Z3';
 
+// Enable/disable API call ManagePurchaseOrderIn if it is the case
+$config['project_manage_purchase_order_enabled'] = false;
+

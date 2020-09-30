@@ -18,6 +18,7 @@ class SyncProjectsLib
 	const PROJECT_PERSON_RESPONSIBLE_CUSTOM = 'project_person_responsible_custom';
 	const PROJECT_TYPE_CUSTOM = 'project_type_custom';
 	const PROJECT_CUSTOM_ID_FORMAT = 'project_custom_id_format';
+	const PROJECT_MANAGE_PURCHASE_ORDER_ENABLED = 'project_manage_purchase_order_enabled';
 
 	// Project types
 	const ADMIN_PROJECT = 'admin';
@@ -29,6 +30,7 @@ class SyncProjectsLib
 	const PARTECIPANT_PROJ_EXISTS_ERROR = 'PRO_CMN_PROJ:010';
 	const PARTECIPANT_TASK_EXISTS_ERROR = 'PRO_CMN_ESRV:010';
 	const RELEASE_PROJECT_ERROR = 'CM_DS_APPL_ERROR:000';
+	const PROJECT_EMPLOYEE_NOT_EXISTS = 'PRO_PROJ_TEMPLATE:030';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -65,6 +67,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('project/Projekt_ressource_model', 'ProjektRessourceModel');
 		// Loads the Ressource_model
 		$this->_ci->load->model('project/Ressource_model', 'RessourceModel');
+		// Loads MessageTokenModel
+		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
 
 		// Loads model SAPMitarbeiterModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPMitarbeiter_model', 'SAPMitarbeiterModel');
@@ -192,7 +196,9 @@ class SyncProjectsLib
 					$projectPersonResponsibles,
 					$projectTypes,
 					$studySemesterStartDateTS,
-					$studySemesterEndDateTS
+					$studySemesterEndDateTS,
+					$studySemesterStartDate,
+					$studySemesterEndDate
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -655,15 +661,21 @@ class SyncProjectsLib
 								}
 								// else the linked project does not exists, should never be the case because of the foreign key
 							}
-							else // blocking error
+							else // log it and continue to the next one
 							{
-								return error('Partecipant object not well formed');
+								$this->_ci->loglib->logWarningDB(
+									'Partecipant object without employee id for project: '.$linkedProject->project_id
+								);
+								continue;
 							}
 						}
 					}
-					else
+					else // otherwise log it and continue to the next one
 					{
-						return error('Project and partercipants object not well formed');
+						$this->_ci->loglib->logWarningDB(
+							'Project without partecipants: '.$linkedProject->project_id
+						);
+						continue;
 					}
 				}
 				else // otherwise if a SAP task was linked to a FHC phase
@@ -1135,62 +1147,16 @@ class SyncProjectsLib
 			// For each employee
 			foreach (getData($lehreEmployeesResult) as $lehreEmployee)
 			{
-				// Get the service id for this employee
-				$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $lehreEmployee->person_id));
+				// Add the employee to this project
+				$addEmployeeResult = $this->_addEmployeeToProject(
+					$lehreEmployee,
+					$projectObjectId,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
 
-				// If error occurred return it
-				if (isError($serviceResult)) return $serviceResult;
-
-				// If the service is present for this employee
-				if (hasData($serviceResult))
-				{
-					// Get the employee from SAP
-					$sapEmployeeResult = $this->_ci->EmployeeModel->getEmployeesByUIDs(
-						array(
-							strtoupper($lehreEmployee->mitarbeiter_uid)
-						)
-					);
-
-					// If an error occurred and this error then return the error
-					if (isError($sapEmployeeResult)) return $sapEmployeeResult;
-
-					// If an employee was found in SAP
-					if (hasData($sapEmployeeResult))
-					{
-						// Add employee to project team and staffing
-						$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-							$projectObjectId,
-							getData($sapEmployeeResult)[0]->C_EeId,
-							$studySemesterStartDateTS,
-							$studySemesterEndDateTS,
-							$lehreEmployee->commited_work
-						);
-
-						// If an error occurred and it is not because of an already existing employee in this project
-						if (isError($addEmployeeResult)
-							&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
-						{
-							return $addEmployeeResult;
-						}
-
-						// Add employee to project work
-						$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-							$projectObjectId,
-							getData($sapEmployeeResult)[0]->C_EeId,
-							getData($serviceResult)[0]->sap_service_id,
-							$lehreEmployee->planned_work,
-							$lehreEmployee->lehre_grobplanung,
-							$lehreEmployee->ma_soll_stunden
-						);
-
-						// If an error occurred and it is not because of an already existing employee in this project
-						if (isError($addEmployeeToTaskResult)
-							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
-						{
-							return $addEmployeeToTaskResult;
-						}
-					}
-				}
+				// If an error occurred then return it
+				if (isError($addEmployeeResult)) return $addEmployeeResult;
 			}
 		}
 
@@ -1208,7 +1174,9 @@ class SyncProjectsLib
 		$projectPersonResponsibles,
 		$projectTypes,
 		$studySemesterStartDateTS,
-		$studySemesterEndDateTS
+		$studySemesterEndDateTS,
+		$studySemesterEndDate,
+		$studySemesterStartDate
 	)
 	{
 		$type = $projectTypes[self::LEHRGAENGE_PROJECT]; // Project type
@@ -1220,7 +1188,8 @@ class SyncProjectsLib
 		// Loads all the courses
 		$coursesResult = $dbModel->execReadOnlyQuery('
 			SELECT s.studiengang_kz,
-				UPPER(s.typ || s.kurzbz) AS name
+				UPPER(s.typ || s.kurzbz) AS name,
+				s.oe_kurzbz
 			  FROM public.tbl_studiengang s
 			 WHERE s.studiengang_kz < 0
 		      ORDER BY name
@@ -1245,8 +1214,19 @@ class SyncProjectsLib
 				$studySemesterEndDateTS
 			);
 
-			// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
-			if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+			// If an error occurred while creating the project on ByD
+			if (isError($createProjectResult))
+			{
+				// ...and the error is not project already exists, then return the error
+				if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+				{
+					return $createProjectResult;
+				}
+				else // if non blocking error then log it
+				{
+					$this->_ci->loglib->logWarningDB(getError($createProjectResult));
+				}
+			}
 
 			$projectObjectId = null;
 
@@ -1310,26 +1290,32 @@ class SyncProjectsLib
 				return $setActiveResult;
 			}
 
-			// Loads employees for this course
+			// Loads employees for this course, study semester and their organization unit
 			$courseEmployeesResult = $dbModel->execReadOnlyQuery('
 				SELECT lm.mitarbeiter_uid,
 					b.person_id,
 					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
 					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
 					\'0\' AS ma_soll_stunden,
-					\'0\' AS lehre_grobplanung
+					\'0\' AS lehre_grobplanung,
+					bf.oe_kurzbz
 				  FROM lehre.tbl_lehreinheitmitarbeiter lm
 				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
 				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
 				  JOIN public.tbl_studiengang s USING(studiengang_kz)
 				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
 			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				 WHERE l.studiensemester_kurzbz = ?
 				   AND s.studiengang_kz = ?
 			   	   AND m.fixangestellt = TRUE
-			      GROUP BY lm.mitarbeiter_uid, b.person_id
+				   AND b.aktiv = TRUE
+				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+				   AND bf.funktion_kurzbz = \'oezuordnung\'
+			      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
 			      ORDER BY lm.mitarbeiter_uid
-			', array($studySemester, $course->studiengang_kz));
+			', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
 
 			// If error occurred while retrieving course employee from database the return the error
 			if (isError($courseEmployeesResult)) return $courseEmployeesResult;
@@ -1340,56 +1326,58 @@ class SyncProjectsLib
 				// For each employee
 				foreach (getData($courseEmployeesResult) as $courseEmployee)
 				{
-					// Get the service id for this employee
-					$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $courseEmployee->person_id));
+					// Add the employee to this project
+					$addEmployeeResult = $this->_addEmployeeToProject(
+						$courseEmployee,
+						$projectObjectId,
+						$studySemesterStartDateTS,
+						$studySemesterEndDateTS
+					);
 
-					if (isError($serviceResult)) return $serviceResult;
+					// If an error occurred then return it
+					if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-					// If the service is present for this employee
-					if (hasData($serviceResult))
+					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
+					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
-						// Get the employee from SAP
-						$sapEmployeeResult = $this->_ci->EmployeeModel->getEmployeesByUIDs(
-							array(
-								strtoupper($courseEmployee->mitarbeiter_uid)
-							)
-						);
+						// Get the root organization unit for the employee
+						$employeeOURootResult = $this->_ci->MessageTokenModel->getOERoot($courseEmployee->oe_kurzbz);
 
-						// If an error occurred return it
-						if (isError($sapEmployeeResult)) return $sapEmployeeResult;
+						// If an error occurred then return it
+						if (isError($employeeOURootResult)) return $employeeOURootResult;
 
-						// If an employee was found in SAP
-						if (hasData($sapEmployeeResult))
+						// Get the root organization unit for the course
+						$courseOURootResult = $this->_ci->MessageTokenModel->getOERoot($course->oe_kurzbz);
+
+						// If an error occurred then return it
+						if (isError($courseOURootResult)) return $courseOURootResult;
+
+						// If no root organization unit found for the employee
+						if (!hasData($employeeOURootResult)) 
 						{
-							// Add employee to project team
-							$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-								$projectObjectId,
-								getData($sapEmployeeResult)[0]->C_EeId,
-								$studySemesterStartDateTS,
-								$studySemesterEndDateTS,
-								$courseEmployee->commited_work
+							$this->_ci->loglib->logWarningDB(
+								'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
 							);
-
-							// If an error occurred and it is not because of an already existing employee in this project
-							if (isError($addEmployeeResult)
-								&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
-							{
-								return $addEmployeeResult;
-							}
-
-							// Add employee to project work
-							$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-								$projectObjectId,
-								getData($sapEmployeeResult)[0]->C_EeId,
-								getData($serviceResult)[0]->sap_service_id,
-								$courseEmployee->planned_work
+						}
+						// If no root organization unit found for the course
+						elseif (!hasData($courseOURootResult)) 
+						{
+							$this->_ci->loglib->logWarningDB(
+								'No root organization unit found for course: '.$course->name
 							);
+						}
+						else // otherwise
+						{
+							// Employee root organization unit
+							$employeeOURoot = getData($employeeOURootResult)[0]->oe_kurzbz;
 
-							// If an error occurred and it is not because of an already existing employee in this project
-							if (isError($addEmployeeToTaskResult)
-								&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+							// Course root organization unit
+							$courseOURoot = getData($courseOURootResult)[0]->oe_kurzbz;
+
+							// If the employee belongs to an organization other than that of the project
+							if ($employeeOURoot != $courseOURoot)
 							{
-								return $addEmployeeToTaskResult;
+								var_dump('Different');
 							}
 						}
 					}
@@ -1482,7 +1470,7 @@ class SyncProjectsLib
 		// Update the time recording attribute of the project
 		$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
 
-		// If an error occurred while setting the project time recording as not allowed
+		// If an error occurred while setting the project time recording
 		if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
 
 		// Set the project as active
@@ -1494,6 +1482,10 @@ class SyncProjectsLib
 			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			return $setActiveResult;
+		}
+		else // otherwise log it
+		{
+			$this->_ci->loglib->logWarningDB(getError($setActiveResult));
 		}
 
 		// If structure is present
@@ -1510,7 +1502,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
-				   AND b.aktiv
+				   AND b.aktiv = TRUE
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
 				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
@@ -1599,12 +1591,18 @@ class SyncProjectsLib
 						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
-						   AND b.aktiv
+						   AND b.aktiv = TRUE
 						   AND m.fixangestellt = TRUE
 						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
 						   AND so.oe_kurzbz_sap = ?
-					', array($studySemesterEndDate, $studySemesterStartDate,$studySemesterEndDate, $studySemesterStartDate, $costCenter->oe_kurzbz_sap));
+					', array(
+						$studySemesterEndDate,
+						$studySemesterStartDate,
+						$studySemesterEndDate,
+						$studySemesterStartDate,
+						$costCenter->oe_kurzbz_sap
+					));
 
 					// If error occurred while retrieving const center employee from database the return the error
 					if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
@@ -1615,63 +1613,24 @@ class SyncProjectsLib
 						// For each employee
 						foreach (getData($costCenterEmployeesResult) as $costCenterEmployee)
 						{
-							// Get the service id for this employee
-							$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $costCenterEmployee->person_id));
+							// Add the employee to this project
+							$addEmployeeResult = $this->_addEmployeeToProject(
+								$costCenterEmployee,
+								$projectObjectId,
+								$studySemesterStartDateTS,
+								$studySemesterEndDateTS
+							);
 
-							if (isError($serviceResult)) return $serviceResult;
-
-							// If the service is present for this employee
-							if (hasData($serviceResult))
-							{
-								// Get the employee from SAP
-								$sapEmployeeResult = $this->_ci->EmployeeModel->getEmployeesByUIDs(
-									array(
-										strtoupper($costCenterEmployee->mitarbeiter_uid)
-									)
-								);
-
-								// If an error occurred and this error is _not_ data not found then return the error
-								if (isError($sapEmployeeResult)) return $sapEmployeeResult;
-
-								// If an employee was found in SAP
-								if (hasData($sapEmployeeResult))
-								{
-									// Add employee to project
-									$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-										$projectObjectId,
-										getData($sapEmployeeResult)[0]->C_EeId,
-										$studySemesterStartDateTS,
-										$studySemesterEndDateTS,
-										$costCenterEmployee->planned_work
-									);
-
-									// If an error occurred and it is not because of an already existing employee in this project
-									if (isError($addEmployeeResult)
-										&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
-									{
-										return $addEmployeeResult;
-									}
-
-									// Add employee to project task
-									$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-										$taskObjectId,
-										getData($sapEmployeeResult)[0]->C_EeId,
-										getData($serviceResult)[0]->sap_service_id,
-										$costCenterEmployee->planned_work
-									);
-
-									// If an error occurred and it is not because of an already existing employee in this project
-									if (isError($addEmployeeToTaskResult)
-										&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
-									{
-										return $addEmployeeToTaskResult;
-									}
-								}
-							}
+							// If an error occurred then return it
+							if (isError($addEmployeeResult)) return $addEmployeeResult;
 						}
 					}
 				}
 			}
+		}
+		else
+		{
+			return error('No admin structure defined in config file');
 		}
 
 		return success('Project admin synchronization ended successfully');
@@ -1839,64 +1798,110 @@ class SyncProjectsLib
 				// For each employee
 				foreach (getData($customEmployeesResult) as $customEmployee)
 				{
-					// Get the service id for this employee
-					$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $customEmployee->person_id));
+					// Add the employee to this project
+					$addEmployeeResult = $this->_addEmployeeToProject(
+						$customEmployee,
+						$projectObjectId,
+						$studySemesterStartDateTS,
+						$studySemesterEndDateTS
+					);
 
-					if (isError($serviceResult)) return $serviceResult;
-
-					// If the service is present for this employee
-					if (hasData($serviceResult))
-					{
-						// Get the employee from SAP
-						$sapEmployeeResult = $this->_ci->EmployeeModel->getEmployeesByUIDs(
-							array(
-								strtoupper($customEmployee->mitarbeiter_uid)
-							)
-						);
-
-						// If an error occurred return it
-						if (isError($sapEmployeeResult)) return $sapEmployeeResult;
-
-						// If an employee was found in SAP
-						if (hasData($sapEmployeeResult))
-						{
-							// Add employee to project team
-							$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
-								$projectObjectId,
-								getData($sapEmployeeResult)[0]->C_EeId,
-								$studySemesterStartDateTS,
-								$studySemesterEndDateTS,
-								$customEmployee->commited_work
-							);
-
-							// If an error occurred and it is not because of an already existing employee in this project
-							if (isError($addEmployeeResult)
-								&& getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR)
-							{
-								return $addEmployeeResult;
-							}
-
-							// Add employee to project work
-							$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-								$projectObjectId,
-								getData($sapEmployeeResult)[0]->C_EeId,
-								getData($serviceResult)[0]->sap_service_id,
-								$customEmployee->planned_work
-							);
-
-							// If an error occurred and it is not because of an already existing employee in this project
-							if (isError($addEmployeeToTaskResult)
-								&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
-							{
-								return $addEmployeeToTaskResult;
-							}
-						}
-					}
+					// If an error occurred then return it
+					if (isError($addEmployeeResult)) return $addEmployeeResult;
 				}
 			}
 		}
 
 		return success('Custom projects synchronization ended successfully');
+	}
+
+	/**
+	 * Add the given employee to the given project
+	 */
+	private function _addEmployeeToProject($employee, $projectObjectId, $studySemesterStartDateTS, $studySemesterEndDateTS)
+	{
+		// Get the service id for this employee
+		$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $employee->person_id));
+
+		// If an error occurred then return it
+		if (isError($serviceResult)) return $serviceResult;
+
+		// If the service is present for this employee
+		if (hasData($serviceResult))
+		{
+			// SAP service id for the employee
+			$sapServiceId = getData($serviceResult)[0]->sap_service_id;
+
+			// Load the SAP eeid from the sync table
+			$sapEeidResult = $this->_ci->SAPMitarbeiterModel->loadWhere(
+				array('mitarbeiter_uid' => $employee->mitarbeiter_uid
+			));
+
+			// If an error occurred return it
+			if (isError($sapEeidResult)) return $sapEeidResult;
+
+			// If an employee was found in the sync table
+			if (hasData($sapEeidResult))
+			{
+				// SAP employee id
+				$sapEeid = getData($sapEeidResult)[0]->sap_eeid;
+
+				// Add employee to project team
+				$addEmployeeResult = $this->_ci->ProjectsModel->addEmployee(
+					$projectObjectId,
+					$sapEeid,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS,
+					isset($employee->commited_work) ? $employee->commited_work : null
+				);
+
+				// If an error occurred and:
+				if (isError($addEmployeeResult))
+				{
+					// - Not because of an already existing employee in this project
+					// - Not because of not existing employee
+					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS)
+					{
+						return $addEmployeeResult; // return the error
+					}
+					else // if non blocking error then log it
+					{
+						$this->_ci->loglib->logWarningDB(getError($addEmployeeResult));
+					}
+				}
+
+				// Add employee to project work
+				$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
+					$projectObjectId,
+					$sapEeid,
+					$sapServiceId,
+					isset($employee->planned_work) ? $employee->planned_work : null,
+					isset($employee->lehre_grobplanung) ? $employee->lehre_grobplanung : null,
+					isset($employee->ma_soll_stunden) ? $employee->ma_soll_stunden : null
+				);
+
+				// If an error occurred and:
+				if (isError($addEmployeeToTaskResult))
+				{
+					// - Not because of an already existing employee in this project
+					// - Not because of not existing employee
+					if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+						&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
+						&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+					{
+						return $addEmployeeToTaskResult; // return the error
+					}
+					else // if non blocking error then log it
+					{
+						$this->_ci->loglib->logWarningDB(getError($addEmployeeToTaskResult));
+					}
+				}
+			}
+		}
+
+		// If here then everything is fine
+		return success('Employee successfully added to this project');
 	}
 }
 
