@@ -229,7 +229,7 @@ class Projects_model extends ODATAClientModel
 				'MASollStunden1unitCode_KUT' => 'HUR',
 				'LehreGrobplanung1content_KUT' => '20.00000000000000',
 				'LehreGrobplanung1unitCode_KUT' => 'HUR',
-				'TimeConfirmationProfileCode' => '1'
+				'TimeConfirmationProfileCode' => '2'
 			)
 		);
 	}

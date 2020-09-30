@@ -1467,11 +1467,15 @@ class SyncProjectsLib
 		// If an error occurred while creating the project on ByD return the error
 		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
 
-		// Update the time recording attribute of the project
-		$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+		// If the projects does not exist then update the time recording attriute
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Update the time recording attribute of the project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
 
-		// If an error occurred while setting the project time recording
-		if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+			// If an error occurred while setting the project time recording
+			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+		}
 
 		// Set the project as active
 		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
@@ -1481,11 +1485,14 @@ class SyncProjectsLib
 		if (isError($setActiveResult)
 			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
-			return $setActiveResult;
-		}
-		else // otherwise log it
-		{
-			$this->_ci->loglib->logWarningDB(getError($setActiveResult));
+			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			{
+				return $setActiveResult;
+			}
+			else // otherwise log it
+			{
+				$this->_ci->loglib->logWarningDB(getError($setActiveResult));
+			}
 		}
 
 		// If structure is present
