@@ -1,0 +1,17 @@
+.panel .panel-heading
+{
+    background-color: white;
+}
+
+#input-sap-project, #input-fue-project
+{
+    background-color: white;
+    font-weight: bold;
+    text-align: center;
+    font-size: initial;
+}
+
+#btn-sync-projects, #btn-create-project, #btn-sync-phases, #btn-create-phase
+{
+    width: 200px;
+}
