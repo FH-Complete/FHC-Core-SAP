@@ -241,7 +241,7 @@ class SyncProjects extends Auth_Controller
 
 		if ($isSynced_SAPProject)
 		{
-			$this->outputJsonSuccess(null); // return null if already synced
+			return $this->outputJsonError('Bitte synchronisieren Sie erst die Projekte'); // return null if already synced
 		}
 
 		// Get SAP project data
@@ -249,7 +249,7 @@ class SyncProjects extends Auth_Controller
 
 		if (!$retval = getData($result)[0])
 		{
-			$this->outputJsonError('SAP Projekt konnte nicht gefunden werden.');
+			return $this->outputJsonError('SAP Projekt konnte nicht gefunden werden.');
 		}
 
 		// Create FUE project
@@ -283,14 +283,14 @@ class SyncProjects extends Auth_Controller
 
 		if(isSuccess($result))
 		{
-			$this->outputJsonSuccess(array(
+			return $this->outputJsonSuccess(array(
 				'projekt_id' => $projekt_id,
 				'titel' => $titel
 			));
 		}
 		else
 		{
-			$this->outputJsonError('Projekte konnten nicht verknüpft werden.');
+			return $this->outputJsonError('Projekte konnten nicht verknüpft werden.');
 		}
 	}
 
