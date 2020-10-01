@@ -49,7 +49,7 @@ function rowSelected_onSAPProject(row)
     var projects_timesheet_id = row.getData().projects_timesheet_id;
 
     // Reset GUI
-    _resetGUI_SyncedProjects();
+    _resetGUI();
 
     // Load SAP phases
     loadSAPPhases(project_id);
@@ -111,7 +111,7 @@ function rowSelected_onFUEProject(row)
     var projekt_id = row.getData().projekt_id;
 
     // Reset GUI
-    _resetGUI_SyncedProjects();
+    _resetGUI();
 
     loadFUEPhases(row.getData().projekt_kurzbz);
 
@@ -234,17 +234,20 @@ function loadFUEPhases(projekt_kurzbz)
 function _setGUI_SyncedProjects()
 {
 	$("#panel-projects button").attr("disabled", true);
+	$("#select-organisationseinheit").attr("disabled", 'disabled');
+
 	$(PROJECT_MSG).text('VERKNÜPFT');
-	$(PROJECT_MSG).addClass('text-success');
+	$(PROJECT_MSG).removeClass().addClass('text-success');
 }
 
 // Reset GUI
-function _resetGUI_SyncedProjects()
+function _resetGUI()
 {
     $("#panel-projects button").attr("disabled", false);
-    $(PHASES_MSG).text('');
-    $(PROJECT_MSG).html('');
-    $(PROJECT_MSG).removeClass();
+    $("#select-organisationseinheit").removeAttr("disabled");
+
+    $(PROJECT_MSG).text('');
+	$(PHASES_MSG).text('');
 }
 
 
@@ -258,13 +261,14 @@ $("#btn-sync-projects").click(function () {
     var fue_project_data = $(FH_PROJECT_TABLE).tabulator('getSelectedData');
 
     // Checks
+
+	if (sap_project_data.length == 0 || fue_project_data.length == 0) {
+		FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP- und ein FH-Projekt aus.');
+		return;
+	}
+
     if (sap_project_data[0].isSynced == 'true' || fue_project_data[0].isSynced == 'true') {
         FHC_DialogLib.alertInfo('Mindestens ein Projekt ist bereits synchronisiert. Bitte wählen Sie ein anderes aus.');
-        return;
-    }
-
-    if (sap_project_data.length == 0 || fue_project_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie zwei Projekte aus.');
         return;
     }
 
@@ -306,7 +310,7 @@ $("#btn-sync-projects").click(function () {
                     _setGUI_SyncedProjects();
 
                     // Print success message
-                    FHC_DialogLib.alertSuccess("Projekte wurden verknüpft.");
+                    // FHC_DialogLib.alertSuccess("Projekte wurden verknüpft.");
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
@@ -433,6 +437,8 @@ $("#btn-create-project").click(function () {
                         JSON.stringify([{projects_timesheet_id: projects_timesheet_id, isSynced: 'true'}])
                     );
 
+	                $("#input-fue-project").val(data.retval.titel);
+
                     $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
                     $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
 
@@ -512,7 +518,7 @@ $("#btn-create-phase").click(function () {
                         }
 
                         // Print success message
-                        FHC_DialogLib.alertSuccess("Phase wurde erstellt und verknüpft.");
+                        // FHC_DialogLib.alertSuccess("Phase wurde erstellt und verknüpft.");
                     }
                 },
                 errorCallback: function (jqXHR, textStatus, errorThrown) {
