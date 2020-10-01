@@ -35,7 +35,8 @@ class SyncProjects extends Auth_Controller
 		// Load language phrases
 		$this->loadPhrases(
 			array(
-				'ui'
+				'ui',
+				'lehre'
 			)
 		);
 		
@@ -228,6 +229,12 @@ class SyncProjects extends Auth_Controller
 	public function createFUEProject()
 	{
 		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+		$oe_kurzbz = $this->input->post('oe_kurzbz');
+
+		if (isEmptyString($oe_kurzbz))
+		{
+			return $this->outputJsonError('Bitte wählen Sie eine Organisationseinheit');
+		}
 
 		// Check, if given project is already synced
 		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($projects_timesheet_id);
@@ -253,13 +260,13 @@ class SyncProjects extends Auth_Controller
 				'beginn' => $retval->start_date,
 				'ende' => $retval->end_date,
 				'beschreibung' => $retval->project_id,
-				'oe_kurzbz' => 'fue'   // TODO: implement oe selection
+				'oe_kurzbz' => $oe_kurzbz
 			)
 		);
 
 		if (isError($result))
 		{
-			$this->outputJsonError('FH-Projekt konnte nicht angelegt werden.');
+			return $this->outputJsonError('FH-Projekt konnte nicht angelegt werden.');
 		}
 
 		// Get returning projekt_id of created FUE project

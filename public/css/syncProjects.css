@@ -9,9 +9,15 @@
     font-weight: bold;
     text-align: center;
     font-size: initial;
+    border: solid 2px grey;
 }
 
-#btn-sync-projects, #btn-create-project, #btn-sync-phases, #btn-create-phase
+#btn-sync-projects, #btn-sync-phases, #btn-create-project, #btn-create-phase
 {
-    width: 200px;
+    width: 180px;
+}
+
+#select-organisationseinheit
+{
+    width: 190px;
 }

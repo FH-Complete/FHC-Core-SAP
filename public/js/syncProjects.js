@@ -10,6 +10,7 @@ const FH_PHASES_TABLE = '[tableuniqueid = FUEPhases] #tableWidgetTabulator';
 const PROJECT_MSG = '#projects-msg';
 const PHASES_MSG = '#projectphases-msg';
 
+var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
 // -----------------------------------------------------------------------------------------------------------------
 // Tabulator table format functions
 // -----------------------------------------------------------------------------------------------------------------
@@ -403,7 +404,8 @@ $("#btn-create-project").click(function () {
 
     // Prepare data object for ajax call
     var data = {
-        'projects_timesheet_id': projects_timesheet_id
+        'projects_timesheet_id': projects_timesheet_id,
+	    'oe_kurzbz' : organisationseinheit_selected
     };
 
     FHC_AjaxClient.ajaxCallPost(
@@ -519,6 +521,10 @@ $("#btn-create-phase").click(function () {
             }
         );
     });
+
+$("#select-organisationseinheit").change(function(){
+	organisationseinheit_selected = $(this).val();
+});
 
 });
 
