@@ -117,6 +117,9 @@ $this->load->view(
 		                                    echo $this->widgetlib->widget(
 			                                    'Organisationseinheit_widget',
 			                                    array(
+				                                    DropdownWidget::SELECTED_ELEMENT => '',
+			                                    ),
+			                                    array(
 				                                    'id' => 'select-organisationseinheit'
 			                                    )
 		                                    );
