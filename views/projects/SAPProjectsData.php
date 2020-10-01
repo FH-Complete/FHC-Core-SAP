@@ -30,6 +30,9 @@ $tableWidgetArray = array(
 		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
+		rowClick: function(e, row){
+            func_rowClick_onSAPProject(e, row);
+        },
 		tableWidgetHeader: false,
 		rowSelected: function(row){
 			rowSelected_onSAPProject(row);

@@ -21,6 +21,54 @@ function func_selectableCheck(row)
     return row.getData().isSynced == 'false';
 }
 
+/**
+ * Empty project title input field and phases when deselecting SAP project.
+ * NOTE: used rowClick callback instead of rowDeselect callback, because rowDeselect would be triggered also when
+ * using 'deselectRow' programmatically and this would cause unwanted behaviour.
+  */
+function func_rowClick_onSAPProject(e, row)
+{
+	var is_synced = row.getData().isSynced;
+
+	if (!row.isSelected())
+	{
+		$("#input-sap-project").val('');
+		$(SAP_PHASES_TABLE).tabulator('replaceData');
+
+		if (is_synced == 'true' ||  $("#input-fue-project").attr('data-fue-project-syncStatus') == 'true')
+		{
+			$("#input-fue-project").val('');
+			$(FH_PHASES_TABLE).tabulator('replaceData');
+
+			_resetGUI();
+		}
+	}
+}
+
+/**
+ * Empty project title input field and phases when deselecting FH project.
+ * NOTE: used rowClick callback instead of rowDeselect callback, because rowDeselect would be triggered also when
+ * using 'deselectRow' programmatically and this would cause unwanted behaviour.
+ */
+function func_rowClick_onFHProject(e, row)
+{
+	var is_synced = row.getData().isSynced;
+
+	if (!row.isSelected())
+	{
+		$("#input-fue-project").val('');
+		$(FH_PHASES_TABLE).tabulator('replaceData');
+
+		if (is_synced == 'true' ||  $("#input-sap-project").attr('data-sap-project-syncStatus') == 'true')
+		{
+			$("#input-sap-project").val('');
+			$(SAP_PHASES_TABLE).tabulator('replaceData');
+
+			_resetGUI();
+		}
+	}
+}
+
 // Resort table on row update and add row
 function resortTable(row)
 {
@@ -51,6 +99,9 @@ function rowSelected_onSAPProject(row)
     // Reset GUI
     _resetGUI();
 
+    // Set SAP project title into input field
+	$("#input-sap-project").val(project_id);
+
     // Load SAP phases
     loadSAPPhases(project_id);
 
@@ -66,7 +117,8 @@ function rowSelected_onSAPProject(row)
             {
                 successCallback: function (data, textStatus, jqXHR) {
                     if (!data.error && data.retval) {
-                        $("#input-sap-project").val(project_id);
+
+                    	// Set FH project title into input field
                         $("#input-fue-project").val(data.retval.titel);
 
                         $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
@@ -90,7 +142,6 @@ function rowSelected_onSAPProject(row)
     }
     else
     {
-        $("#input-sap-project").val(project_id);
         $("#input-sap-project").attr('data-sap-project-syncStatus', 'false');
 
         // if projects of last selection were synced
@@ -113,6 +164,10 @@ function rowSelected_onFUEProject(row)
     // Reset GUI
     _resetGUI();
 
+	// Set FH project title into input field
+	$("#input-fue-project").val(titel);
+
+	// Load FH projectphases
     loadFUEPhases(row.getData().projekt_kurzbz);
 
     if (is_synced == 'true') {
@@ -128,8 +183,8 @@ function rowSelected_onFUEProject(row)
                 {
                     if (!data.error && data.retval)
                     {
+	                    // Set SAP project title into input field
                         $("#input-sap-project").val(data.retval.project_id);
-                        $("#input-fue-project").val(titel);
 
                         $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
                         $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
@@ -152,7 +207,6 @@ function rowSelected_onFUEProject(row)
     }
     else
     {
-        $("#input-fue-project").val(titel);
         $("#input-fue-project").attr('data-fue-project-syncStatus', 'false');
 
         // if projects of last selection were synced
@@ -445,7 +499,7 @@ $("#btn-create-project").click(function () {
                     _setGUI_SyncedProjects();
 
                     // Print success message
-                    FHC_DialogLib.alertSuccess("Projekt wurde erstellt und verknüpft.");
+                    // FHC_DialogLib.alertSuccess("Projekt wurde erstellt und verknüpft.");
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {

@@ -34,6 +34,9 @@ $tableWidgetArray = array(
 		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
+		rowClick: function(e, row){
+            func_rowClick_onFHProject(e, row);
+        },
 		tableWidgetHeader: false,
 		rowSelected: function(row){
 			rowSelected_onFUEProject(row);
