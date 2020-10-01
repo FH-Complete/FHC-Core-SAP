@@ -12,7 +12,7 @@ $qry = '
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projekt_id)
 	WHERE 		synctbl.projektphase_id IS NULL
 	-- filter active projects only
-	AND 		(ende IS NULL OR ende >= NOW())
+	AND 		( ende IS NULL OR ende >= ( NOW() - INTERVAL \'1 YEAR\' ) )
 	ORDER BY 	projects_timesheets_project, projekt_kurzbz
 ';
 
