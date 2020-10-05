@@ -13,6 +13,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
+	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	/**
 	 * Object initialization
@@ -20,6 +21,9 @@ class JQMSchedulerLib
 	public function __construct()
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
+
+		// Load users configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -71,8 +75,13 @@ class JQMSchedulerLib
 				 WHERE pss.studiensemester_kurzbz = ?
 				   AND pss.status_kurzbz IN (\'Aufgenommener\', \'Student\', \'Incoming\', \'Diplomand\')
 				   AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_students WHERE person_id=ps.person_id)
+				   AND ps.studiengang_kz NOT IN ?
 			      GROUP BY ps.person_id
-			', array($currentOrNextStudySemester));
+			', array(
+				$currentOrNextStudySemester,
+				$this->_ci->config->item(self::USERS_BLOCK_LIST_COURSES)
+			  )
+			);
 
 			// If error occurred while retrieving new users from database then return the error
 			if (isError($newUsersResult)) return $newUsersResult;

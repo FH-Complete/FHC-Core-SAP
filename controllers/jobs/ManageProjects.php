@@ -15,10 +15,10 @@ class ManageProjects extends JOB_Controller
 		parent::__construct();
 
 		// Loads SAP common helper
-                $this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
+		$this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
 
 		// Loads SyncProjectsLib
-                $this->load->library('extensions/FHC-Core-SAP/SyncProjectsLib');
+		$this->load->library('extensions/FHC-Core-SAP/SyncProjectsLib');
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ class ManageProjects extends JOB_Controller
 	{
 		var_dump($this->syncprojectslib->getProjects());
 	}
-	
+
 	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to get all projects and their tasks
 	 */
@@ -47,7 +47,7 @@ class ManageProjects extends JOB_Controller
 	{
 		var_dump($this->syncprojectslib->getProjectById($id));
 	}
-	
+
 	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to get all tasks for a project with the given ID
 	 */
@@ -72,7 +72,7 @@ class ManageProjects extends JOB_Controller
 		$this->logInfo('Start projects synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADLL, $studySemester);
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ALL, $studySemester);
 
 		// Log result
 		if (isError($syncResult))
@@ -180,7 +180,7 @@ class ManageProjects extends JOB_Controller
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function importProjectsDates()
 	{
@@ -202,4 +202,3 @@ class ManageProjects extends JOB_Controller
 		$this->logInfo('End projects dates synchronization with SAP ByD');
 	}
 }
-

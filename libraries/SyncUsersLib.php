@@ -54,7 +54,6 @@ class SyncUsersLib
 	// Config entries name
 	const USERS_PAYMENT_COMPANY_IDS = 'users_payment_company_ids';
 	const USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE = 'users_account_determination_debtor_group_code';
-	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	// Address info
 	const STRASSE_LENGHT = 60;
@@ -610,10 +609,8 @@ class SyncUsersLib
 		     LEFT JOIN public.tbl_sprache s USING(sprache)
 		     LEFT JOIN public.tbl_prestudent ps USING(person_id)
 			 WHERE p.person_id IN ?
-			   AND ps.studiengang_kz IN ?
 		', array(
-			getData($users),
-			$this->_ci->config->item(self::USERS_BLOCK_LIST_COURSES)
+			getData($users)
 		));
 
 		if (isError($dbUsersPersonalData)) return $dbUsersPersonalData;
@@ -947,4 +944,3 @@ class SyncUsersLib
 		return $addressInformationArray;
 	}
 }
-
