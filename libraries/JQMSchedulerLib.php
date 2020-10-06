@@ -179,8 +179,8 @@ class JQMSchedulerLib
 			SELECT b.person_id
 			  FROM public.tbl_benutzer b
 			  JOIN public.tbl_mitarbeiter m ON(m.mitarbeiter_uid = b.uid)
-			 WHERE NOW() - m.insertamum::timestamptz <= INTERVAL \'42 hours\'
-			   AND m.fixangestellt = TRUE
+			 WHERE
+			 	m.fixangestellt = TRUE
 			   AND b.aktiv = TRUE
 			   AND b.person_id NOT IN (
 				SELECT ss.person_id FROM sync.tbl_sap_services ss
