@@ -185,6 +185,7 @@ class JQMSchedulerLib
 			   AND b.person_id NOT IN (
 				SELECT ss.person_id FROM sync.tbl_sap_services ss
 			   )
+			   AND m.personalnummer>0
 		');
 
 		// If error occurred while retrieving new users from database then return the error
