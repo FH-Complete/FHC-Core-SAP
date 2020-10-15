@@ -2,10 +2,10 @@
 $qry = '
 	SELECT
 				CASE
-				WHEN (projects_timesheets_project IS NOT NULL) THEN \'true\'
+				WHEN (projects_timesheets_project_id IS NOT NULL) THEN \'true\'
 				ELSE \'false\'
 				END AS "isSynced",
-				projekt_id, 
+				projekt_id,
 				projekt_kurzbz,
 				titel
 	FROM 		fue.tbl_projekt
@@ -13,7 +13,7 @@ $qry = '
 	WHERE 		synctbl.projektphase_id IS NULL
 	-- filter active projects only
 	AND 		( ende IS NULL OR ende >= ( NOW() - INTERVAL \'1 YEAR\' ) )
-	ORDER BY 	projects_timesheets_project, projekt_kurzbz
+	ORDER BY 	projects_timesheets_project_id, projekt_kurzbz
 ';
 
 $tableWidgetArray = array(

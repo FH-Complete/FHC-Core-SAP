@@ -2,7 +2,7 @@
 $qry = '
 	SELECT
 				CASE
-				WHEN projects_timesheets_project IS NOT NULL THEN \'true\'
+				WHEN projects_timesheets_project_id IS NOT NULL THEN \'true\'
 				ELSE \'false\'
 				END AS "isSynced",
 				projects_timesheet_id,
@@ -10,7 +10,7 @@ $qry = '
 	FROM    	sync.tbl_sap_projects_timesheets
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projects_timesheet_id)
 	WHERE 		project_task_id IS NULL
-	ORDER BY 	projects_timesheets_project, project_id
+	ORDER BY 	projects_timesheets_project_id, project_id
 ';
 
 $tableWidgetArray = array(

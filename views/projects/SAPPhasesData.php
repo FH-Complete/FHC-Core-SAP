@@ -8,7 +8,7 @@ $qry = '
     "projects_timesheets_project",
     "projects_timesheet_id",
     "project_id",
-    "project_task_id"  
+    "project_task_id"
 	) LIMIT 0;
 ';
 
@@ -30,7 +30,7 @@ $tableWidgetArray = array(
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
 		tableWidgetHeader: false,
-	    selectable: true,     
+	    selectable: true,
         selectableRangeMode: "click",
 		selectablePersistence: false,
 		selectableCheck: function(row){

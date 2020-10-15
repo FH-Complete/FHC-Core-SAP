@@ -28,19 +28,19 @@ class ProjectsTimesheetsProject_model extends DB_Model
 					WHERE   project_id = ?
 	                AND     project_task_id IS NOT NULL
 				)
-				
+
 			SELECT
 	            CASE
-					WHEN projects_timesheets_project IS NOT NULL THEN \'true\'
+					WHEN projects_timesheets_project_id IS NOT NULL THEN \'true\'
 					ELSE \'false\'
 		        END AS "isSynced",
-	            projects_timesheets_project,
+	            projects_timesheets_project_id,
 	            projects_timesheet_id,
 	            project_id,
-	            project_task_id                
-			FROM        sap_projectphases 
+	            project_task_id
+			FROM        sap_projectphases
 	        LEFT JOIN   sync.tbl_projects_timesheets_project USING (projects_timesheet_id)
-	        ORDER BY    projects_timesheets_project, project_task_id;
+	        ORDER BY    projects_timesheets_project_id, project_task_id;
 		';
 
 		return $this->execQuery($qry, array($project_id));
@@ -62,20 +62,20 @@ class ProjectsTimesheetsProject_model extends DB_Model
 					JOIN    fue.tbl_projektphase USING (projekt_kurzbz)
 					WHERE   projekt_kurzbz = ?
 				)
-				
+
 			SELECT
 	            CASE
-					WHEN projects_timesheets_project IS NOT NULL THEN \'true\'
+					WHEN projects_timesheets_project_id IS NOT NULL THEN \'true\'
 					ELSE \'false\'
 		        END AS "isSynced",
-	            projects_timesheets_project,
+	            projects_timesheets_project_id,
 	            fue_projectphases.projekt_id,
 	            projekt_kurzbz,
 	            projektphase_id,
-	            bezeichnung                   
-			FROM        fue_projectphases 
+	            bezeichnung
+			FROM        fue_projectphases
             LEFT JOIN   sync.tbl_projects_timesheets_project USING (projektphase_id)
-            ORDER BY    projects_timesheets_project, bezeichnung;
+            ORDER BY    projects_timesheets_project_id, bezeichnung;
 		';
 
 		return $this->execQuery($qry, array($projekt_kurzbz));
@@ -178,4 +178,3 @@ class ProjectsTimesheetsProject_model extends DB_Model
 		return hasData($result);
 	}
 }
-
