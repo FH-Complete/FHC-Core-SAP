@@ -25,5 +25,18 @@ class SAPProjectsTimesheets_model extends DB_Model
 			)
 		);
 	}
+
+	/**
+	 * Get project by project_id.
+	 * @param $project_id
+	 * @return mixed
+	 */
+	public function getProject($project_id)
+	{
+		return $this->loadWhere(array(
+			'project_id' => $project_id,
+			'project_task_id' => NULL
+		));
+	}
 }
 
