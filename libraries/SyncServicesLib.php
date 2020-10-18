@@ -44,6 +44,22 @@ class SyncServicesLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
+		// Loads the LogLib with the needed parameters to log correctly from this library
+		$this->_ci->load->library(
+			'LogLib',
+			array(
+				'classIndex' => 3,
+				'functionIndex' => 3,
+				'lineIndex' => 2,
+				'dbLogType' => 'job', // required
+				'dbExecuteUser' => 'Cronjob system',
+				'requestId' => 'JOB',
+				'requestDataFormatter' => function($data) {
+					return json_encode($data);
+				}
+			)
+		);
+
 		// Loads QueryServiceProductIn
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryServiceProductIn_model', 'QueryServiceProductInModel');
 
@@ -584,6 +600,7 @@ class SyncServicesLib
 			  JOIN public.tbl_benutzer b USING(person_id)
 			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
 			 WHERE p.person_id IN ?
+			   AND m.personalnummer > 0
 		', array(getData($users)));
 
 		if (isError($dbServicesData)) return $dbServicesData;
@@ -643,10 +660,10 @@ class SyncServicesLib
 		if (isError($queryServiceResult)) return $queryServiceResult;
 		if (!hasData($queryServiceResult)) return error('Something went wrong while checking if a service is present using a description');
 
-		// Get data from the returned object
+		// Get data from then returned object
 		$queryService = getData($queryServiceResult);
 
-		// Checks the structure of the returned object
+		// Checks the structure of then returned object
 		if (isset($queryService->ProcessingConditions)
 			&& isset($queryService->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{
@@ -678,10 +695,10 @@ class SyncServicesLib
 		if (isError($queryServiceResult)) return $queryServiceResult;
 		if (!hasData($queryServiceResult)) return error('Something went wrong while checking if a service is present using an id');
 
-		// Get data from the returned object
+		// Get data from then returned object
 		$queryService = getData($queryServiceResult);
 
-		// Checks the structure of the returned object
+		// Checks the structure of then returned object
 		if (isset($queryService->ProcessingConditions)
 			&& isset($queryService->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{

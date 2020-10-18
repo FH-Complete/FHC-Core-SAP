@@ -1569,18 +1569,18 @@ class SyncProjectsLib
 				   AND so.oe_kurzbz_sap NOT IN (\'100000\', \'LPC\', \'LEHRGANG\')
 				   AND so.oe_kurzbz NOT IN (
 					WITH RECURSIVE oes(oe_kurzbz, oe_parent_kurzbz) as
-                			(
+					(
 						SELECT oe_kurzbz, oe_parent_kurzbz
 						  FROM public.tbl_organisationseinheit
-                			         WHERE oe_kurzbz = \'gmbh\'
-                			     UNION ALL
+						 WHERE oe_kurzbz = \'gmbh\'
+					     UNION ALL
 						SELECT o.oe_kurzbz, o.oe_parent_kurzbz
 						  FROM public.tbl_organisationseinheit o, oes
-                			         WHERE o.oe_parent_kurzbz = oes.oe_kurzbz
-                			)
-                			SELECT oe_kurzbz
-                			  FROM oes
-                	 	      GROUP BY oe_kurzbz
+						 WHERE o.oe_parent_kurzbz = oes.oe_kurzbz
+					)
+					SELECT oe_kurzbz
+					  FROM oes
+				      GROUP BY oe_kurzbz
 				   )
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
