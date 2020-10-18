@@ -16,6 +16,22 @@ class SyncListPricesLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
+		// Loads the LogLib with the needed parameters to log correctly from this library
+		$this->_ci->load->library(
+			'LogLib',
+			array(
+				'classIndex' => 3,
+				'functionIndex' => 3,
+				'lineIndex' => 2,
+				'dbLogType' => 'job', // required
+				'dbExecuteUser' => 'Cronjob system',
+				'requestId' => 'JOB',
+				'requestDataFormatter' => function($data) {
+					return json_encode($data);
+				}
+			)
+		);
+
 		// Loads ManageProcurementPriceSpecificationInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageProcurementPriceSpecificationIn_model', 'ManageProcurementPriceSpecificationInModel');
 	}
