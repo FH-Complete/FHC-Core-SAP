@@ -296,6 +296,12 @@ class SyncProjectsLib
 		// If projects are present
 		if (hasData($projectsResult))
 		{
+			// Sets flag deleted to true for all the records
+			$sapProjectsTimesheetsDeletedResult = $this->_ci->SAPProjectsTimesheetsModel->setDeletedTrue();
+
+			// If error occurred return database error
+			if (isError($sapProjectsTimesheetsDeletedResult)) return $sapProjectsTimesheetsDeletedResult;
+
 			// For each project found
 			foreach (getData($projectsResult) as $project)
 			{
@@ -319,46 +325,45 @@ class SyncProjectsLib
 				$endDate = $project->PlannedEndDateTime;
 				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
 
+				$projects_timesheet_id = null;
+
 				// If already present then update
 				if (hasData($sapProjectsTimesheetsResult))
 				{
 					// Data from dabase
 					$sapProjectTimesheet = getData($sapProjectsTimesheetsResult)[0];
 
-					// Updates the already present record with data from SAP only if they differ
-					if ($project->ProjectID != $sapProjectTimesheet->project_id
-						|| $startDate != $sapProjectTimesheet->start_date
-						|| $endDate != $sapProjectTimesheet->end_date
-						|| $project->ProjectLifeCycleStatusCode != $sapProjectTimesheet->status)
+					// If the project id changed, then update all the records where the old project id is present
+					if ($project->ProjectID != $sapProjectTimesheet->project_id)
 					{
-						// If the project id changed, then update all the records where the old project id is present
-						if ($project->ProjectID != $sapProjectTimesheet->project_id)
-						{
-							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->renameProjectId(
-								$sapProjectTimesheet->project_id,
-								$project->ProjectID
-							);
-
-							// If error occurred during update return database error
-							if (isError($updateResult)) return $updateResult;
-						}
-
-						// Updates everything except obejcts id and sets updateamum with the current date
-						// NOTE: there is no need to update the project id because was update before
-						$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
-							$sapProjectTimesheet->projects_timesheet_id,
-							array(
-								'start_date' => $startDate,
-								'end_date' => $endDate,
-								'status' => $project->ProjectLifeCycleStatusCode,
-								'updateamum' => 'NOW()'
-							)
+						$updateResult = $this->_ci->SAPProjectsTimesheetsModel->renameProjectId(
+							$sapProjectTimesheet->project_id,
+							$project->ProjectID
 						);
 
 						// If error occurred during update return database error
 						if (isError($updateResult)) return $updateResult;
 					}
-					// else continue to the next one
+
+					// Updates everything except obejcts id and sets updateamum with the current date
+					// NOTE: there is no need to update the project id because was update before
+					$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+						$sapProjectTimesheet->projects_timesheet_id,
+						array(
+							'start_date' => $startDate,
+							'end_date' => $endDate,
+							'status' => $project->ProjectLifeCycleStatusCode,
+							'responsible_unit' => $project->ResponsibleCostCentreID,
+							'updateamum' => 'NOW()',
+							'deleted' => false
+						)
+					);
+
+					// If error occurred during update return database error
+					if (isError($updateResult)) return $updateResult;
+
+					// Store the projects_timesheet_id to be used later
+					$projects_timesheet_id = $sapProjectTimesheet->projects_timesheet_id;
 				}
 				else // otherwise insert
 				{
@@ -369,12 +374,17 @@ class SyncProjectsLib
 							'project_object_id' => $project->ObjectID,
 							'start_date' => $startDate,
 							'end_date' => $endDate,
-							'status' => $project->ProjectLifeCycleStatusCode
+							'status' => $project->ProjectLifeCycleStatusCode,
+							'responsible_unit' => $project->ResponsibleCostCentreID,
+							'deleted' => false
 						)
 					);
 
 					// If error occurred during insert return database error
 					if (isError($insertResult)) return $insertResult;
+
+					// Store the projects_timesheet_id to be used later
+					$projects_timesheet_id = getData($insertResult);
 				}
 
 				// If this project has tasks and more then one
@@ -384,8 +394,22 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
 					{
-						// If the current task is the project itself then skip to the next one
-						if ($project->ProjectID == $projectTask->ID) continue;
+						// If the current task is the project itself then update the name and skip to the next one
+						if ($project->ProjectID == $projectTask->ID)
+						{
+							// Updates only the name
+							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+								$projects_timesheet_id,
+								array(
+									'name' => $projectTask->Name
+								)
+							);
+
+							// If error occurred during update return database error
+							if (isError($updateResult)) return $updateResult;
+
+							continue;
+						}
 
 						// Check if the task is already present with the SAP project object id and SAP task object id
 						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
@@ -412,29 +436,24 @@ class SyncProjectsLib
 							// Data from database
 							$sapProjectTaskTimesheet = getData($sapProjectsTaskTimesheetsResult)[0];
 
-							// Updates the already present record with data from SAP only if they differ
-							if ($projectTask->ID != $sapProjectTaskTimesheet->project_task_id
-								|| $startDate != $sapProjectTaskTimesheet->start_date
-								|| $endDate != $sapProjectTaskTimesheet->end_date
-								|| $projectTask->LifeCycleStatusCode != $sapProjectTaskTimesheet->status)
-							{
-								// Updates everything except obejcts id and sets updateamum with the current date
-								// NOTE: there is no need to update the project id because was update before
-								$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
-									$sapProjectTaskTimesheet->projects_timesheet_id,
-									array(
-										'project_task_id' => $projectTask->ID,
-										'start_date' => $startDate,
-										'end_date' => $endDate,
-										'status' => $projectTask->LifeCycleStatusCode,
-										'updateamum' => 'NOW()'
-									)
-								);
+							// Updates everything except obejcts id and sets updateamum with the current date
+							// NOTE: there is no need to update the project id because was update before
+							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+								$sapProjectTaskTimesheet->projects_timesheet_id,
+								array(
+									'project_task_id' => $projectTask->ID,
+									'start_date' => $startDate,
+									'end_date' => $endDate,
+									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
+									'updateamum' => 'NOW()',
+									'status' => $projectTask->LifeCycleStatusCode,
+									'deleted' => false,
+									'name' => $projectTask->Name
+								)
+							);
 
-								// If error occurred during update return database error
-								if (isError($updateResult)) return $updateResult;
-							}
-							// else continue with the next one
+							// If error occurred during update return database error
+							if (isError($updateResult)) return $updateResult;
 						}
 						else // otherwise insert
 						{
@@ -447,7 +466,10 @@ class SyncProjectsLib
 									'project_task_object_id' => $projectTask->ObjectID,
 									'start_date' => $startDate,
 									'end_date' => $endDate,
-									'status' => $projectTask->LifeCycleStatusCode
+									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
+									'status' => $projectTask->LifeCycleStatusCode,
+									'deleted' => false,
+									'name' => $projectTask->Name
 								)
 							);
 

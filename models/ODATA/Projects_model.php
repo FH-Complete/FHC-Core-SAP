@@ -64,7 +64,7 @@ class Projects_model extends ODATAClientModel
 	{
 		// ODATA call parameters
 		$odataParameters = array(
-			'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode',
+			'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode,ResponsibleCostCentreID',
 			'$orderby' => 'ProjectID',
 			'$expand' => 'ProjectTask',
 			'$top' => 999999

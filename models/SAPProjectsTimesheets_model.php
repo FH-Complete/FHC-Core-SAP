@@ -38,5 +38,15 @@ class SAPProjectsTimesheets_model extends DB_Model
 			'project_task_id' => NULL
 		));
 	}
+
+	/**
+	 * Renames the project id
+	 */
+	public function setDeletedTrue()
+	{
+		return $this->execQuery(
+			'UPDATE sync.tbl_sap_projects_timesheets SET deleted = TRUE'
+		);
+	}
 }
 
