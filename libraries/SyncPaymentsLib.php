@@ -811,6 +811,7 @@ class SyncPaymentsLib
 				AND buchungsnr_verweis is null
 				AND person_id = ?
 				AND buchungsdatum >= ?
+				AND buchungsdatum <= now()
 				AND tbl_studiensemester.start <= ?
 			ORDER BY
 				studiengang_kz
