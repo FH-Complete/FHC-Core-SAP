@@ -293,6 +293,7 @@ class JQMSchedulerLib
 			)
 
 			AND buchungsnr_verweis is null
+			AND buchungsdatum <= now()
 			AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
 
@@ -308,4 +309,3 @@ class JQMSchedulerLib
 		return success($jobInput);
 	}
 }
-
