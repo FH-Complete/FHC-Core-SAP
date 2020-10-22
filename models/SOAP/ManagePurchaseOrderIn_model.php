@@ -27,7 +27,7 @@ class ManagePurchaseOrderIn_model extends CoreAPIModel
 	 */
 	public function purchaseOrderMaintainBundle($parameters)
 	{
-		return $this->_call('PurchaseOrderMaintainBundle', $parameters);
+		return $this->_call('ManagePurchaseOrderInMaintainBundle', $parameters);
 	}
 }
 

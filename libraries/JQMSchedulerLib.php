@@ -73,9 +73,35 @@ class JQMSchedulerLib
 				  FROM public.tbl_prestudent ps
 				  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 				 WHERE pss.studiensemester_kurzbz = ?
-				   AND pss.status_kurzbz IN (\'Aufgenommener\', \'Student\', \'Incoming\', \'Diplomand\')
-				   AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_students WHERE person_id=ps.person_id)
+				   AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_students WHERE person_id = ps.person_id)
 				   AND ps.studiengang_kz NOT IN ?
+				   AND
+					(
+						EXISTS (
+							SELECT
+								1
+							FROM
+								public.tbl_prestudent
+								JOIN public.tbl_student USING (prestudent_id)
+								JOIN public.tbl_benutzer ON (uid = student_uid)
+							WHERE
+								tbl_prestudent.person_id = ps.person_id
+								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+								AND tbl_benutzer.aktiv
+						)
+						OR
+						EXISTS (
+							SELECT
+								1
+							FROM
+								public.tbl_prestudent
+							WHERE
+								tbl_prestudent.person_id = ps.person_id
+								AND studiengang_kz = ps.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+						)
+					)
 			      GROUP BY ps.person_id
 			', array(
 				$currentOrNextStudySemester,
@@ -128,6 +154,26 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($personResult)) $persons = getData($personResult);
 
+
+		// Prestudents
+
+		// Get users that have been updated in tbl_prestudent = tbl_prestudentstatus table
+		$prestudentsResult = $dbModel->execReadOnlyQuery('
+			SELECT ps.person_id
+			  FROM public.tbl_prestudent ps
+			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
+			 WHERE NOW() - pss.insertamum::timestamptz <= INTERVAL \'24 hours\'
+			    OR NOW() - pss.updateamum::timestamptz <= INTERVAL \'24 hours\'
+			    OR NOW() - pss.datum::timestamptz <= INTERVAL \'24 hours\'
+		      GROUP BY ps.person_id
+		');
+
+		// If error occurred while retrieving updated users from database then return the error
+		if (isError($prestudentsResult)) return $prestudentsResult;
+
+		// If there are updated users
+		if (hasData($prestudentsResult)) $prestudents = getData($prestudentsResult);
+
 		// Contacts
 
 		// Get users that have been updated in tbl_kontakt table
@@ -160,7 +206,7 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
-		$jobInput = json_encode(array_merge($persons, $contacts, $addresses));
+		$jobInput = json_encode(array_merge($persons, $contacts, $addresses, $prestudents));
 
 		return success($jobInput);
 	}
@@ -179,13 +225,12 @@ class JQMSchedulerLib
 			SELECT b.person_id
 			  FROM public.tbl_benutzer b
 			  JOIN public.tbl_mitarbeiter m ON(m.mitarbeiter_uid = b.uid)
-			 WHERE
-			 	m.fixangestellt = TRUE
+			 WHERE m.fixangestellt = TRUE
 			   AND b.aktiv = TRUE
 			   AND b.person_id NOT IN (
 				SELECT ss.person_id FROM sync.tbl_sap_services ss
 			   )
-			   AND m.personalnummer>0
+			   AND m.personalnummer > 0
 		');
 
 		// If error occurred while retrieving new users from database then return the error
@@ -263,3 +308,4 @@ class JQMSchedulerLib
 		return success($jobInput);
 	}
 }
+

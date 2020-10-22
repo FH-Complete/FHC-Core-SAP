@@ -52,10 +52,28 @@ class SyncProjectsLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
+		// Loads the LogLib with the needed parameters to log correctly from this library
+		$this->_ci->load->library(
+			'LogLib',
+			array(
+				'classIndex' => 3,
+				'functionIndex' => 3,
+				'lineIndex' => 2,
+				'dbLogType' => 'job', // required
+				'dbExecuteUser' => 'Cronjob system',
+				'requestId' => 'JOB',
+				'requestDataFormatter' => function($data) {
+					return json_encode($data);
+				}
+			)
+		);
+
 		// Loads model ProjectsModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Projects_model', 'ProjectsModel');
 		// Loads model EmployeeModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/Employee_model', 'EmployeeModel');
+		// Loads model ManagePurchaseOrderIn
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePurchaseOrderIn_model', 'ManagePurchaseOrderInModel');
 
 		// Loads the StudiensemesterModel
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
@@ -278,6 +296,12 @@ class SyncProjectsLib
 		// If projects are present
 		if (hasData($projectsResult))
 		{
+			// Sets flag deleted to true for all the records
+			$sapProjectsTimesheetsDeletedResult = $this->_ci->SAPProjectsTimesheetsModel->setDeletedTrue();
+
+			// If error occurred return database error
+			if (isError($sapProjectsTimesheetsDeletedResult)) return $sapProjectsTimesheetsDeletedResult;
+
 			// For each project found
 			foreach (getData($projectsResult) as $project)
 			{
@@ -301,46 +325,45 @@ class SyncProjectsLib
 				$endDate = $project->PlannedEndDateTime;
 				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
 
+				$projects_timesheet_id = null;
+
 				// If already present then update
 				if (hasData($sapProjectsTimesheetsResult))
 				{
 					// Data from dabase
 					$sapProjectTimesheet = getData($sapProjectsTimesheetsResult)[0];
 
-					// Updates the already present record with data from SAP only if they differ
-					if ($project->ProjectID != $sapProjectTimesheet->project_id
-						|| $startDate != $sapProjectTimesheet->start_date
-						|| $endDate != $sapProjectTimesheet->end_date
-						|| $project->ProjectLifeCycleStatusCode != $sapProjectTimesheet->status)
+					// If the project id changed, then update all the records where the old project id is present
+					if ($project->ProjectID != $sapProjectTimesheet->project_id)
 					{
-						// If the project id changed, then update all the records where the old project id is present
-						if ($project->ProjectID != $sapProjectTimesheet->project_id)
-						{
-							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->renameProjectId(
-								$sapProjectTimesheet->project_id,
-								$project->ProjectID
-							);
-
-							// If error occurred during update return database error
-							if (isError($updateResult)) return $updateResult;
-						}
-
-						// Updates everything except obejcts id and sets updateamum with the current date
-						// NOTE: there is no need to update the project id because was update before
-						$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
-							$sapProjectTimesheet->projects_timesheet_id,
-								array(
-									'start_date' => $startDate,
-									'end_date' => $endDate,
-									'status' => $project->ProjectLifeCycleStatusCode,
-									'updateamum' => 'NOW()'
-								)
+						$updateResult = $this->_ci->SAPProjectsTimesheetsModel->renameProjectId(
+							$sapProjectTimesheet->project_id,
+							$project->ProjectID
 						);
 
 						// If error occurred during update return database error
 						if (isError($updateResult)) return $updateResult;
 					}
-					// else continue to the next one
+
+					// Updates everything except obejcts id and sets updateamum with the current date
+					// NOTE: there is no need to update the project id because was update before
+					$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+						$sapProjectTimesheet->projects_timesheet_id,
+						array(
+							'start_date' => $startDate,
+							'end_date' => $endDate,
+							'status' => $project->ProjectLifeCycleStatusCode,
+							'responsible_unit' => $project->ResponsibleCostCentreID,
+							'updateamum' => 'NOW()',
+							'deleted' => false
+						)
+					);
+
+					// If error occurred during update return database error
+					if (isError($updateResult)) return $updateResult;
+
+					// Store the projects_timesheet_id to be used later
+					$projects_timesheet_id = $sapProjectTimesheet->projects_timesheet_id;
 				}
 				else // otherwise insert
 				{
@@ -351,12 +374,17 @@ class SyncProjectsLib
 							'project_object_id' => $project->ObjectID,
 							'start_date' => $startDate,
 							'end_date' => $endDate,
-							'status' => $project->ProjectLifeCycleStatusCode
+							'status' => $project->ProjectLifeCycleStatusCode,
+							'responsible_unit' => $project->ResponsibleCostCentreID,
+							'deleted' => false
 						)
 					);
 
 					// If error occurred during insert return database error
 					if (isError($insertResult)) return $insertResult;
+
+					// Store the projects_timesheet_id to be used later
+					$projects_timesheet_id = getData($insertResult);
 				}
 
 				// If this project has tasks and more then one
@@ -366,8 +394,22 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
 					{
-						// If the current task is the project itself then skip to the next one
-						if ($project->ProjectID == $projectTask->ID) continue;
+						// If the current task is the project itself then update the name and skip to the next one
+						if ($project->ProjectID == $projectTask->ID)
+						{
+							// Updates only the name
+							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+								$projects_timesheet_id,
+								array(
+									'name' => $projectTask->Name
+								)
+							);
+
+							// If error occurred during update return database error
+							if (isError($updateResult)) return $updateResult;
+
+							continue;
+						}
 
 						// Check if the task is already present with the SAP project object id and SAP task object id
 						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
@@ -394,29 +436,24 @@ class SyncProjectsLib
 							// Data from database
 							$sapProjectTaskTimesheet = getData($sapProjectsTaskTimesheetsResult)[0];
 
-							// Updates the already present record with data from SAP only if they differ
-							if ($projectTask->ID != $sapProjectTaskTimesheet->project_task_id
-								|| $startDate != $sapProjectTaskTimesheet->start_date
-								|| $endDate != $sapProjectTaskTimesheet->end_date
-								|| $projectTask->LifeCycleStatusCode != $sapProjectTaskTimesheet->status)
-							{
-								// Updates everything except obejcts id and sets updateamum with the current date
-								// NOTE: there is no need to update the project id because was update before
-								$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
-									$sapProjectTaskTimesheet->projects_timesheet_id,
-									array(
-										'project_task_id' => $projectTask->ID,
-										'start_date' => $startDate,
-										'end_date' => $endDate,
-										'status' => $projectTask->LifeCycleStatusCode,
-										'updateamum' => 'NOW()'
-									)
-								);
+							// Updates everything except obejcts id and sets updateamum with the current date
+							// NOTE: there is no need to update the project id because was update before
+							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
+								$sapProjectTaskTimesheet->projects_timesheet_id,
+								array(
+									'project_task_id' => $projectTask->ID,
+									'start_date' => $startDate,
+									'end_date' => $endDate,
+									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
+									'updateamum' => 'NOW()',
+									'status' => $projectTask->LifeCycleStatusCode,
+									'deleted' => false,
+									'name' => $projectTask->Name
+								)
+							);
 
-								// If error occurred during update return database error
-								if (isError($updateResult)) return $updateResult;
-							}
-							// else continue with the next one
+							// If error occurred during update return database error
+							if (isError($updateResult)) return $updateResult;
 						}
 						else // otherwise insert
 						{
@@ -429,7 +466,10 @@ class SyncProjectsLib
 									'project_task_object_id' => $projectTask->ObjectID,
 									'start_date' => $startDate,
 									'end_date' => $endDate,
-									'status' => $projectTask->LifeCycleStatusCode
+									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
+									'status' => $projectTask->LifeCycleStatusCode,
+									'deleted' => false,
+									'name' => $projectTask->Name
 								)
 							);
 
@@ -455,7 +495,8 @@ class SyncProjectsLib
 	{
 		$dbModel = new DB_Model();
 
-		// Gets all the records from sync.tbl_projects_timesheets_project that link a project to a phase or a task to a project (rule 0)
+		// Gets all the records from sync.tbl_projects_timesheets_project that link a project to a phase or a task to a project
+		// Aka all those records which break the rule 0
 		$rule0BreakerResults = $dbModel->execReadOnlyQuery('
 			SELECT ptp.projects_timesheet_id,
 				ptp.projekt_id,
@@ -466,7 +507,7 @@ class SyncProjectsLib
 			    OR (ptp.projektphase_id IS NOT NULL AND spt.project_task_object_id IS NULL)
 		');
 
-		// If an error occurred the return it
+		// If an error occurred then return it
 		if (isError($rule0BreakerResults)) return $rule0BreakerResults;
 
 		// Stores link breakers id to not load them later
@@ -498,6 +539,7 @@ class SyncProjectsLib
 			  FROM sync.tbl_projects_timesheets_project ptp
 			  JOIN sync.tbl_sap_projects_timesheets pt USING(projects_timesheet_id)
 			 WHERE ptp.projects_timesheet_id NOT IN ?
+			   AND NOW() - pt.end_date::timestamptz <= INTERVAL \'1 year\'
 		      ORDER BY pt.project_object_id, pt.project_task_object_id
 		', array($breakersArray));
 
@@ -526,16 +568,25 @@ class SyncProjectsLib
 					// If SAP returned something usable
 					if (hasData($projectTaskResults))
 					{
-						$projectTasks = getData($projectTaskResults); // get the data
+						// Get the project
+						$project = getData($projectTaskResults)[0];
 
 						// If it is set the ProjectTask property and it is a valid array with at least one element
-						if (isset($projectTasks[0]->ProjectTask) && !isEmptyArray($projectTasks[0]->ProjectTask))
+						if (isset($project->ProjectTask) && !isEmptyArray($project->ProjectTask))
 						{
-							// If is set the ResponsibleEmployeeID property and it is a valid string
-							if (isset($projectTasks[0]->ProjectTask[0]->ResponsibleEmployeeID)
-								&& !isEmptyString($projectTasks[0]->ProjectTask[0]->ResponsibleEmployeeID))
+							// Loop on the project tasks
+							foreach ($project->ProjectTask as $projectTask)
 							{
-								$sapLeaderId = $projectTasks[0]->ProjectTask[0]->ResponsibleEmployeeID;
+								// If the current task is the project itself
+								if ($linkedProject->project_id == $projectTask->ID)
+								{
+									// If is set the ResponsibleEmployeeID property and it is a valid string
+									if (isset($projectTask->ResponsibleEmployeeID)
+										&& !isEmptyString($projectTask->ResponsibleEmployeeID))
+									{
+										$sapLeaderId = $projectTask->ResponsibleEmployeeID;
+									}
+								}
 							}
 						}
 					}
@@ -786,7 +837,7 @@ class SyncProjectsLib
 			    OR (ptp.projektphase_id IS NOT NULL AND spt.project_task_object_id IS NULL)
 		');
 
-		// If an error occurred the return it
+		// If an error occurred then return it
 		if (isError($rule0BreakerResults)) return $rule0BreakerResults;
 
 		// Stores link breakers id to not load them later
@@ -1135,10 +1186,11 @@ class SyncProjectsLib
 			 WHERE l.studiensemester_kurzbz = ?
 			   AND s.typ IN (\'b\', \'m\')
 			   AND m.fixangestellt = TRUE
+			   AND m.personalnummer > 0
 		      GROUP BY lm.mitarbeiter_uid, b.person_id
 		', array($studySemester));
 
-		// If error occurred while retrieving teachers from database the return the error
+		// If error occurred while retrieving teachers from database then return the error
 		if (isError($lehreEmployeesResult)) return $lehreEmployeesResult;
 
 		// If teachers are present
@@ -1195,7 +1247,7 @@ class SyncProjectsLib
 		      ORDER BY name
 		');
 
-		// If error occurred while retrieving courses from database the return the error
+		// If error occurred while retrieving courses from database then return the error
 		if (isError($coursesResult)) return $coursesResult;
 		if (!hasData($coursesResult)) return success('No courses found in database');
 
@@ -1217,7 +1269,7 @@ class SyncProjectsLib
 			// If an error occurred while creating the project on ByD
 			if (isError($createProjectResult))
 			{
-				// ...and the error is not project already exists, then return the error
+				// ...and the error is _not_ project already exists, then return the error
 				if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 				{
 					return $createProjectResult;
@@ -1309,6 +1361,7 @@ class SyncProjectsLib
 				 WHERE l.studiensemester_kurzbz = ?
 				   AND s.studiengang_kz = ?
 			   	   AND m.fixangestellt = TRUE
+				   AND m.personalnummer > 0
 				   AND b.aktiv = TRUE
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
@@ -1317,7 +1370,7 @@ class SyncProjectsLib
 			      ORDER BY lm.mitarbeiter_uid
 			', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
 
-			// If error occurred while retrieving course employee from database the return the error
+			// If error occurred while retrieving course employee from database then return the error
 			if (isError($courseEmployeesResult)) return $courseEmployeesResult;
 
 			// If employees are present for this course
@@ -1340,52 +1393,73 @@ class SyncProjectsLib
 					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
 					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
-						// Get the root organization unit for the employee
-						$employeeOURootResult = $this->_ci->MessageTokenModel->getOERoot($courseEmployee->oe_kurzbz);
+						$purchaseOrder = $this->_purchaseOrder();
 
-						// If an error occurred then return it
-						if (isError($employeeOURootResult)) return $employeeOURootResult;
-
-						// Get the root organization unit for the course
-						$courseOURootResult = $this->_ci->MessageTokenModel->getOERoot($course->oe_kurzbz);
-
-						// If an error occurred then return it
-						if (isError($courseOURootResult)) return $courseOURootResult;
-
-						// If no root organization unit found for the employee
-						if (!hasData($employeeOURootResult)) 
-						{
-							$this->_ci->loglib->logWarningDB(
-								'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
-							);
-						}
-						// If no root organization unit found for the course
-						elseif (!hasData($courseOURootResult)) 
-						{
-							$this->_ci->loglib->logWarningDB(
-								'No root organization unit found for course: '.$course->name
-							);
-						}
-						else // otherwise
-						{
-							// Employee root organization unit
-							$employeeOURoot = getData($employeeOURootResult)[0]->oe_kurzbz;
-
-							// Course root organization unit
-							$courseOURoot = getData($courseOURootResult)[0]->oe_kurzbz;
-
-							// If the employee belongs to an organization other than that of the project
-							if ($employeeOURoot != $courseOURoot)
-							{
-								var_dump('Different');
-							}
-						}
+						// If error occurred then return the error
+						if (isError($purchaseOrder)) return $purchaseOrder;
 					}
 				}
 			}
 		}
 
 		return success('Project lehrgaenge synchronization ended successfully');
+	}
+
+	/**
+	 *
+	 */
+	private function _purchaseOrder($courseEmployee, $course)
+	{
+		// Get the root organization unit for the employee
+		$employeeOURootResult = $this->_ci->MessageTokenModel->getOERoot($courseEmployee->oe_kurzbz);
+
+		// If an error occurred then return it
+		if (isError($employeeOURootResult)) return $employeeOURootResult;
+
+		// Get the root organization unit for the course
+		$courseOURootResult = $this->_ci->MessageTokenModel->getOERoot($course->oe_kurzbz);
+
+		// If an error occurred then return it
+		if (isError($courseOURootResult)) return $courseOURootResult;
+
+		// If no root organization unit found for the employee
+		if (!hasData($employeeOURootResult)) 
+		{
+			$this->_ci->loglib->logWarningDB(
+				'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
+			);
+		}
+		// If no root organization unit found for the course
+		elseif (!hasData($courseOURootResult)) 
+		{
+			$this->_ci->loglib->logWarningDB(
+				'No root organization unit found for course: '.$course->name
+			);
+		}
+		else // otherwise
+		{
+			// Employee root organization unit
+			$employeeOURoot = getData($employeeOURootResult)[0]->oe_kurzbz;
+
+			// Course root organization unit
+			$courseOURoot = getData($courseOURootResult)[0]->oe_kurzbz;
+
+			// If the employee belongs to an organization other than that of the project
+			if ($employeeOURoot != $courseOURoot)
+			{
+				// Place the purchase order
+				$purchaseOrder = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+					array(
+						// Data
+					)
+				);
+
+				// If error occurred then return the error
+				if (isError($purchaseOrder)) return $purchaseOrder;
+			}
+		}
+
+		return success('Purchase order successfully placed');
 	}
 
 	/**
@@ -1510,14 +1584,30 @@ class SyncProjectsLib
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
 				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
 				   AND b.aktiv = TRUE
+				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
 				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
-				   AND so.oe_kurzbz_sap NOT IN (\'100000\',\'LPC\',\'LEHRGANG\')
+				   AND so.oe_kurzbz_sap NOT IN (\'100000\', \'LPC\', \'LEHRGANG\')
+				   AND so.oe_kurzbz NOT IN (
+					WITH RECURSIVE oes(oe_kurzbz, oe_parent_kurzbz) as
+					(
+						SELECT oe_kurzbz, oe_parent_kurzbz
+						  FROM public.tbl_organisationseinheit
+						 WHERE oe_kurzbz = \'gmbh\'
+					     UNION ALL
+						SELECT o.oe_kurzbz, o.oe_parent_kurzbz
+						  FROM public.tbl_organisationseinheit o, oes
+						 WHERE o.oe_parent_kurzbz = oes.oe_kurzbz
+					)
+					SELECT oe_kurzbz
+					  FROM oes
+				      GROUP BY oe_kurzbz
+				   )
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
-			// If error occurred while retrieving const centers from database the return the error
+			// If error occurred while retrieving const centers from database then return the error
 			if (isError($costCentersResult)) return $costCentersResult;
 
 			// For each cost center
@@ -1600,6 +1690,7 @@ class SyncProjectsLib
 						 WHERE bf.funktion_kurzbz = \'oezuordnung\'
 						   AND b.aktiv = TRUE
 						   AND m.fixangestellt = TRUE
+						   AND m.personalnummer > 0
 						   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 						   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
 						   AND so.oe_kurzbz_sap = ?
@@ -1611,7 +1702,7 @@ class SyncProjectsLib
 						$costCenter->oe_kurzbz_sap
 					));
 
-					// If error occurred while retrieving const center employee from database the return the error
+					// If error occurred while retrieving const center employee from database then return the error
 					if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
 
 					// If employees are present for this cost center
@@ -1684,7 +1775,7 @@ class SyncProjectsLib
 			 WHERE s1.studiengang_kz IN(10006)
 		');
 
-		// If error occurred while retrieving custom projects from database the return the error
+		// If error occurred while retrieving custom projects from database then return the error
 		if (isError($customResult)) return $customResult;
 		if (!hasData($customResult)) return success('No custom projects found in database');
 
@@ -1792,11 +1883,12 @@ class SyncProjectsLib
 				 WHERE l.studiensemester_kurzbz = ?
 				   AND s.studiengang_kz = ?
 			   	   AND m.fixangestellt = TRUE
+				   AND m.personalnummer > 0
 			      GROUP BY lm.mitarbeiter_uid, b.person_id
 			      ORDER BY lm.mitarbeiter_uid
 			', array($studySemester, $customProject->studiengang_kz));
 
-			// If error occurred while retrieving csutom project employee from database the return the error
+			// If error occurred while retrieving csutom project employee from database then return the error
 			if (isError($customEmployeesResult)) return $customEmployeesResult;
 
 			// If employees are present for this custom project

@@ -69,6 +69,22 @@ class SyncUsersLib
 	{
 		$this->_ci =& get_instance(); // get code igniter instance
 
+		// Loads the LogLib with the needed parameters to log correctly from this library
+		$this->_ci->load->library(
+			'LogLib',
+			array(
+				'classIndex' => 3,
+				'functionIndex' => 3,
+				'lineIndex' => 2,
+				'dbLogType' => 'job', // required
+				'dbExecuteUser' => 'Cronjob system',
+				'requestId' => 'JOB',
+				'requestDataFormatter' => function($data) {
+					return json_encode($data);
+				}
+			)
+		);
+
 		// Loads QueryCustomerInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryCustomerIn_model', 'QueryCustomerInModel');
 		// Loads ManageCustomerInModel
@@ -160,10 +176,22 @@ class SyncUsersLib
 				continue; // ...and continue to the next one
 			}
 
+			// If not a valid ort or gemeinde is present
+			// If ort is not present or it is an empty string
+			if (!isset($userData->ort) || (isset($userData->ort) && isEmptyString($userData->ort)))
+			{
+				// If also the gemeinde is not present or it is an empty string
+				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
+				{
+					$this->_ci->loglib->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
+					continue; // ...and continue to the next one
+				}
+			}
+
 			// Checks if the current user is already present in SAP
 			$userDataSAP = $this->_userExistsByEmailSAP($userData->email);
 
-			// If an error occurred the return it
+			// If an error occurred then return it
 			if (isError($userDataSAP)) return $userDataSAP;
 
 			// If the current user is not present in SAP
@@ -347,6 +375,18 @@ class SyncUsersLib
 			{
 				$this->_ci->loglib->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
 				continue; // ...and continue to the next one
+			}
+
+			// If not a valid ort or gemeinde is present
+			// If ort is not present or it is an empty string
+			if (!isset($userData->ort) || (isset($userData->ort) && isEmptyString($userData->ort)))
+			{
+				// If also the gemeinde is not present or it is an empty string
+				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
+				{
+					$this->_ci->loglib->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
+					continue; // ...and continue to the next one
+				}
 			}
 
 			// Gets the SAP id for the current user
@@ -672,7 +712,7 @@ class SyncUsersLib
 			$userAllData->country = '';
 
 			if (isError($addressResult)) return $addressResult;
-			if (hasData($addressResult)) // if a private email was found
+			if (hasData($addressResult)) // if an address was found
 			{
 				$userAllData->country = getData($addressResult)[0]->iso3166_1_a2;
 				$userAllData->strasse = getData($addressResult)[0]->strasse;
@@ -700,7 +740,7 @@ class SyncUsersLib
 			);
 
 			if (isError($kontaktResult)) return $kontaktResult;
-			if (hasData($kontaktResult)) // if a private email was found
+			if (hasData($kontaktResult)) // if an email was found
 			{
 				$userAllData->email = getData($kontaktResult)[0]->kontakt;
 			}
@@ -817,10 +857,10 @@ class SyncUsersLib
 		if (isError($queryCustomerResult)) return $queryCustomerResult;
 		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using email adress');
 
-		// Get data from the returned object
+		// Get data from then returned object
 		$queryCustomer = getData($queryCustomerResult);
 
-		// Checks the structure of the returned object
+		// Checks the structure of then returned object
 		if (isset($queryCustomer->ProcessingConditions)
 			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{
@@ -854,10 +894,10 @@ class SyncUsersLib
 		if (isError($queryCustomerResult)) return $queryCustomerResult;
 		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using SAP id');
 
-		// Get data from the returned object
+		// Get data from then returned object
 		$queryCustomer = getData($queryCustomerResult);
 
-		// Checks the structure of the returned object
+		// Checks the structure of then returned object
 		if (isset($queryCustomer->ProcessingConditions)
 			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
 		{
@@ -904,17 +944,39 @@ class SyncUsersLib
 	 */
 	private function _getAddressInformations($userData)
 	{
-		$addressInformationArray = array(); // in case is not possible to generate address info
+		$addressInformationArray = null; // in case is not possible to generate address info
 
 		// If address info are present in database
-		if (isset($userData->strasse) && isset($userData->country) && isset($userData->plz) && isset($userData->ort))
+		if (isset($userData->strasse) && isset($userData->country) && isset($userData->plz))
 		{
-			// ORT
-			$ort = $userData->ort;
-			if (mb_strlen($userData->ort) >= self::ORT_LENGHT)
+			// If ort is not present or it is an empty string
+			if (!isset($userData->ort) || (isset($userData->ort) && isEmptyString($userData->ort)))
 			{
-				$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
-				$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
+				// If also the gemeinde is not present or it is an empty string
+				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
+				{
+					break; // return a null value. Should never happen because was checked earlier
+				}
+				else // otherwise use the gemeinde instead of the ort
+				{
+					// ORT
+					$ort = $userData->gemeinde;
+					if (mb_strlen($ort) >= self::ORT_LENGHT)
+					{
+						$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
+						$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
+					}
+				}
+			}
+			else // if present and valid then use it
+			{
+				// ORT
+				$ort = $userData->ort;
+				if (mb_strlen($userData->ort) >= self::ORT_LENGHT)
+				{
+					$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
+					$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
+				}
 			}
 
 			// Strasse
@@ -944,3 +1006,4 @@ class SyncUsersLib
 		return $addressInformationArray;
 	}
 }
+
