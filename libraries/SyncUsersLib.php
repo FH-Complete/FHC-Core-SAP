@@ -955,7 +955,7 @@ class SyncUsersLib
 				// If also the gemeinde is not present or it is an empty string
 				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
 				{
-					break; // return a null value. Should never happen because was checked earlier
+					return error('Gemeinde is empty'); // return a null value. Should never happen because was checked earlier
 				}
 				else // otherwise use the gemeinde instead of the ort
 				{
@@ -1006,4 +1006,3 @@ class SyncUsersLib
 		return $addressInformationArray;
 	}
 }
-
