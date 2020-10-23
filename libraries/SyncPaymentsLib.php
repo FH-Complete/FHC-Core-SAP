@@ -35,6 +35,7 @@ class SyncPaymentsLib
 
 		// Loads Payment configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -102,7 +103,11 @@ class SyncPaymentsLib
 	 */
 	private function _isInvoiceCleared($studentId, $invoiceId)
 	{
-		$result = $this->_ci->RPFINGLAU08_Q0002Model->getByCustomer($studentId);
+		$companyIds = array();
+		$companyIds[] = $this->_ci->config->item('users_payment_company_ids')['fhtw'];
+		$companyIds[] = $this->_ci->config->item('users_payment_company_ids')['gmbh'];
+
+		$result = $this->_ci->RPFINGLAU08_Q0002Model->getByCustomer($studentId, $companyIds);
 
 		if (isSuccess($result))
 		{
