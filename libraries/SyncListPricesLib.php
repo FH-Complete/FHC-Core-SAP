@@ -29,7 +29,8 @@ class SyncListPricesLib
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads ManageProcurementPriceSpecificationInModel
@@ -145,13 +146,13 @@ class SyncListPricesLib
 					{
 						if (isset($item->Note))
 						{
-							$this->_ci->loglib->logWarningDB($item->Note.' for list price: '.$sap_service_id);
+							$this->_ci->LogLibSAP->logWarningDB($item->Note.' for list price: '.$sap_service_id);
 						}
 					}
 				}
 				elseif ($manageProcurementPriceSpecificationIn->Log->Item->Note)
 				{
-					$this->_ci->loglib->logWarningDB(
+					$this->_ci->LogLibSAP->logWarningDB(
 						$manageProcurementPriceSpecificationIn->Log->Item->Note.' for list price: '.$sap_service_id
 					);
 				}
@@ -159,7 +160,7 @@ class SyncListPricesLib
 			else
 			{
 				// Default non blocking error
-				$this->_ci->loglib->logWarningDB('SAP did not return ID for list price: ILV-GMBH');
+				$this->_ci->LogLibSAP->logWarningDB('SAP did not return ID for list price: ILV-GMBH');
 			}
 
 			// ...and return a success

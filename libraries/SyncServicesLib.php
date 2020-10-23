@@ -52,12 +52,13 @@ class SyncServicesLib
 				'functionIndex' => 3,
 				'lineIndex' => 2,
 				'dbLogType' => 'job', // required
-				'dbExecuteUser' => 'Cronjob system',
-				'requestId' => 'JOB',
+				'dbExecuteUser' => 'Jobs queue system',
+				'requestId' => 'JQW',
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads QueryServiceProductIn
@@ -158,21 +159,21 @@ class SyncServicesLib
 			$stundensatz = $serviceData->stundensatz;
 			if (isEmptyString($stundensatz))
 			{
-				$this->_ci->loglib->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the name is not set for this user...
 			if (isEmptyString($serviceData->name))
 			{
-				$this->_ci->loglib->logWarningDB('No surname set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No surname set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the organization unit is null then skip this user...
 			if (isEmptyString($serviceData->organization_unit))
 			{
-				$this->_ci->loglib->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -266,14 +267,14 @@ class SyncServicesLib
 					}
 					else
 					{
-						$this->_ci->loglib->logWarningDB('Was not possible to find the root organization unit for this service: '.$serviceId);
+						$this->_ci->LogLibSAP->logWarningDB('Was not possible to find the root organization unit for this service: '.$serviceId);
 					}
 				}
 				// otherwise non blocking error and continue with the next one
 			}
 			else // if the service is already present in SAP
 			{
-				$this->_ci->loglib->logWarningDB('Service already present: '.$serviceData->description);
+				$this->_ci->LogLibSAP->logWarningDB('Service already present: '.$serviceData->description);
 				continue;
 			}
 		}
@@ -309,21 +310,21 @@ class SyncServicesLib
 			$stundensatz = $serviceData->stundensatz;
 			if (isEmptyString($stundensatz))
 			{
-				$this->_ci->loglib->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No stundensatz set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the name is not set for this user...
 			if (isEmptyString($serviceData->name))
 			{
-				$this->_ci->loglib->logWarningDB('No surname set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No surname set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If the organization unit is null then skip this user...
 			if (isEmptyString($serviceData->organization_unit))
 			{
-				$this->_ci->loglib->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('No organization unit set for user: '.$serviceData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -455,7 +456,7 @@ class SyncServicesLib
 					}
 					else
 					{
-						$this->_ci->loglib->logWarningDB(
+						$this->_ci->LogLibSAP->logWarningDB(
 							'Was not possible to find the root organization unit for this service: '.$serviceId
 						);
 					}
@@ -472,26 +473,26 @@ class SyncServicesLib
 							{
 								if (isset($item->Note))
 								{
-									$this->_ci->loglib->logWarningDB($item->Note.' for user: '.$serviceData->person_id);
+									$this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$serviceData->person_id);
 								}
 							}
 						}
 						elseif ($manageService->Log->Item->Note)
 						{
-							$this->_ci->loglib->logWarningDB($manageService->Log->Item->Note.' for user: '.$serviceData->person_id);
+							$this->_ci->LogLibSAP->logWarningDB($manageService->Log->Item->Note.' for user: '.$serviceData->person_id);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$serviceData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$serviceData->person_id);
 					}
 					continue;
 				}
 			}
 			else // if the service is already present in SAP
 			{
-				$this->_ci->loglib->logWarningDB('Service is not present: '.$serviceData->description);
+				$this->_ci->LogLibSAP->logWarningDB('Service is not present: '.$serviceData->description);
 				continue;
 			}
 		}
@@ -800,19 +801,19 @@ class SyncServicesLib
 					{
 						if (isset($item->Note))
 						{
-							$this->_ci->loglib->logWarningDB($item->Note.' for user: '.$person_id);
+							$this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$person_id);
 						}
 					}
 				}
 				elseif ($manageService->Log->Item->Note)
 				{
-					$this->_ci->loglib->logWarningDB($manageService->Log->Item->Note.' for user: '.$person_id);
+					$this->_ci->LogLibSAP->logWarningDB($manageService->Log->Item->Note.' for user: '.$person_id);
 				}
 			}
 			else
 			{
 				// Default non blocking error
-				$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$person_id);
+				$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$person_id);
 			}
 		}
 
@@ -882,19 +883,19 @@ class SyncServicesLib
 					{
 						if (isset($item->Note))
 						{
-							$this->_ci->loglib->logWarningDB($item->Note.' for service: '.$sap_service_id);
+							$this->_ci->LogLibSAP->logWarningDB($item->Note.' for service: '.$sap_service_id);
 						}
 					}
 				}
 				elseif ($manageServiceProductValuation->Log->Item->Note)
 				{
-					$this->_ci->loglib->logWarningDB($manageServiceProductValuation->Log->Item->Note.' for service: '.$sap_service_id);
+					$this->_ci->LogLibSAP->logWarningDB($manageServiceProductValuation->Log->Item->Note.' for service: '.$sap_service_id);
 				}
 			}
 			else
 			{
 				// Default non blocking error
-				$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$sap_service_id);
+				$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$sap_service_id);
 			}
 		}
 

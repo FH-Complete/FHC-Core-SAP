@@ -29,7 +29,8 @@ class SyncEmployeesLib
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads model EmployeeModel
@@ -77,8 +78,8 @@ class SyncEmployeesLib
 		if (!hasData($sapEmployeeResult)) return error('Was not possible to retrieve employees from SAP');
 		
 		// Log some statistics
-		$this->_ci->loglib->logInfoDB('Employees to import: '.count(getData($employeeResult)));
-		$this->_ci->loglib->logInfoDB('Employees retrieved from SAP: '.count(getData($sapEmployeeResult)));
+		$this->_ci->LogLibSAP->logInfoDB('Employees to import: '.count(getData($employeeResult)));
+		$this->_ci->LogLibSAP->logInfoDB('Employees retrieved from SAP: '.count(getData($sapEmployeeResult)));
 
 		$importedCounter = 0; // imported employees counter
 

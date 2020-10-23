@@ -65,7 +65,8 @@ class SyncProjectsLib
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads model ProjectsModel
@@ -520,7 +521,7 @@ class SyncProjectsLib
 			// For each breaker
 			foreach (getData($rule0BreakerResults) as $breaker)
 			{
-				$this->_ci->loglib->logWarningDB(
+				$this->_ci->LogLibSAP->logWarningDB(
 					'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
 				);
 				$breakersArray[] = $breaker->projects_timesheet_id;
@@ -594,7 +595,7 @@ class SyncProjectsLib
 					// If no leader is assigned to this project
 					if ($sapLeaderId == null)
 					{
-						$this->_ci->loglib->logWarningDB('No leader assigned in SAP for project: '.$linkedProject->projekt_id);
+						$this->_ci->LogLibSAP->logWarningDB('No leader assigned in SAP for project: '.$linkedProject->projekt_id);
 					}
 
 					// If a leader was assigned to this project in SAP
@@ -613,7 +614,7 @@ class SyncProjectsLib
 						}
 						else // otherwise log it
 						{
-							$this->_ci->loglib->logWarningDB(
+							$this->_ci->LogLibSAP->logWarningDB(
 								'Leader '.$sapLeaderId.' is assigned in SAP to project '.
 								$linkedProject->projekt_id.' but is not syncd'
 							);
@@ -629,7 +630,7 @@ class SyncProjectsLib
 					// If no project were found in SAP log and continue to the next one, should not happen
 					if (!hasData($projectPartecipantResult))
 					{
-						$this->_ci->loglib->logWarningDB('No project found in SAP with id: '.$linkedProject->project_id);
+						$this->_ci->LogLibSAP->logWarningDB('No project found in SAP with id: '.$linkedProject->project_id);
 						continue;
 					}
 
@@ -714,7 +715,7 @@ class SyncProjectsLib
 							}
 							else // log it and continue to the next one
 							{
-								$this->_ci->loglib->logWarningDB(
+								$this->_ci->LogLibSAP->logWarningDB(
 									'Partecipant object without employee id for project: '.$linkedProject->project_id
 								);
 								continue;
@@ -723,7 +724,7 @@ class SyncProjectsLib
 					}
 					else // otherwise log it and continue to the next one
 					{
-						$this->_ci->loglib->logWarningDB(
+						$this->_ci->LogLibSAP->logWarningDB(
 							'Project without partecipants: '.$linkedProject->project_id
 						);
 						continue;
@@ -740,7 +741,7 @@ class SyncProjectsLib
 					// If there are no services for this task
 					if (!hasData($taskServiceResult))
 					{
-						$this->_ci->loglib->logWarningDB('No services found in SAP for task: '.$linkedProject->project_task_id);
+						$this->_ci->LogLibSAP->logWarningDB('No services found in SAP for task: '.$linkedProject->project_task_id);
 						continue;
 					}
 
@@ -750,7 +751,7 @@ class SyncProjectsLib
 						// If the service is present but without employee
 						if (isEmptyString($task->AssignedEmployeeID))
 						{
-							$this->_ci->loglib->logWarningDB('Found a service without emplyee for task: '.$linkedProject->project_task_id);
+							$this->_ci->LogLibSAP->logWarningDB('Found a service without emplyee for task: '.$linkedProject->project_task_id);
 							continue;
 						}
 
@@ -850,7 +851,7 @@ class SyncProjectsLib
 			// For each breaker
 			foreach (getData($rule0BreakerResults) as $breaker)
 			{
-				$this->_ci->loglib->logWarningDB(
+				$this->_ci->LogLibSAP->logWarningDB(
 					'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
 				);
 				$breakersArray[] = $breaker->projects_timesheet_id;
@@ -893,7 +894,7 @@ class SyncProjectsLib
 					// If no data are found in SAP
 					if (!hasData($projectResult))
 					{
-						$this->_ci->loglib->logWarningDB('Project not found in SAP: '.$linkedProject->project_id);
+						$this->_ci->LogLibSAP->logWarningDB('Project not found in SAP: '.$linkedProject->project_id);
 						continue;
 					}
 
@@ -913,7 +914,7 @@ class SyncProjectsLib
 					// If the project is present in database, should not happen because of the foreign key
 					if (!hasData($projektResult))
 					{
-						$this->_ci->loglib->logWarningDB('Project not found in database: '.$linkedProject->project_id);
+						$this->_ci->LogLibSAP->logWarningDB('Project not found in database: '.$linkedProject->project_id);
 						continue;
 					}
 
@@ -945,7 +946,7 @@ class SyncProjectsLib
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
 					{
-						$this->_ci->loglib->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
 						continue;
 					}
 
@@ -965,7 +966,7 @@ class SyncProjectsLib
 					// If the project is present in database, should not happen because of the foreign key
 					if (!hasData($projektPhaseResult))
 					{
-						$this->_ci->loglib->logWarningDB('Project phase not found in database: '.$linkedProject->project_task_id);
+						$this->_ci->LogLibSAP->logWarningDB('Project phase not found in database: '.$linkedProject->project_task_id);
 						continue;
 					}
 
@@ -1045,7 +1046,7 @@ class SyncProjectsLib
 			// If no data have been found log it and continue to the next one
 			if (!hasData($ressourceResult))
 			{
-				$this->_ci->loglib->logWarningDB('SAP Employee '.$sapEmployeeId.' not found in database');
+				$this->_ci->LogLibSAP->logWarningDB('SAP Employee '.$sapEmployeeId.' not found in database');
 			}
 			else
 			{
@@ -1276,7 +1277,7 @@ class SyncProjectsLib
 				}
 				else // if non blocking error then log it
 				{
-					$this->_ci->loglib->logWarningDB(getError($createProjectResult));
+					$this->_ci->LogLibSAP->logWarningDB(getError($createProjectResult));
 				}
 			}
 
@@ -1425,14 +1426,14 @@ class SyncProjectsLib
 		// If no root organization unit found for the employee
 		if (!hasData($employeeOURootResult)) 
 		{
-			$this->_ci->loglib->logWarningDB(
+			$this->_ci->LogLibSAP->logWarningDB(
 				'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
 			);
 		}
 		// If no root organization unit found for the course
 		elseif (!hasData($courseOURootResult)) 
 		{
-			$this->_ci->loglib->logWarningDB(
+			$this->_ci->LogLibSAP->logWarningDB(
 				'No root organization unit found for course: '.$course->name
 			);
 		}
@@ -1565,7 +1566,7 @@ class SyncProjectsLib
 			}
 			else // otherwise log it
 			{
-				$this->_ci->loglib->logWarningDB(getError($setActiveResult));
+				$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
 			}
 		}
 
@@ -1966,7 +1967,7 @@ class SyncProjectsLib
 					}
 					else // if non blocking error then log it
 					{
-						$this->_ci->loglib->logWarningDB(getError($addEmployeeResult));
+						$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeResult));
 					}
 				}
 
@@ -1993,7 +1994,7 @@ class SyncProjectsLib
 					}
 					else // if non blocking error then log it
 					{
-						$this->_ci->loglib->logWarningDB(getError($addEmployeeToTaskResult));
+						$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeToTaskResult));
 					}
 				}
 			}

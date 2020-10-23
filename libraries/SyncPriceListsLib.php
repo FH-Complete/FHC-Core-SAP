@@ -42,7 +42,8 @@ class SyncPriceListsLib
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads QuerySalesPriceListInModel
@@ -140,19 +141,19 @@ class SyncPriceListsLib
 							{
 								if (isset($item->Note))
 								{
-									$this->_ci->loglib->logWarningDB($item->Note);
+									$this->_ci->LogLibSAP->logWarningDB($item->Note);
 								}
 							}
 						}
 						elseif ($manageSalesPriceListIn->Log->Item->Note)
 						{
-							$this->_ci->loglib->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
+							$this->_ci->LogLibSAP->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$this->_ci->loglib->logWarningDB('SAP did not return ID for price list: '.$priceListId);
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return ID for price list: '.$priceListId);
 					}
 				}
 			}
@@ -223,19 +224,19 @@ class SyncPriceListsLib
 					{
 						if (isset($item->Note))
 						{
-							$this->_ci->loglib->logWarningDB($item->Note);
+							$this->_ci->LogLibSAP->logWarningDB($item->Note);
 						}
 					}
 				}
 				elseif ($manageSalesPriceListIn->Log->Item->Note)
 				{
-					$this->_ci->loglib->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
+					$this->_ci->LogLibSAP->logWarningDB($manageSalesPriceListIn->Log->Item->Note);
 				}
 			}
 			else
 			{
 				// Default non blocking error
-				$this->_ci->loglib->logWarningDB('SAP did not return ID for price list: '.$priceListId);
+				$this->_ci->LogLibSAP->logWarningDB('SAP did not return ID for price list: '.$priceListId);
 			}
 		}
 

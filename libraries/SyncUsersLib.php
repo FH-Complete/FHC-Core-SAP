@@ -77,12 +77,13 @@ class SyncUsersLib
 				'functionIndex' => 3,
 				'lineIndex' => 2,
 				'dbLogType' => 'job', // required
-				'dbExecuteUser' => 'Cronjob system',
-				'requestId' => 'JOB',
+				'dbExecuteUser' => 'Jobs queue system',
+				'requestId' => 'JQW',
 				'requestDataFormatter' => function($data) {
 					return json_encode($data);
 				}
-			)
+			),
+			'LogLibSAP'
 		);
 
 		// Loads QueryCustomerInModel
@@ -172,7 +173,7 @@ class SyncUsersLib
 			// If an email address was not found for this user...
 			if (isEmptyString($userData->email))
 			{
-				$this->_ci->loglib->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -183,7 +184,7 @@ class SyncUsersLib
 				// If also the gemeinde is not present or it is an empty string
 				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
 				{
-					$this->_ci->loglib->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
+					$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
 					continue; // ...and continue to the next one
 				}
 			}
@@ -310,18 +311,18 @@ class SyncUsersLib
 						{
 							foreach ($manageCustomer->Log->Item as $item)
 							{
-								if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
+								if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$userData->person_id);
 							}
 						}
 						elseif ($manageCustomer->Log->Item->Note)
 						{
-							$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
+							$this->_ci->LogLibSAP->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
 					}
 					continue;
 				}
@@ -373,7 +374,7 @@ class SyncUsersLib
 			// If an email address was not found for this user...
 			if (isEmptyString($userData->email))
 			{
-				$this->_ci->loglib->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
 				continue; // ...and continue to the next one
 			}
 
@@ -384,7 +385,7 @@ class SyncUsersLib
 				// If also the gemeinde is not present or it is an empty string
 				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
 				{
-					$this->_ci->loglib->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
+					$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
 					continue; // ...and continue to the next one
 				}
 			}
@@ -441,7 +442,7 @@ class SyncUsersLib
 				// better to skip to the next user
 				if ($userData->addressInformationUUID == null)
 				{
-					$this->_ci->loglib->logWarningDB('Was no possible to retrieve the AddressInformation UUID for user '.$userData->person_id);
+					$this->_ci->LogLibSAP->logWarningDB('Was no possible to retrieve the AddressInformation UUID for user '.$userData->person_id);
 					continue;
 				}
 
@@ -542,18 +543,18 @@ class SyncUsersLib
 						{
 							foreach ($manageCustomer->Log->Item as $item)
 							{
-								if (isset($item->Note)) $this->_ci->loglib->logWarningDB($item->Note.' for user: '.$userData->person_id);
+								if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$userData->person_id);
 							}
 						}
 						elseif ($manageCustomer->Log->Item->Note)
 						{
-							$this->_ci->loglib->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
+							$this->_ci->LogLibSAP->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$this->_ci->loglib->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
 					}
 					continue;
 				}
@@ -955,7 +956,7 @@ class SyncUsersLib
 				// If also the gemeinde is not present or it is an empty string
 				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
 				{
-					break; // return a null value. Should never happen because was checked earlier
+					return null; // return a null value. Should never happen because was checked earlier
 				}
 				else // otherwise use the gemeinde instead of the ort
 				{
@@ -964,7 +965,7 @@ class SyncUsersLib
 					if (mb_strlen($ort) >= self::ORT_LENGHT)
 					{
 						$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
-						$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
 					}
 				}
 			}
@@ -975,7 +976,7 @@ class SyncUsersLib
 				if (mb_strlen($userData->ort) >= self::ORT_LENGHT)
 				{
 					$ort = mb_substr($userData->ort, 0, self::ORT_LENGHT);
-					$this->_ci->loglib->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
+					$this->_ci->LogLibSAP->logWarningDB('Ort is longer then '.self::ORT_LENGHT.' chars for user: '.$userData->person_id);
 				}
 			}
 
@@ -984,7 +985,7 @@ class SyncUsersLib
 			if (mb_strlen($userData->strasse) >= self::STRASSE_LENGHT)
 			{
 				$strasse = mb_substr($userData->strasse, 0, self::STRASSE_LENGHT);
-				$this->_ci->loglib->logWarningDB('Strasse is longer then '.self::STRASSE_LENGHT.' chars for user: '.$userData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('Strasse is longer then '.self::STRASSE_LENGHT.' chars for user: '.$userData->person_id);
 			}
 
 			// PLZ
@@ -992,7 +993,7 @@ class SyncUsersLib
 			if (mb_strlen($userData->plz) >= self::PLZ_LENGHT)
 			{
 				$plz = mb_substr($userData->plz, 0, self::PLZ_LENGHT);
-				$this->_ci->loglib->logWarningDB('Plz is longer then '.self::PLZ_LENGHT.' chars for user: '.$userData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('Plz is longer then '.self::PLZ_LENGHT.' chars for user: '.$userData->person_id);
 			}
 
 			$addressInformationArray = array(

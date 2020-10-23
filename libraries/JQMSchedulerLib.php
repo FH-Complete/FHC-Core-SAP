@@ -136,6 +136,7 @@ class JQMSchedulerLib
 		$persons = array();
 		$contacts = array();
 		$addresses = array();
+		$prestudents = array();
 
 		$dbModel = new DB_Model();
 
@@ -309,3 +310,4 @@ class JQMSchedulerLib
 		return success($jobInput);
 	}
 }
+
