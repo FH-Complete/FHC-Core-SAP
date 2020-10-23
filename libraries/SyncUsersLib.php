@@ -1007,4 +1007,3 @@ class SyncUsersLib
 		return $addressInformationArray;
 	}
 }
-
