@@ -21,7 +21,8 @@ class SyncProjectsLib
 	const PROJECT_MANAGE_PURCHASE_ORDER_ENABLED = 'project_manage_purchase_order_enabled';
 
 	// Project types
-	const ADMIN_PROJECT = 'admin';
+	const ADMIN_FHTW_PROJECT = 'admin_fhtw';
+	const ADMIN_GMBH_PROJECT = 'admin_gmbh';
 	const LEHRE_PROJECT = 'lehre';
 	const LEHRGAENGE_PROJECT = 'lehrgaenge';
 
@@ -31,6 +32,9 @@ class SyncProjectsLib
 	const PARTECIPANT_TASK_EXISTS_ERROR = 'PRO_CMN_ESRV:010';
 	const RELEASE_PROJECT_ERROR = 'CM_DS_APPL_ERROR:000';
 	const PROJECT_EMPLOYEE_NOT_EXISTS = 'PRO_PROJ_TEMPLATE:030';
+	const PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME = 'PRO_PROJ_TEMPLATE:103';
+	const PROJECT_SERVICE_NOT_EXITSTS = 'PRO_PROJ_TEMPLATE:031';
+	const PROJECT_SERVICE_TIME_BASED_NOT_VALID = 'PRO_PROJ_TEMPLATE:014';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -38,7 +42,8 @@ class SyncProjectsLib
 
 	// Project type
 	const ALL = 'all';
-	const ADMIN = 'admin';
+	const ADMIN_FHTW = 'admin_fhtw';
+	const ADMIN_GMBH = 'admin_gmbh';
 	const LEHRE = 'lehre';
 	const LEHRGAENGE = 'lehrgaenge';
 	const CUSTOM = 'custom';
@@ -166,11 +171,31 @@ class SyncProjectsLib
 			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
-			// If it is requested a full sync or only for admin
-			if ($type == self::ALL || $type == self::ADMIN)
+			// If it is requested a full sync or only for admin FHTW
+			if ($type == self::ALL || $type == self::ADMIN_FHTW)
 			{
-				// Create admin project
-				$createResult = $this->_syncAdminProject(
+				// Create admin project for FHTW
+				$createResult = $this->_syncAdminProjectFhtw(
+					$currentOrNextStudySemester,
+					$projectStructures,
+					$projectIdFormats,
+					$projectNameFormats,
+					$projectUnitResponsibles,
+					$projectPersonResponsibles,
+					$projectTypes,
+					$studySemesterStartDate,
+					$studySemesterEndDate,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
+
+			// If it is requested a full sync or only for admin GMBH
+			if ($type == self::ALL || $type == self::ADMIN_GMBH)
+			{
+				// Create admin project fot GMBH
+				$createResult = $this->_syncAdminProjectGmbh(
 					$currentOrNextStudySemester,
 					$projectStructures,
 					$projectIdFormats,
@@ -1466,7 +1491,7 @@ class SyncProjectsLib
 	/**
 	 *
 	 */
-	private function _syncAdminProject(
+	private function _syncAdminProjectFhtw(
 		$studySemester,
 		$projectStructures,
 		$projectIdFormats,
@@ -1480,10 +1505,10 @@ class SyncProjectsLib
 		$studySemesterEndDateTS
 	)
 	{
-		$projectId = strtoupper(sprintf($projectIdFormats[self::ADMIN_PROJECT], $studySemester)); // project id
-		$type = $projectTypes[self::ADMIN_PROJECT]; // Project type
-		$unitResponsible = $projectUnitResponsibles[self::ADMIN_PROJECT]; // project unit responsible
-		$personResponsible = $projectPersonResponsibles[self::ADMIN_PROJECT]; // project person responsible
+		$projectId = strtoupper(sprintf($projectIdFormats[self::ADMIN_FHTW_PROJECT], $studySemester)); // project id
+		$type = $projectTypes[self::ADMIN_FHTW_PROJECT]; // Project type
+		$unitResponsible = $projectUnitResponsibles[self::ADMIN_FHTW_PROJECT]; // project unit responsible
+		$personResponsible = $projectPersonResponsibles[self::ADMIN_FHTW_PROJECT]; // project person responsible
 
 		// Create the project on ByD
 		$createProjectResult = $this->_ci->ProjectsModel->create(
@@ -1533,7 +1558,7 @@ class SyncProjectsLib
 		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
 
 		// Update project ProjectTaskCollection name
-		$projectName = sprintf($projectNameFormats[self::ADMIN_PROJECT], $studySemester);
+		$projectName = sprintf($projectNameFormats[self::ADMIN_FHTW_PROJECT], $studySemester);
 		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
 			$projectObjectId,
 			$projectName
@@ -1571,7 +1596,7 @@ class SyncProjectsLib
 		}
 
 		// If structure is present
-		if (isset($projectStructures[self::ADMIN_PROJECT]))
+		if (isset($projectStructures[self::ADMIN_FHTW_PROJECT]))
 		{
 			$dbModel = new DB_Model();
 
@@ -1617,7 +1642,7 @@ class SyncProjectsLib
 				$countStructures = 0;
 
 				// For each project task in the structure
-				foreach ($projectStructures[self::ADMIN_PROJECT] as $taskFormatName)
+				foreach ($projectStructures[self::ADMIN_FHTW_PROJECT] as $taskFormatName)
 				{
 					$countStructures++; // count the number of structures for each task type
 
@@ -1641,7 +1666,7 @@ class SyncProjectsLib
 						// Create a task for this project
 						$createTaskResult = $this->_ci->ProjectsModel->createTask(
 							$projectObjectId,
-							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz),0,40),
+							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 							$costCenter->oe_kurzbz_sap
 						);
 
@@ -1725,6 +1750,286 @@ class SyncProjectsLib
 						}
 					}
 				}
+			}
+		}
+		else
+		{
+			return error('No admin structure defined in config file');
+		}
+
+		return success('Project admin synchronization ended successfully');
+	}
+
+	/**
+	 *
+	 */
+	private function _syncAdminProjectGmbh(
+		$studySemester,
+		$projectStructures,
+		$projectIdFormats,
+		$projectNameFormats,
+		$projectUnitResponsibles,
+		$projectPersonResponsibles,
+		$projectTypes,
+		$studySemesterStartDate,
+		$studySemesterEndDate,
+		$studySemesterStartDateTS,
+		$studySemesterEndDateTS
+	)
+	{
+		$projectId = strtoupper(sprintf($projectIdFormats[self::ADMIN_GMBH_PROJECT], $studySemester)); // project id
+		$type = $projectTypes[self::ADMIN_GMBH_PROJECT]; // Project type
+		$unitResponsible = $projectUnitResponsibles[self::ADMIN_GMBH_PROJECT]; // project unit responsible
+		$personResponsible = $projectPersonResponsibles[self::ADMIN_GMBH_PROJECT]; // project person responsible
+
+		// Create the project on ByD
+		$createProjectResult = $this->_ci->ProjectsModel->create(
+			$projectId,
+			$type,
+			$unitResponsible,
+			$personResponsible,
+			$studySemesterStartDateTS,
+			$studySemesterEndDateTS
+		);
+
+		// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+
+		$projectObjectId = null;
+
+		// If the projects is not alredy present it is _not_ needed to sync the database
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Add entry database into sync table for projects
+			$insertResult = $this->_ci->SAPProjectsModel->insert(
+				array(
+					'project_id' => $projectId,
+					'project_object_id' => getData($createProjectResult)->ObjectID,
+					'studiensemester_kurzbz' => $studySemester
+				)
+			);
+
+			// If error occurred during insert return database error
+			if (isError($insertResult)) return $insertResult;
+
+			$projectObjectId = getData($createProjectResult)->ObjectID; // store the project object id
+		}
+		else // otherwise retrieves the project object id from database
+		{
+			$projectResult = $this->_ci->SAPProjectsModel->loadWhere(array('project_id' => $projectId, 'studiensemester_kurzbz' => $studySemester));
+
+			// If an error occurred while getting project info from database return the error itself
+			if (isError($projectResult)) return $projectResult;
+			// If no data found with these parameters
+			if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects');
+
+			$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+		}
+
+		// If was not possible to get a valid project object id
+		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
+
+		// Update project ProjectTaskCollection name
+		$projectName = sprintf($projectNameFormats[self::ADMIN_GMBH_PROJECT], $studySemester);
+		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
+			$projectObjectId,
+			$projectName
+		);
+
+		// If an error occurred while creating the project on ByD return the error
+		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+		// If the projects does not exist then update the time recording attriute
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Update the time recording attribute of the project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+
+			// If an error occurred while setting the project time recording
+			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+		}
+
+		// Set the project as active
+		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+		// If an error occurred while setting the project as active on ByD
+		// and not because the project was alredy released then return the error
+		if (isError($setActiveResult)
+			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		{
+			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			{
+				return $setActiveResult;
+			}
+			else // otherwise log it
+			{
+				$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
+			}
+		}
+
+		// If structure is present
+		if (isset($projectStructures[self::ADMIN_GMBH_PROJECT]))
+		{
+			$dbModel = new DB_Model();
+
+			// Loads all the active cost centers
+			$costCentersResult = $dbModel->execReadOnlyQuery('
+				SELECT so.oe_kurzbz,
+					so.oe_kurzbz_sap
+				  FROM public.tbl_mitarbeiter m
+				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
+				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
+				   AND b.aktiv = TRUE
+				   AND m.personalnummer > 0
+				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
+				   AND so.oe_kurzbz_sap NOT IN (\'100000\', \'LPC\', \'LEHRGANG\')
+				   AND so.oe_kurzbz IN (
+					WITH RECURSIVE oes(oe_kurzbz, oe_parent_kurzbz) as
+					(
+						SELECT oe_kurzbz, oe_parent_kurzbz
+						  FROM public.tbl_organisationseinheit
+						 WHERE oe_kurzbz = \'gmbh\'
+					     UNION ALL
+						SELECT o.oe_kurzbz, o.oe_parent_kurzbz
+						  FROM public.tbl_organisationseinheit o, oes
+						 WHERE o.oe_parent_kurzbz = oes.oe_kurzbz
+					)
+					SELECT oe_kurzbz
+					  FROM oes
+				      GROUP BY oe_kurzbz
+				   )
+			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
+			', array($studySemesterEndDate, $studySemesterStartDate));
+
+			// If error occurred while retrieving const centers from database then return the error
+			if (isError($costCentersResult)) return $costCentersResult;
+
+			// If cost centers are present in database
+			if (hasData($costCentersResult))
+			{
+				// For each cost center
+				foreach (getData($costCentersResult) as $costCenter)
+				{
+					$countStructures = 0;
+
+					// For each project task in the structure
+					foreach ($projectStructures[self::ADMIN_GMBH_PROJECT] as $taskFormatName)
+					{
+						$countStructures++; // count the number of structures for each task type
+
+						// Check if this cost center is already present in SAP looking in the sync table
+						$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
+							array(
+								'project_task_id' => $projectId.'-'.$countStructures,
+								'studiensemester_kurzbz' => $studySemester,
+								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+							)
+						);
+
+						// If error occurred then return it
+						if (isError($syncCostCenterResult)) return $syncCostCenterResult;
+
+						$taskObjectId = null;
+
+						// If is _not_ present then create it
+						if (!hasData($syncCostCenterResult))
+						{
+							// Create a task for this project
+							$createTaskResult = $this->_ci->ProjectsModel->createTask(
+								$projectObjectId,
+								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
+								$costCenter->oe_kurzbz_sap
+							);
+
+							// If an error occurred while creating the project task on ByD return the error
+							if (isError($createTaskResult)) return $createTaskResult;
+
+							// Add entry database into sync table for projects
+							$insertResult = $this->_ci->SAPProjectsCostcentersModel->insert(
+								array(
+									'project_id' => $projectId,
+									'project_object_id' => $projectObjectId,
+									'project_task_id' => getData($createTaskResult)->ID,
+									'project_task_object_id' => getData($createTaskResult)->ObjectID,
+									'studiensemester_kurzbz' => $studySemester,
+									'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+								)
+							);
+
+							// If error occurred while saving into database then return the error
+							if (isError($insertResult)) return $insertResult;
+
+							$taskObjectId = getData($createTaskResult)->ObjectID;
+						}
+						else // otherwise get the task object id from database
+						{
+							$taskObjectId = getData($syncCostCenterResult)[0]->project_task_object_id;
+						}
+
+						// If was _not_ possible to get a valid task object id
+						if (isEmptyString($taskObjectId)) return error('Was _not_ possible to retrieve a valid task object id');
+
+						// Loads employees for this cost center
+						$costCenterEmployeesResult = $dbModel->execReadOnlyQuery('
+							SELECT m.mitarbeiter_uid,
+								b.person_id,
+								(
+									SELECT SUM(wochenstunden) * 15
+									  FROM public.tbl_benutzerfunktion bfws
+									 WHERE bfws.uid = m.mitarbeiter_uid
+									   AND (bfws.datum_von IS NULL OR bfws.datum_von <= ?)
+									   AND (bfws.datum_bis IS NULL OR bfws.datum_bis >= ?)
+								) as planned_work
+							  FROM public.tbl_mitarbeiter m
+							  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
+							  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+							  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
+							 WHERE bf.funktion_kurzbz = \'oezuordnung\'
+							   AND b.aktiv = TRUE
+							   AND m.fixangestellt = TRUE
+							   AND m.personalnummer > 0
+							   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+							   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+							   AND so.oe_kurzbz_sap = ?
+						', array(
+							$studySemesterEndDate,
+							$studySemesterStartDate,
+							$studySemesterEndDate,
+							$studySemesterStartDate,
+							$costCenter->oe_kurzbz_sap
+						));
+
+						// If error occurred while retrieving const center employee from database then return the error
+						if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
+
+						// If employees are present for this cost center
+						if (hasData($costCenterEmployeesResult))
+						{
+							// For each employee
+							foreach (getData($costCenterEmployeesResult) as $costCenterEmployee)
+							{
+								// Add the employee to this project
+								$addEmployeeResult = $this->_addEmployeeToProject(
+									$costCenterEmployee,
+									$projectObjectId,
+									$studySemesterStartDateTS,
+									$studySemesterEndDateTS
+								);
+
+								// If an error occurred then return it
+								if (isError($addEmployeeResult)) return $addEmployeeResult;
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				$this->_ci->LogLibSAP->logWarningDB('No const centers found in database');
 			}
 		}
 		else
@@ -1961,7 +2266,9 @@ class SyncProjectsLib
 					// - Not because of an already existing employee in this project
 					// - Not because of not existing employee
 					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
-						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS)
+						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
+						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
+						&& getCode($addEmployeeResult) != self::PROJECT_SERVICE_NOT_EXITSTS)
 					{
 						return $addEmployeeResult; // return the error
 					}
@@ -1988,7 +2295,10 @@ class SyncProjectsLib
 					// - Not because of not existing employee
 					if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
 						&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
-						&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR)
+						&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
+						&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
+						&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_NOT_EXITSTS
+						&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID)
 					{
 						return $addEmployeeToTaskResult; // return the error
 					}

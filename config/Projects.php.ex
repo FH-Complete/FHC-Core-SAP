@@ -2,7 +2,8 @@
 
 // Project id formats (required)
 $config['project_id_formats'] = array(
-	'admin' => 'ADM-%s',		// admin project id format
+	'admin_fhtw' => 'ADM-FHTW-%s',		// admin project id format
+	'admin_gmbh' => 'ADM-GMBH-%s',		// admin project id format
 	'lehre' => 'LEHRE-%s',		// lehre project id format
 	'lehrgaenge' => 'LG-%s-%s'	// lehrgaenge project id format
 );
@@ -12,14 +13,21 @@ $config['project_custom_id_format'] = '%s-%s';
 
 // Project name formats for each study semester (required)
 $config['project_name_formats'] = array(
-	'admin' => 'Admin %s',		// admin project
+	'admin_fhtw' => 'Admin FHTW %s',		// admin project
+	'admin_gmbh' => 'Admin GMBH %s',		// admin project
 	'lehre' => 'Lehre %s',		// lehre project
 	'lehrgaenge' => 'Lehrgaenge %s %s'	// lehrgaenge project
 );
 
 // Project structure for each project (optional)
 $config['project_structures'] = array(
-	'admin' => array(		// structure for project admin
+	'admin_fhtw' => array(		// structure for project admin
+		'Admin - %s',
+		'Betrieb - %s',
+		'Design - %s',
+		'Operativ - %s'
+	),
+	'admin_gmbh' => array(		// structure for project admin
 		'Admin - %s',
 		'Betrieb - %s',
 		'Design - %s',
@@ -29,14 +37,16 @@ $config['project_structures'] = array(
 
 // Project unit responsibles (required)
 $config['project_unit_responsibles'] = array(
-	'admin' => 'GF20',	// admin project unit responsible
+	'admin_fhtw' => 'GF20',	// admin project unit responsible
+	'admin_gmbh' => 'GF20',	// admin project unit responsible
 	'lehre' => 'GF20',	// lehre project unit responsible
 	'lehrgaenge' => 'GF20'	// lehrgaenge project unit responsible
 );
 
 // Project person responsibles (required)
 $config['project_person_responsibles'] = array(
-	'admin' => '9',		// admin project person responsible
+	'admin_fhtw' => '9',		// admin project person responsible
+	'admin_gmbh' => '9',		// admin project person responsible
 	'lehre' => '9',		// lehre project person responsible
 	'lehrgaenge' => '9'	// lehrgaenge project person responsible
 );
@@ -46,7 +56,8 @@ $config['project_person_responsible_custom'] = '9';
 
 // Project types (required)
 $config['project_types'] = array(
-	'admin' => 'Z7',	// admin project type
+	'admin_fhtw' => 'Z7',	// admin project type
+	'admin_gmbh' => 'Z7',	// admin project type
 	'lehre' => 'Z3',	// lehre project type
 	'lehrgaenge' => 'Z2'	// lehrgaenge project type
 );

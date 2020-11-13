@@ -90,12 +90,12 @@ class ManageProjects extends JOB_Controller
 	/**
 	 * Updates and creates projects on SAP side only admin
 	 */
-	public function syncAdmin($studySemester = null)
+	public function syncAdminFhtw($studySemester = null)
 	{
-		$this->logInfo('Start projects admin synchronization with SAP ByD');
+		$this->logInfo('Start projects admin FHTW synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADMIN, $studySemester);
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADMIN_FHTW, $studySemester);
 
 		// Log result
 		if (isError($syncResult))
@@ -107,7 +107,30 @@ class ManageProjects extends JOB_Controller
 			$this->logInfo(getData($syncResult));
 		}
 
-		$this->logInfo('End projects admin synchronization with SAP ByD');
+		$this->logInfo('End projects admin FHTW synchronization with SAP ByD');
+	}
+
+	/**
+	 * Updates and creates projects on SAP side only admin
+	 */
+	public function syncAdminGmbh($studySemester = null)
+	{
+		$this->logInfo('Start projects admin GMBH synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::ADMIN_GMBH, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects admin GMBH synchronization with SAP ByD');
 	}
 
 	/**
