@@ -1229,6 +1229,7 @@ class SyncProjectsLib
 				$addEmployeeResult = $this->_addEmployeeToProject(
 					$lehreEmployee,
 					$projectObjectId,
+					null, // task object id not present
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS
 				);
@@ -1409,6 +1410,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$courseEmployee,
 						$projectObjectId,
+						null, // task object id not present
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -1639,17 +1641,15 @@ class SyncProjectsLib
 			// For each cost center
 			foreach (getData($costCentersResult) as $costCenter)
 			{
-				$countStructures = 0;
-
 				// For each project task in the structure
 				foreach ($projectStructures[self::ADMIN_FHTW_PROJECT] as $taskFormatName)
 				{
-					$countStructures++; // count the number of structures for each task type
-
 					// Check if this cost center is already present in SAP looking in the sync table
 					$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
 						array(
-							'project_task_id' => $projectId.'-'.$countStructures,
+							'project_id' => $projectId,
+							'project_object_id' => $projectObjectId,
+							'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 							'studiensemester_kurzbz' => $studySemester,
 							'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
 						)
@@ -1664,6 +1664,7 @@ class SyncProjectsLib
 					if (!hasData($syncCostCenterResult))
 					{
 						// Create a task for this project
+						// NOTE: here the project name is shortened because on SAP is not possible to store a longer name
 						$createTaskResult = $this->_ci->ProjectsModel->createTask(
 							$projectObjectId,
 							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
@@ -1680,6 +1681,7 @@ class SyncProjectsLib
 								'project_object_id' => $projectObjectId,
 								'project_task_id' => getData($createTaskResult)->ID,
 								'project_task_object_id' => getData($createTaskResult)->ObjectID,
+								'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 								'studiensemester_kurzbz' => $studySemester,
 								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
 							)
@@ -1741,6 +1743,7 @@ class SyncProjectsLib
 							$addEmployeeResult = $this->_addEmployeeToProject(
 								$costCenterEmployee,
 								$projectObjectId,
+								$taskObjectId,
 								$studySemesterStartDateTS,
 								$studySemesterEndDateTS
 							);
@@ -1914,17 +1917,15 @@ class SyncProjectsLib
 				// For each cost center
 				foreach (getData($costCentersResult) as $costCenter)
 				{
-					$countStructures = 0;
-
 					// For each project task in the structure
 					foreach ($projectStructures[self::ADMIN_GMBH_PROJECT] as $taskFormatName)
 					{
-						$countStructures++; // count the number of structures for each task type
-
 						// Check if this cost center is already present in SAP looking in the sync table
 						$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
 							array(
-								'project_task_id' => $projectId.'-'.$countStructures,
+								'project_id' => $projectId,
+								'project_object_id' => $projectObjectId,
+								'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 								'studiensemester_kurzbz' => $studySemester,
 								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
 							)
@@ -1939,6 +1940,7 @@ class SyncProjectsLib
 						if (!hasData($syncCostCenterResult))
 						{
 							// Create a task for this project
+							// NOTE: here the project name is shortened because on SAP is not possible to store a longer name
 							$createTaskResult = $this->_ci->ProjectsModel->createTask(
 								$projectObjectId,
 								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
@@ -1955,6 +1957,7 @@ class SyncProjectsLib
 									'project_object_id' => $projectObjectId,
 									'project_task_id' => getData($createTaskResult)->ID,
 									'project_task_object_id' => getData($createTaskResult)->ObjectID,
+									'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 									'studiensemester_kurzbz' => $studySemester,
 									'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
 								)
@@ -2016,6 +2019,7 @@ class SyncProjectsLib
 								$addEmployeeResult = $this->_addEmployeeToProject(
 									$costCenterEmployee,
 									$projectObjectId,
+									$taskObjectId,
 									$studySemesterStartDateTS,
 									$studySemesterEndDateTS
 								);
@@ -2207,6 +2211,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$customEmployee,
 						$projectObjectId,
+						null, // task object id not present
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2223,7 +2228,7 @@ class SyncProjectsLib
 	/**
 	 * Add the given employee to the given project
 	 */
-	private function _addEmployeeToProject($employee, $projectObjectId, $studySemesterStartDateTS, $studySemesterEndDateTS)
+	private function _addEmployeeToProject($employee, $projectObjectId, $taskObjectId, $studySemesterStartDateTS, $studySemesterEndDateTS)
 	{
 		// Get the service id for this employee
 		$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $employee->person_id));
@@ -2278,35 +2283,40 @@ class SyncProjectsLib
 					}
 				}
 
-				// Add employee to project work
-				$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
-					$projectObjectId,
-					$sapEeid,
-					$sapServiceId,
-					isset($employee->planned_work) ? $employee->planned_work : null,
-					isset($employee->lehre_grobplanung) ? $employee->lehre_grobplanung : null,
-					isset($employee->ma_soll_stunden) ? $employee->ma_soll_stunden : null
-				);
-
-				// If an error occurred and:
-				if (isError($addEmployeeToTaskResult))
+				// If the task object id was given
+				if ($taskObjectId != null)
 				{
-					// - Not because of an already existing employee in this project
-					// - Not because of not existing employee
-					if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
-						&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
-						&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
-						&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
-						&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_NOT_EXITSTS
-						&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID)
+					// Add employee to project work
+					$addEmployeeToTaskResult = $this->_ci->ProjectsModel->addEmployeeToTask(
+						$taskObjectId,
+						$sapEeid,
+						$sapServiceId,
+						isset($employee->planned_work) ? $employee->planned_work : null,
+						isset($employee->lehre_grobplanung) ? $employee->lehre_grobplanung : null,
+						isset($employee->ma_soll_stunden) ? $employee->ma_soll_stunden : null
+					);
+
+					// If an error occurred and:
+					if (isError($addEmployeeToTaskResult))
 					{
-						return $addEmployeeToTaskResult; // return the error
-					}
-					else // if non blocking error then log it
-					{
-						$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeToTaskResult));
+						// - Not because of an already existing employee in this project
+						// - Not because of not existing employee
+						if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
+							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_NOT_EXITSTS
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID)
+						{
+							return $addEmployeeToTaskResult; // return the error
+						}
+						else // if non blocking error then log it
+						{
+							$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeToTaskResult));
+						}
 					}
 				}
+				// otherwise do not perform any action
 			}
 		}
 
