@@ -224,4 +224,15 @@ class ManageProjects extends JOB_Controller
 
 		$this->logInfo('End projects dates synchronization with SAP ByD');
 	}
+
+	/**
+	 *
+	 */
+	public function mpo()
+	{
+		$mpo = $this->syncprojectslib->mpo();
+
+		var_dump($mpo);
+	}
 }
+

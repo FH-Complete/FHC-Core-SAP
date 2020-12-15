@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_costcenters (
 	project_object_id character varying(42) NOT NULL,
 	project_task_id character varying(42) NOT NULL,
 	project_task_object_id character varying(42) NOT NULL,
-	project_task_name character varying(256) NOT NULL,
+	project_task_type character varying(42) NOT NULL,
 	studiensemester_kurzbz character varying(16) NOT NULL,
 	oe_kurzbz_sap character varying(20) NOT NULL
 );
@@ -13,7 +13,7 @@ COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_id IS 'SAP Project I
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_object_id IS 'SAP Project Object ID ';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_id IS 'SAP Project Task ID';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_object_id IS 'SAP Project Task Object ID';
-COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_name IS 'SAP Project Task name';
+COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_type IS 'SAP Project Task type';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.studiensemester_kurzbz IS 'FH Complete study semester';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.oe_kurzbz_sap IS 'SAP Cost Center ID';
 
@@ -21,7 +21,7 @@ DO $$
 BEGIN
 	ALTER TABLE sync.tbl_sap_projects_costcenters
 	ADD CONSTRAINT tbl_sap_projects_costcenters_pkey
-	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, project_task_id, project_task_object_id, oe_kurzbz_sap, project_name);
+	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, project_task_id, project_task_object_id, oe_kurzbz_sap, project_task_type);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 

@@ -1644,14 +1644,17 @@ class SyncProjectsLib
 				// For each project task in the structure
 				foreach ($projectStructures[self::ADMIN_FHTW_PROJECT] as $taskFormatName)
 				{
+					// Stores the type of the current task
+					$projectTaskType = substr(strtolower(trim(sprintf($taskFormatName, ' '))), 0, -2);
+
 					// Check if this cost center is already present in SAP looking in the sync table
 					$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
 						array(
 							'project_id' => $projectId,
 							'project_object_id' => $projectObjectId,
-							'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 							'studiensemester_kurzbz' => $studySemester,
-							'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+							'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap,
+							'project_task_type' => $projectTaskType
 						)
 					);
 
@@ -1681,9 +1684,9 @@ class SyncProjectsLib
 								'project_object_id' => $projectObjectId,
 								'project_task_id' => getData($createTaskResult)->ID,
 								'project_task_object_id' => getData($createTaskResult)->ObjectID,
-								'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 								'studiensemester_kurzbz' => $studySemester,
-								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap,
+								'project_task_type' => $projectTaskType
 							)
 						);
 
@@ -1917,6 +1920,9 @@ class SyncProjectsLib
 				// For each cost center
 				foreach (getData($costCentersResult) as $costCenter)
 				{
+					// Stores the type of the current task
+					$projectTaskType = substr(strtolower(trim(sprintf($taskFormatName, ' '))), 0, -2);
+
 					// For each project task in the structure
 					foreach ($projectStructures[self::ADMIN_GMBH_PROJECT] as $taskFormatName)
 					{
@@ -1925,9 +1931,9 @@ class SyncProjectsLib
 							array(
 								'project_id' => $projectId,
 								'project_object_id' => $projectObjectId,
-								'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 								'studiensemester_kurzbz' => $studySemester,
-								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+								'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap,
+								'project_task_type' => $projectTaskType
 							)
 						);
 
@@ -1957,9 +1963,9 @@ class SyncProjectsLib
 									'project_object_id' => $projectObjectId,
 									'project_task_id' => getData($createTaskResult)->ID,
 									'project_task_object_id' => getData($createTaskResult)->ObjectID,
-									'project_task_name' => sprintf($taskFormatName, $costCenter->oe_kurzbz),
 									'studiensemester_kurzbz' => $studySemester,
-									'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap
+									'oe_kurzbz_sap' => $costCenter->oe_kurzbz_sap,
+									'project_task_type' => $projectTaskType
 								)
 							);
 
@@ -2322,6 +2328,250 @@ class SyncProjectsLib
 
 		// If here then everything is fine
 		return success('Employee successfully added to this project');
+	}
+
+	public function mpo()
+	{
+		return $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+			array(
+				'BasicMessageHeader' => array(
+					'UUID' => generateUUID()
+				),
+				'PurchaseOrderMaintainBundle' => array(
+					'actionCode' => '01',
+					'ItemListCompleteTransmissionIndicator' => 'true',
+					'UUID' => generateUUID(),
+					'BusinessTransactionDocumentTypeCode' => '001',
+					//'DataOriginTypeCode' => 9,
+					//'ProcessingTypeCode' => 'ECPO',
+					//'Name' => 'Test 001',
+					'CurrencyCode' => 'EUR',
+					//'TotalNetAmount' => 33,
+					//'Status' => array(),
+					'BillToParty' => array(
+						'actionCode' => '01',
+						'PartyTypeCode' => 154,
+						'PartyKey' => array(
+							'PartyTypeCode' => 200,
+							'PartyID' => '100000'
+						),
+						'AddressReference' => array(
+							'AddressHostUUID' => '00163e8c-8089-1eda-bbb5-b4eb33b38fd8'
+						)
+					),
+					'Company' => array(
+						'actionCode' => '01',
+      						//'ObjectNodePartyTechnicalID' => 6,
+      						'PartyKey' => array(
+							'PartyID' => '100000'
+						)
+					),
+					'BuyerParty' => array(
+						'actionCode' => '01',
+						'PartyTypeCode' => 154,
+						'PartyKey' => array(
+							'PartyTypeCode' => 200,
+							'PartyID' => '100000'
+						),
+						'AddressReference' => array(
+							'AddressHostUUID' => '00163e8c-8089-1eda-bbb5-b4eb33b38fd8'
+						)
+					),
+					'EmployeeResponsibleParty' => array(
+						'actionCode' => '01',
+						'PartyTypeCode' => 167,
+						'PartyKey' => array(
+							'PartyTypeCode' => 147,
+							'PartyID' => 'BRANDSTA'
+						),
+						'AddressReference' => array(
+							'AddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d6201'
+						)
+					),
+					'ShipToLocation' => array(
+						'actionCode' => '01',
+						'ObjectNodePartyTechnicalID' => 7,
+						'LocationID' => ''
+					),
+					'SellerParty' => array(
+						'actionCode' => '01',
+						'PartyTypeCode' => 266,
+						'PartyKey' => array(
+							'PartyTypeCode' => 147,
+							'PartyID' => '200000'
+						),
+						'AddressReference' => array(
+							'AddressHostUUID' => '00163e8c-4619-1edb-85a7-ec93b2c9ccad'
+						)
+					),
+					'Item' => array(
+						'actionCode' => '01',
+						'ItemID' => 1,
+						'ItemUUID' => generateUUID(),
+						'TypeCode' => 19,
+						'Description' => 'Vincenzo Lembo 10005',
+					'ShipToLocation' => array(
+						'actionCode' => '01',
+						'ObjectNodePartyTechnicalID' => 7,
+						'LocationID' => ''
+					),
+						'Quantity' => array(
+							'unitCode' => 'HUR',
+							'_' => 1
+						),
+						'QuantityTypeCode' => 'HUR',
+						'CostUpperLimitExpectedAmount' => array(
+							'currencyCode' => 'EUR',
+							'_' => 0
+						),
+						'NetAmount' => array(
+							'currencyCode' => 'EUR',
+							'_' => 33
+						),
+						'NetUnitPrice' => array(
+							'Amount' => array(
+								'currencyCode' => 'EUR',
+								'_' => 33
+							),
+							'BaseQuantity' => 1,
+							'BaseQuantityTypeCode' => 'HUR'
+						),
+						'ListUnitPrice' => array(
+							'Amount' => array(
+								'currencyCode' => 'EUR',
+								'_' => 33
+							),
+							'BaseQuantity' => 1,
+							'BaseQuantityTypeCode' => 'HUR'
+						),
+						'FollowUpPurchaseOrderConfirmation' => array(
+							'RequirementCode' => '04'
+						),
+						'FollowUpDelivery' => array(
+							'RequirementCode' => '01',
+							'EmployeeTimeConfirmationRequiredIndicator' => true
+						),
+						'FollowUpInvoice' => array(
+						        'BusinessTransactionDocumentSettlementRelevanceIndicator' => false,
+						        'RequirementCode' => '01',
+						        'EvaluatedReceiptSettlementIndicator' => false,
+							'DeliveryBasedInvoiceVerificationIndicator' => false
+						),
+						'ShipToLocationAddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d2201',
+						'ItemProduct' => array(
+							'actionCode' => '01',
+							'CashDiscountDeductibleIndicator' => false,
+							'ProductCategoryIDKey' => array(
+								'ProductCategoryHierarchyID' => 'ROOT-1',
+								'ProductCategoryInternalID' => '7GMBH'
+							),
+							'ProductKey' => array(
+								'ProductTypeCode' => 2,
+								'ProductIdentifierTypeCode' => 1,
+								'ProductID' => '20000447'
+							)
+						),
+						'ProductRecipientParty' => array(
+							'actionCode' => '01',
+							'PartyKey' => array(
+								'PartyTypeCode' => 147,
+								'PartyID' => 'BISON'
+							)
+						),
+						'ItemAccountingCodingBlockDistribution' => array(
+							'actionCode' => '01',
+							'ValidityDate' => '2020-11-23',
+							'CompanyID' => '100000',
+							'HostObjectTypeCode' => '001',
+							'TotalAmount' => 33,
+							'TotalQuantity' => array(
+								'unitCode' => 'HUR',
+								'_' => 1
+							),
+							'AccountingCodingBlockAssignment' => array(
+								'Percent' => 100,
+								'Amount' => array(
+									'currencyCode' => 'EUR',
+									'_' => 33
+								),
+								'Quantity' => array(
+									'unitCode' => 'HUR',
+									'_' => 1
+								),
+								'AccountingCodingBlockTypeCode' => 'PRO',
+								'ProjectTaskKey' => array(
+									'TaskID' => 'ADM-MANUALTEST'
+								),
+								'ProjectReference' => array(
+									'ProjectID' => 'ADM-MANUALTEST',
+									'ProjectName' => 'ADM-Manualtest',
+									'ProjectElementID' => 'ADM-MANUALTEST',
+									'ProjectElementName' => 'ADM-Manualtest'
+								),
+								'CompanyID' => '100000'
+							)
+						),
+						'ItemTaxCalculation' => array(
+							'actionCode' => '01',
+							'CountryCode' => 'AT',
+							'TaxationCharacteristicsCode' => array(
+								'listID' => 'AT',
+								'_' => 1
+							),
+							'ItemProductTaxDetails' => array(
+								'UUID' => generateUUID(),
+								'TransactionCurrencyProductTax' => array(
+									'CountryCode' => 'AT',
+									'EventTypeCode' => array(
+										'listID' => 'AT',
+										'_' => 1
+									),
+									'TypeCode' => array(
+										'listID' => 'AT',
+										'_' => 1
+									),
+									'Amount' => array(
+										'currencyCode' => 'EUR',
+										'_' => 0
+									),
+									'InternalAmount' => array(
+										'currencyCode' => 'EUR',
+										'_' => 0
+									),
+									'BaseAmount' => array(
+										'currencyCode' => 'EUR',
+										'_' => 33
+									),
+									'BaseQuantity' => array(
+										'unitCode' => 'HUR',
+										'_' => 1
+									),
+									'DueCategoryCode' => 2,
+									'StatisticRelevanceIndicator' => true
+								)
+							),
+							'ItemTaxationTerms' => array(
+								'actionCode' => '01',
+								'UUID' => generateUUID(),
+								'SellerCountryCode' => 'AT',
+								'SellerTaxID' => 'ATU61910007',
+								'SellerTaxIdentificationNumberTypeCode' => array(
+									'listID' => 'AT',
+									'_' => 1
+								),
+								'BuyerCountryCode' => 'AT',
+								'BuyerTaxID' => 'ATU65565658',
+								'BuyerTaxIdentificationNumberTypeCode' => array(
+									'listID' => 'AT',
+									'_' => 1
+								),
+								'TaxDate' => '2020-11-23'
+							)
+						)
+					)
+				)
+			)
+		);
 	}
 }
 
