@@ -134,7 +134,7 @@ class SyncProjectsLib
 		else // otherwise get the last or current one
 		{
 			// Get the last or current studysemester
-			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester();
+			$currentOrNextStudySemesterResult = $this->_ci->StudiensemesterModel->getAktOrNextSemester(0);
 		}
 
 		// If an error occurred while getting the study semester return it
@@ -451,7 +451,7 @@ class SyncProjectsLib
 						// Convert the start date from SAP date to timestamp
 						$startDate = $projectTask->StartDateTime;
 						if ($startDate != null) $startDate = date('Y-m-d H:i:s', toTimestamp($startDate));
-		
+
 						// Convert the end date from SAP date to timestamp
 						$endDate = $projectTask->EndDateTime;
 						if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
@@ -515,7 +515,7 @@ class SyncProjectsLib
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function importEmployees()
 	{
@@ -846,7 +846,7 @@ class SyncProjectsLib
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function importProjectsDates()
 	{
@@ -1025,7 +1025,7 @@ class SyncProjectsLib
 
 	// --------------------------------------------------------------------------------------------
 	// Private methods
-	
+
 	/**
 	 *
 	 */
@@ -1093,7 +1093,7 @@ class SyncProjectsLib
 				// If error then return it
 				if (isError($ressourceInsertResult)) return $ressourceInsertResult;
 
-				// Get the new ressource_id 
+				// Get the new ressource_id
 				$ressource_id = getData($ressourceInsertResult);
 			}
 		}
@@ -1451,14 +1451,14 @@ class SyncProjectsLib
 		if (isError($courseOURootResult)) return $courseOURootResult;
 
 		// If no root organization unit found for the employee
-		if (!hasData($employeeOURootResult)) 
+		if (!hasData($employeeOURootResult))
 		{
 			$this->_ci->LogLibSAP->logWarningDB(
 				'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
 			);
 		}
 		// If no root organization unit found for the course
-		elseif (!hasData($courseOURootResult)) 
+		elseif (!hasData($courseOURootResult))
 		{
 			$this->_ci->LogLibSAP->logWarningDB(
 				'No root organization unit found for course: '.$course->name
@@ -1900,8 +1900,7 @@ class SyncProjectsLib
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
-				   AND so.oe_kurzbz_sap NOT IN (\'100000\', \'LPC\', \'LEHRGANG\')
+				   AND so.oe_kurzbz_sap NOT IN (\'LPC\', \'LEHRGANG\')
 				   AND so.oe_kurzbz IN (
 					WITH RECURSIVE oes(oe_kurzbz, oe_parent_kurzbz) as
 					(
@@ -1911,7 +1910,9 @@ class SyncProjectsLib
 					     UNION ALL
 						SELECT o.oe_kurzbz, o.oe_parent_kurzbz
 						  FROM public.tbl_organisationseinheit o, oes
-						 WHERE o.oe_parent_kurzbz = oes.oe_kurzbz
+						 WHERE
+						 	o.oe_parent_kurzbz = oes.oe_kurzbz
+						 	AND o.oe_kurzbz!=\'lehrgang\'
 					)
 					SELECT oe_kurzbz
 					  FROM oes
@@ -2592,4 +2593,3 @@ class SyncProjectsLib
 		);
 	}
 }
-
