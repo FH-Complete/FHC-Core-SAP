@@ -13,7 +13,6 @@ COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_id IS 'SAP Project I
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_object_id IS 'SAP Project Object ID ';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_id IS 'SAP Project Task ID';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_object_id IS 'SAP Project Task Object ID';
-COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_type IS 'SAP Project Task type';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.studiensemester_kurzbz IS 'FH Complete study semester';
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.oe_kurzbz_sap IS 'SAP Cost Center ID';
 
@@ -21,7 +20,7 @@ DO $$
 BEGIN
 	ALTER TABLE sync.tbl_sap_projects_costcenters
 	ADD CONSTRAINT tbl_sap_projects_costcenters_pkey
-	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, project_task_id, project_task_object_id, oe_kurzbz_sap, project_task_type);
+	PRIMARY KEY (project_id, project_object_id, studiensemester_kurzbz, project_task_id, project_task_object_id, oe_kurzbz_sap);
 	EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -43,4 +42,3 @@ END $$;
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE sync.tbl_sap_projects_costcenters TO vilesci;
 GRANT SELECT ON TABLE sync.tbl_sap_projects_costcenters TO web;
-

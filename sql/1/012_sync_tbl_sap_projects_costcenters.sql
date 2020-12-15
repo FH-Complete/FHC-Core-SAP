@@ -15,4 +15,3 @@ BEGIN
 END $$;
 
 COMMENT ON COLUMN sync.tbl_sap_projects_costcenters.project_task_type IS 'SAP Project Task type';
-
