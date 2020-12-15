@@ -1900,8 +1900,6 @@ class SyncProjectsLib
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
 				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-				   AND so.oe_kurzbz_sap NOT LIKE \'2%\'
-				   AND so.oe_kurzbz_sap NOT IN (\'100000\', \'LPC\', \'LEHRGANG\')
 				   AND so.oe_kurzbz IN (
 					WITH RECURSIVE oes(oe_kurzbz, oe_parent_kurzbz) as
 					(
