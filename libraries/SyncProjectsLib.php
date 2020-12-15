@@ -1421,7 +1421,7 @@ class SyncProjectsLib
 					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
 					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
-						$purchaseOrder = $this->_purchaseOrder();
+						$purchaseOrder = $this->_purchaseOrder($courseEmployee, $course);
 
 						// If error occurred then return the error
 						if (isError($purchaseOrder)) return $purchaseOrder;
@@ -1753,6 +1753,15 @@ class SyncProjectsLib
 
 							// If an error occurred then return it
 							if (isError($addEmployeeResult)) return $addEmployeeResult;
+
+							// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
+							if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+							{
+								$purchaseOrder = $this->_purchaseOrder();
+
+								// If error occurred then return the error
+								if (isError($purchaseOrder)) return $purchaseOrder;
+							}
 						}
 					}
 				}
@@ -1920,12 +1929,12 @@ class SyncProjectsLib
 				// For each cost center
 				foreach (getData($costCentersResult) as $costCenter)
 				{
-					// Stores the type of the current task
-					$projectTaskType = substr(strtolower(trim(sprintf($taskFormatName, ' '))), 0, -2);
-
 					// For each project task in the structure
 					foreach ($projectStructures[self::ADMIN_GMBH_PROJECT] as $taskFormatName)
 					{
+						// Stores the type of the current task
+						$projectTaskType = substr(strtolower(trim(sprintf($taskFormatName, ' '))), 0, -2);
+
 						// Check if this cost center is already present in SAP looking in the sync table
 						$syncCostCenterResult = $this->_ci->SAPProjectsCostcentersModel->loadWhere(
 							array(
@@ -2032,6 +2041,15 @@ class SyncProjectsLib
 
 								// If an error occurred then return it
 								if (isError($addEmployeeResult)) return $addEmployeeResult;
+
+								// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
+								if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+								{
+									$purchaseOrder = $this->_purchaseOrder();
+
+									// If error occurred then return the error
+									if (isError($purchaseOrder)) return $purchaseOrder;
+								}
 							}
 						}
 					}
