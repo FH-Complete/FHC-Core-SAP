@@ -152,6 +152,10 @@ function rowSelected_onSAPProject(row)
             $(FH_PHASES_TABLE).tabulator('replaceData');
         }
     }
+
+    // Change Dropdown selection to actual SAP project Organisationseinheit
+    SyncProjects.changeSelectionOrganisationseinheit(projects_timesheet_id);
+
 }
 
 // Get FH phases and also, if the project is synchronized, the corresponding SAP project and phases.
@@ -191,6 +195,9 @@ function rowSelected_onFUEProject(row)
 
                         // Deselect former selected SAP project row
                         $(SAP_PROJECT_TABLE).tabulator('deselectRow');
+
+	                    // Change Dropdown selection to actual SAP project Organisationseinheit
+	                    SyncProjects.changeSelectionOrganisationseinheit(data.retval.projects_timesheet_id);
 
                         _setGUI_SyncedProjects();
 
@@ -298,7 +305,10 @@ function _setGUI_SyncedProjects()
 function _resetGUI()
 {
     $("#panel-projects button").attr("disabled", false);
-    $("#select-organisationseinheit").removeAttr("disabled");
+    $("#select-organisationseinheit")
+	    .removeAttr("disabled")
+	    .val('')
+	    .change();
 
     $(PROJECT_MSG).text('');
 	$(PHASES_MSG).text('');
@@ -587,5 +597,36 @@ $("#select-organisationseinheit").change(function(){
 });
 
 });
+
+var SyncProjects = {
+
+	/**
+	 * Get SAP Project Organisationseinheit and use as Dropdown selection
+	 * @param projects_timesheet_id
+	 */
+	changeSelectionOrganisationseinheit: function(projects_timesheet_id) {
+		var data = {
+			'projects_timesheet_id': projects_timesheet_id
+		};
+
+		FHC_AjaxClient.ajaxCallPost(
+			FHC_JS_DATA_STORAGE_OBJECT.called_path + "/getSAPProjectOE",
+			data,
+			{
+				successCallback: function (data, textStatus, jqXHR) {
+					if (!data.error && data.retval) {
+
+						$("#select-organisationseinheit")
+							.val(data.retval.oe_kurzbz)
+							.change();
+					}
+				},
+				errorCallback: function (jqXHR, textStatus, errorThrown) {
+					FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+				}
+			}
+		);
+	}
+}
 
 
