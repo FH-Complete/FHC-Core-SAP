@@ -418,7 +418,7 @@ class SyncProjectsLib
 
 				// If this project has tasks and more then one
 				// NOTE: one of the tasks it's the project itself
-				if (!isEmptyArray($project->ProjectTask) && count($project->ProjectTask) > 1)
+				if (!isEmptyArray($project->ProjectTask) && count($project->ProjectTask) >= 1)
 				{
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
