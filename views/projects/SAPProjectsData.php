@@ -6,7 +6,8 @@ $qry = '
 				ELSE \'false\'
 				END AS "isSynced",
 				projects_timesheet_id,
-				project_id
+				project_id,
+				name
 	FROM    	sync.tbl_sap_projects_timesheets
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projects_timesheet_id)
 	WHERE 		project_task_id IS NULL
@@ -20,7 +21,8 @@ $tableWidgetArray = array(
 	'datasetRepresentation' => 'tabulator',
 	'columnsAliases' => array(
 		'Synced',
-		'ProjektID',
+		'ProjectTimesheetID',
+		'ProjectID',
 		'Projekt'
 	),
 	'datasetRepOptions' => '{
@@ -47,7 +49,8 @@ $tableWidgetArray = array(
 	'datasetRepFieldsDefs' => '{
 		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 100},
 		projects_timesheet_id: {visible: false},
-		project_id: {headerFilter:"input"}
+		project_id: {visible: false},
+		name: {headerFilter: "input"}
 	}'
 );
 

@@ -95,12 +95,13 @@ function rowSelected_onSAPProject(row)
     var is_synced = row.getData().isSynced;
     var project_id = row.getData().project_id;
     var projects_timesheet_id = row.getData().projects_timesheet_id;
+    var name = row.getData().name;
 
     // Reset GUI
     _resetGUI();
 
     // Set SAP project title into input field
-	$("#input-sap-project").val(project_id);
+	$("#input-sap-project").val(name);
 
     // Load SAP phases
     loadSAPPhases(project_id);
