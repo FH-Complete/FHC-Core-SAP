@@ -10,12 +10,15 @@ class ODATAClientLib
 	const HTTP_GET_METHOD = 'GET'; // http get method name
 	const HTTP_POST_METHOD = 'POST'; // http post method name
 	const HTTP_MERGE_METHOD = 'MERGE'; // http merge method name
+	const HTTP_PATCH_METHOD = 'PATCH'; // http merge method name
 	const URI_TEMPLATE = '%s://%s/%s/%s'; // URI format
 	const TOKEN_HEADER_FETCH_NAME = 'x-csrf-token'; // token header name when fetching
 	const TOKEN_HEADER_FETCH_VALUE = 'fetch'; // token header value name when fetching
 	const COOKIE_HEADER_FETCH_NAME = 'set-cookie'; // cookie header name when fetching
 	const MERGE_HEADER_NAME = 'X-HTTP-Method'; // merge header name
 	const MERGE_HEADER_VALUE = 'MERGE'; // merge header value
+	const PATCH_HEADER_NAME = 'X-HTTP-Method'; // patch header name
+	const PATCH_HEADER_VALUE = 'PATCH'; // patch header value
 	const TOKEN_HEADER_SEND_NAME = 'X-CSRF-Token'; // token header name when posting
 	const COOKIE_HEADER_SEND_NAME = 'Cookie'; // cookie header name when posting
 	const ACCEPT_HEADER_NAME = 'Accept'; // accept header name
@@ -104,7 +107,8 @@ class ODATAClientLib
 	
 	    	// Checks that the HTTP method required is valid
 	    	if ($httpMethod != null
-	    		&& ($httpMethod == self::HTTP_GET_METHOD || $httpMethod == self::HTTP_POST_METHOD || $httpMethod == self::HTTP_MERGE_METHOD))
+			&& ($httpMethod == self::HTTP_GET_METHOD || $httpMethod == self::HTTP_POST_METHOD
+				|| $httpMethod == self::HTTP_MERGE_METHOD || $httpMethod == self::HTTP_PATCH_METHOD))
 	    	{
 	    		$this->_httpMethod = $httpMethod;
 	    	}
@@ -244,6 +248,14 @@ class ODATAClientLib
 	}
 
 	/**
+	 * Returns true if the HTTP method used to call this server is PATCH
+	 */
+	private function _isPATCH()
+	{
+	    return $this->_httpMethod == self::HTTP_PATCH_METHOD;
+	}
+
+	/**
 	 * Generate the URI to call the remote web service
 	 */
 	private function _generateURI()
@@ -306,6 +318,10 @@ class ODATAClientLib
 			elseif ($this->_isMERGE()) // else if the call was performed using a HTTP MERGE...
 			{
 				$response = $this->_callMERGE($uri); // ...calls the remote web service with the HTTP MERGE method
+			}
+			elseif ($this->_isPATCH()) // else if the call was performed using a HTTP PATCH...
+			{
+				$response = $this->_callPATCH($uri); // ...calls the remote web service with the HTTP PATCH method
 			}
 
 			// Checks the response of the remote web service and handles possible errors
@@ -417,6 +433,31 @@ class ODATAClientLib
 			return \Httpful\Request::post($uri)
 				->expectsJson() // dangerous expectations
 				->addHeader(self::MERGE_HEADER_NAME, self::MERGE_HEADER_VALUE) // merge option
+				->addHeader(self::TOKEN_HEADER_SEND_NAME, $header[self::TOKEN_HEADER_FETCH_NAME]) // token
+				->addHeader(self::COOKIE_HEADER_SEND_NAME, $header[self::COOKIE_HEADER_FETCH_NAME]) // session cookie value
+				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
+				->body($this->_callParametersArray) // post parameters
+				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+				->sendsJson() // content type json
+				->send();
+		}
+		else // ...otherwise return a null value
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Performs a remote call using the PATCH HTTP method
+	 */
+	private function _callPATCH($uri)
+	{
+		// If the header data are present then perform the call...
+		if (($header = $this->_getHeader($uri)) != null)
+		{
+			return \Httpful\Request::post($uri)
+				->expectsJson() // dangerous expectations
+				->addHeader(self::PATCH_HEADER_NAME, self::PATCH_HEADER_VALUE) // merge option
 				->addHeader(self::TOKEN_HEADER_SEND_NAME, $header[self::TOKEN_HEADER_FETCH_NAME]) // token
 				->addHeader(self::COOKIE_HEADER_SEND_NAME, $header[self::COOKIE_HEADER_FETCH_NAME]) // session cookie value
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required

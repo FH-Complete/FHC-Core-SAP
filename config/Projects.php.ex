@@ -1,5 +1,8 @@
 <?php
 
+// Enable/disable warnings in projects synchronization
+$config['project_warnings_enabled'] = false;
+
 // Project id formats (required)
 $config['project_id_formats'] = array(
 	'admin_fhtw' => 'ADM-FHTW-%s',		// admin project id format

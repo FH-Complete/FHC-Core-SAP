@@ -7,6 +7,9 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class SyncProjectsLib
 {
+	// Config entry name to enable/disable log warnings
+	const PROJECT_WARNINGS_ENABLED = 'project_warnings_enabled';
+
 	// Indexes used to access to the configuration array
 	const PROJECT_ID_FORMATS = 'project_id_formats';
 	const PROJECT_NAME_FORMATS = 'project_name_formats';
@@ -546,9 +549,12 @@ class SyncProjectsLib
 			// For each breaker
 			foreach (getData($rule0BreakerResults) as $breaker)
 			{
-				$this->_ci->LogLibSAP->logWarningDB(
-					'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
-				);
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
+					);
+				}
 				$breakersArray[] = $breaker->projects_timesheet_id;
 			}
 		}
@@ -620,7 +626,10 @@ class SyncProjectsLib
 					// If no leader is assigned to this project
 					if ($sapLeaderId == null)
 					{
-						$this->_ci->LogLibSAP->logWarningDB('No leader assigned in SAP for project: '.$linkedProject->projekt_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('No leader assigned in SAP for project: '.$linkedProject->projekt_id);
+						}
 					}
 
 					// If a leader was assigned to this project in SAP
@@ -639,10 +648,13 @@ class SyncProjectsLib
 						}
 						else // otherwise log it
 						{
-							$this->_ci->LogLibSAP->logWarningDB(
-								'Leader '.$sapLeaderId.' is assigned in SAP to project '.
-								$linkedProject->projekt_id.' but is not syncd'
-							);
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB(
+									'Leader '.$sapLeaderId.' is assigned in SAP to project '.
+									$linkedProject->projekt_id.' but is not syncd'
+								);
+							}
 						}
 					}
 
@@ -655,7 +667,10 @@ class SyncProjectsLib
 					// If no project were found in SAP log and continue to the next one, should not happen
 					if (!hasData($projectPartecipantResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('No project found in SAP with id: '.$linkedProject->project_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('No project found in SAP with id: '.$linkedProject->project_id);
+						}
 						continue;
 					}
 
@@ -740,18 +755,24 @@ class SyncProjectsLib
 							}
 							else // log it and continue to the next one
 							{
-								$this->_ci->LogLibSAP->logWarningDB(
-									'Partecipant object without employee id for project: '.$linkedProject->project_id
-								);
+								if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+								{
+									$this->_ci->LogLibSAP->logWarningDB(
+										'Partecipant object without employee id for project: '.$linkedProject->project_id
+									);
+								}
 								continue;
 							}
 						}
 					}
 					else // otherwise log it and continue to the next one
 					{
-						$this->_ci->LogLibSAP->logWarningDB(
-							'Project without partecipants: '.$linkedProject->project_id
-						);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB(
+								'Project without partecipants: '.$linkedProject->project_id
+							);
+						}
 						continue;
 					}
 				}
@@ -766,7 +787,10 @@ class SyncProjectsLib
 					// If there are no services for this task
 					if (!hasData($taskServiceResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('No services found in SAP for task: '.$linkedProject->project_task_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('No services found in SAP for task: '.$linkedProject->project_task_id);
+						}
 						continue;
 					}
 
@@ -776,7 +800,11 @@ class SyncProjectsLib
 						// If the service is present but without employee
 						if (isEmptyString($task->AssignedEmployeeID))
 						{
-							$this->_ci->LogLibSAP->logWarningDB('Found a service without emplyee for task: '.$linkedProject->project_task_id);
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB('Found a service without emplyee for task: '.
+									$linkedProject->project_task_id);
+							}
 							continue;
 						}
 
@@ -876,9 +904,12 @@ class SyncProjectsLib
 			// For each breaker
 			foreach (getData($rule0BreakerResults) as $breaker)
 			{
-				$this->_ci->LogLibSAP->logWarningDB(
-					'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
-				);
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						'Rule 0 breaker record found: '.$breaker->projects_timesheet_id.', '.$breaker->projekt_id.', '.$breaker->projektphase_id
+					);
+				}
 				$breakersArray[] = $breaker->projects_timesheet_id;
 			}
 		}
@@ -919,7 +950,10 @@ class SyncProjectsLib
 					// If no data are found in SAP
 					if (!hasData($projectResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Project not found in SAP: '.$linkedProject->project_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Project not found in SAP: '.$linkedProject->project_id);
+						}
 						continue;
 					}
 
@@ -939,7 +973,10 @@ class SyncProjectsLib
 					// If the project is present in database, should not happen because of the foreign key
 					if (!hasData($projektResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Project not found in database: '.$linkedProject->project_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Project not found in database: '.$linkedProject->project_id);
+						}
 						continue;
 					}
 
@@ -971,7 +1008,10 @@ class SyncProjectsLib
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						}
 						continue;
 					}
 
@@ -991,7 +1031,10 @@ class SyncProjectsLib
 					// If the project is present in database, should not happen because of the foreign key
 					if (!hasData($projektPhaseResult))
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Project phase not found in database: '.$linkedProject->project_task_id);
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Project phase not found in database: '.$linkedProject->project_task_id);
+						}
 						continue;
 					}
 
@@ -1071,7 +1114,10 @@ class SyncProjectsLib
 			// If no data have been found log it and continue to the next one
 			if (!hasData($ressourceResult))
 			{
-				$this->_ci->LogLibSAP->logWarningDB('SAP Employee '.$sapEmployeeId.' not found in database');
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('SAP Employee '.$sapEmployeeId.' not found in database');
+				}
 			}
 			else
 			{
@@ -1303,7 +1349,10 @@ class SyncProjectsLib
 				}
 				else // if non blocking error then log it
 				{
-					$this->_ci->LogLibSAP->logWarningDB(getError($createProjectResult));
+					if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+					{
+						$this->_ci->LogLibSAP->logWarningDB(getError($createProjectResult));
+					}
 				}
 			}
 
@@ -1453,16 +1502,22 @@ class SyncProjectsLib
 		// If no root organization unit found for the employee
 		if (!hasData($employeeOURootResult))
 		{
-			$this->_ci->LogLibSAP->logWarningDB(
-				'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
-			);
+			if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'No root organization unit found for employee: '.$courseEmployee->mitarbeiter_uid
+				);
+			}
 		}
 		// If no root organization unit found for the course
 		elseif (!hasData($courseOURootResult))
 		{
-			$this->_ci->LogLibSAP->logWarningDB(
-				'No root organization unit found for course: '.$course->name
-			);
+			if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'No root organization unit found for course: '.$course->name
+				);
+			}
 		}
 		else // otherwise
 		{
@@ -1559,6 +1614,16 @@ class SyncProjectsLib
 		// If was not possible to get a valid project object id
 		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
 
+		// If the projects does not exist then update the time recording attribute
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Update the time recording attribute of the project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+
+			// If an error occurred while setting the project time recording
+			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+		}
+
 		// Update project ProjectTaskCollection name
 		$projectName = sprintf($projectNameFormats[self::ADMIN_FHTW_PROJECT], $studySemester);
 		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
@@ -1568,16 +1633,6 @@ class SyncProjectsLib
 
 		// If an error occurred while creating the project on ByD return the error
 		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
-
-		// If the projects does not exist then update the time recording attriute
-		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
-		{
-			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
-
-			// If an error occurred while setting the project time recording
-			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
-		}
 
 		// Set the project as active
 		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
@@ -1593,7 +1648,10 @@ class SyncProjectsLib
 			}
 			else // otherwise log it
 			{
-				$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
+				}
 			}
 		}
 
@@ -1635,7 +1693,7 @@ class SyncProjectsLib
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
-			// If error occurred while retrieving const centers from database then return the error
+			// If error occurred while retrieving cost centers from database then return the error
 			if (isError($costCentersResult)) return $costCentersResult;
 
 			// For each cost center
@@ -1671,7 +1729,8 @@ class SyncProjectsLib
 						$createTaskResult = $this->_ci->ProjectsModel->createTask(
 							$projectObjectId,
 							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
-							$costCenter->oe_kurzbz_sap
+							$costCenter->oe_kurzbz_sap,
+							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
 						);
 
 						// If an error occurred while creating the project task on ByD return the error
@@ -1733,7 +1792,7 @@ class SyncProjectsLib
 						$costCenter->oe_kurzbz_sap
 					));
 
-					// If error occurred while retrieving const center employee from database then return the error
+					// If error occurred while retrieving cost center employee from database then return the error
 					if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
 
 					// If employees are present for this cost center
@@ -1753,15 +1812,6 @@ class SyncProjectsLib
 
 							// If an error occurred then return it
 							if (isError($addEmployeeResult)) return $addEmployeeResult;
-
-							// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-							if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
-							{
-								$purchaseOrder = $this->_purchaseOrder();
-
-								// If error occurred then return the error
-								if (isError($purchaseOrder)) return $purchaseOrder;
-							}
 						}
 					}
 				}
@@ -1878,7 +1928,10 @@ class SyncProjectsLib
 			}
 			else // otherwise log it
 			{
-				$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(getError($setActiveResult));
+				}
 			}
 		}
 
@@ -1921,7 +1974,7 @@ class SyncProjectsLib
 			      GROUP BY so.oe_kurzbz, so.oe_kurzbz_sap
 			', array($studySemesterEndDate, $studySemesterStartDate));
 
-			// If error occurred while retrieving const centers from database then return the error
+			// If error occurred while retrieving cost centers from database then return the error
 			if (isError($costCentersResult)) return $costCentersResult;
 
 			// If cost centers are present in database
@@ -1960,7 +2013,8 @@ class SyncProjectsLib
 							$createTaskResult = $this->_ci->ProjectsModel->createTask(
 								$projectObjectId,
 								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
-								$costCenter->oe_kurzbz_sap
+								$costCenter->oe_kurzbz_sap,
+								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
 							);
 
 							// If an error occurred while creating the project task on ByD return the error
@@ -2022,7 +2076,7 @@ class SyncProjectsLib
 							$costCenter->oe_kurzbz_sap
 						));
 
-						// If error occurred while retrieving const center employee from database then return the error
+						// If error occurred while retrieving cost center employee from database then return the error
 						if (isError($costCenterEmployeesResult)) return $costCenterEmployeesResult;
 
 						// If employees are present for this cost center
@@ -2042,15 +2096,6 @@ class SyncProjectsLib
 
 								// If an error occurred then return it
 								if (isError($addEmployeeResult)) return $addEmployeeResult;
-
-								// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-								if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
-								{
-									$purchaseOrder = $this->_purchaseOrder();
-
-									// If error occurred then return the error
-									if (isError($purchaseOrder)) return $purchaseOrder;
-								}
 							}
 						}
 					}
@@ -2058,7 +2103,10 @@ class SyncProjectsLib
 			}
 			else
 			{
-				$this->_ci->LogLibSAP->logWarningDB('No const centers found in database');
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('No cost centers found in database');
+				}
 			}
 		}
 		else
@@ -2304,7 +2352,10 @@ class SyncProjectsLib
 					}
 					else // if non blocking error then log it
 					{
-						$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeResult));
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeResult));
+						}
 					}
 				}
 
@@ -2337,7 +2388,10 @@ class SyncProjectsLib
 						}
 						else // if non blocking error then log it
 						{
-							$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeToTaskResult));
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB(getError($addEmployeeToTaskResult));
+							}
 						}
 					}
 				}
@@ -2361,27 +2415,19 @@ class SyncProjectsLib
 					'ItemListCompleteTransmissionIndicator' => 'true',
 					'UUID' => generateUUID(),
 					'BusinessTransactionDocumentTypeCode' => '001',
-					//'DataOriginTypeCode' => 9,
-					//'ProcessingTypeCode' => 'ECPO',
-					//'Name' => 'Test 001',
 					'CurrencyCode' => 'EUR',
-					//'TotalNetAmount' => 33,
-					//'Status' => array(),
 					'BillToParty' => array(
 						'actionCode' => '01',
 						'PartyTypeCode' => 154,
 						'PartyKey' => array(
 							'PartyTypeCode' => 200,
 							'PartyID' => '100000'
-						),
-						'AddressReference' => array(
-							'AddressHostUUID' => '00163e8c-8089-1eda-bbb5-b4eb33b38fd8'
 						)
 					),
 					'Company' => array(
 						'actionCode' => '01',
-      						//'ObjectNodePartyTechnicalID' => 6,
       						'PartyKey' => array(
+							'PartyTypeCode' => 200,
 							'PartyID' => '100000'
 						)
 					),
@@ -2391,9 +2437,6 @@ class SyncProjectsLib
 						'PartyKey' => array(
 							'PartyTypeCode' => 200,
 							'PartyID' => '100000'
-						),
-						'AddressReference' => array(
-							'AddressHostUUID' => '00163e8c-8089-1eda-bbb5-b4eb33b38fd8'
 						)
 					),
 					'EmployeeResponsibleParty' => array(
@@ -2402,15 +2445,7 @@ class SyncProjectsLib
 						'PartyKey' => array(
 							'PartyTypeCode' => 147,
 							'PartyID' => 'BRANDSTA'
-						),
-						'AddressReference' => array(
-							'AddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d6201'
 						)
-					),
-					'ShipToLocation' => array(
-						'actionCode' => '01',
-						'ObjectNodePartyTechnicalID' => 7,
-						'LocationID' => ''
 					),
 					'SellerParty' => array(
 						'actionCode' => '01',
@@ -2418,22 +2453,14 @@ class SyncProjectsLib
 						'PartyKey' => array(
 							'PartyTypeCode' => 147,
 							'PartyID' => '200000'
-						),
-						'AddressReference' => array(
-							'AddressHostUUID' => '00163e8c-4619-1edb-85a7-ec93b2c9ccad'
 						)
 					),
 					'Item' => array(
 						'actionCode' => '01',
-						'ItemID' => 1,
+						//'ItemID' => 1,
 						'ItemUUID' => generateUUID(),
-						'TypeCode' => 19,
+						//'TypeCode' => 19,
 						'Description' => 'Vincenzo Lembo 10005',
-					'ShipToLocation' => array(
-						'actionCode' => '01',
-						'ObjectNodePartyTechnicalID' => 7,
-						'LocationID' => ''
-					),
 						'Quantity' => array(
 							'unitCode' => 'HUR',
 							'_' => 1
@@ -2476,7 +2503,7 @@ class SyncProjectsLib
 						        'EvaluatedReceiptSettlementIndicator' => false,
 							'DeliveryBasedInvoiceVerificationIndicator' => false
 						),
-						'ShipToLocationAddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d2201',
+						//'ShipToLocationAddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d2201',
 						'ItemProduct' => array(
 							'actionCode' => '01',
 							'CashDiscountDeductibleIndicator' => false,
@@ -2501,7 +2528,7 @@ class SyncProjectsLib
 							'actionCode' => '01',
 							'ValidityDate' => '2020-11-23',
 							'CompanyID' => '100000',
-							'HostObjectTypeCode' => '001',
+							//'HostObjectTypeCode' => '001',
 							'TotalAmount' => 33,
 							'TotalQuantity' => array(
 								'unitCode' => 'HUR',

@@ -57,7 +57,7 @@ function mergeUsersPersonIdArray($jobs)
  */
 function toDate($phpTimestamp)
 {
-	if ($phpTimestamp) return null;
+	if (isEmptyString($phpTimestamp)) return null;
 
 	return '/Date('.$phpTimestamp.'000)/';
 }
