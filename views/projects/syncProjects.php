@@ -94,6 +94,17 @@ $this->load->view(
                                 <br>
                             </div>
 
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-6">
+												<small><span class="text-muted">SAP Projektstatus: </span></small><b><span id="sap-project-status" class="pull-right text-uppercase">-</span></b>
+											</div>
+											<div class="col-xs-6">
+												<small><span class="text-muted">SAP Projekt gelöscht: </span></small><b><span id="sap-project-deleted" class="pull-right text-uppercase">-</span></b>
+											</div>
+										</div>
+									</div>
+
                             <div class="panel-heading">
                                 <div class="row">
                                     <div class="col-xs-4">

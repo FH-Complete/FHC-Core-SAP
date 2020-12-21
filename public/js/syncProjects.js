@@ -10,6 +10,15 @@ const FH_PHASES_TABLE = '[tableuniqueid = FUEPhases] #tableWidgetTabulator';
 const PROJECT_MSG = '#projects-msg';
 const PHASES_MSG = '#projectphases-msg';
 
+const SAP_PROJECT_STATUS_MAP = new Map([
+	['1', 'Planning'],
+	['2', 'Start'],
+	['3', 'Released'],
+	['4', 'Stopped'],
+	['5', 'Closed'],
+	['6', 'Completed']
+]);
+
 var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
 // -----------------------------------------------------------------------------------------------------------------
 // Tabulator table format functions
@@ -157,6 +166,10 @@ function rowSelected_onSAPProject(row)
     // Change Dropdown selection to actual SAP project Organisationseinheit
     SyncProjects.changeSelectionOrganisationseinheit(projects_timesheet_id);
 
+	SyncProjects.showSAPProjectStatus(projects_timesheet_id);
+
+	SyncProjects.showSAPProjectDeleted(projects_timesheet_id);
+
 }
 
 // Get FH phases and also, if the project is synchronized, the corresponding SAP project and phases.
@@ -199,6 +212,10 @@ function rowSelected_onFUEProject(row)
 
 	                    // Change Dropdown selection to actual SAP project Organisationseinheit
 	                    SyncProjects.changeSelectionOrganisationseinheit(data.retval.projects_timesheet_id);
+
+	                    SyncProjects.showSAPProjectStatus(data.retval.projects_timesheet_id);
+
+	                    SyncProjects.showSAPProjectDeleted(data.retval.projects_timesheet_id);
 
                         _setGUI_SyncedProjects();
 
@@ -308,8 +325,10 @@ function _resetGUI()
     $("#panel-projects button").attr("disabled", false);
     $("#select-organisationseinheit")
 	    .removeAttr("disabled")
-	    .val('')
+	    .val('null')
 	    .change();
+	$("#sap-project-status").text('-');
+	$("#sap-project-deleted").text('-');
 
     $(PROJECT_MSG).text('');
 	$(PHASES_MSG).text('');
@@ -601,10 +620,7 @@ $("#select-organisationseinheit").change(function(){
 
 var SyncProjects = {
 
-	/**
-	 * Get SAP Project Organisationseinheit and use as Dropdown selection
-	 * @param projects_timesheet_id
-	 */
+	 // Change OE Dropdown selection
 	changeSelectionOrganisationseinheit: function(projects_timesheet_id) {
 		var data = {
 			'projects_timesheet_id': projects_timesheet_id
@@ -627,7 +643,30 @@ var SyncProjects = {
 				}
 			}
 		);
+	},
+
+	// Show SAP project status text
+	showSAPProjectStatus: function(projects_timesheet_id){
+
+		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
+		let status = sap_project_row.getData().status;
+		let status_text = SAP_PROJECT_STATUS_MAP.has(status) ? SAP_PROJECT_STATUS_MAP.get(status) : '-';
+
+		$("#sap-project-status").text(status_text);
+	},
+
+	// Show if SAP project deleted
+	showSAPProjectDeleted: function(projects_timesheet_id){
+
+		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
+		let deleted = sap_project_row.getData().deleted;
+		let deleted_text = (deleted == 'false') ? 'nein' : 'ja';
+
+		$("#sap-project-deleted").text(deleted_text);
 	}
+
+
+
 }
 
 
