@@ -105,6 +105,7 @@ function rowSelected_onSAPProject(row)
     var project_id = row.getData().project_id;
     var projects_timesheet_id = row.getData().projects_timesheet_id;
     var name = row.getData().name;
+    var deleted = row.getData().deleted;
 
     // Reset GUI
     _resetGUI();
@@ -114,6 +115,11 @@ function rowSelected_onSAPProject(row)
 
     // Load SAP phases
     loadSAPPhases(project_id);
+
+    // If SAP project was deleted, disable syncing
+    if (deleted == 'true'){
+	    _setGUI_disabledButtons();
+    }
 
     // If SAP project is synced, get the synced FUE project and FUE phases
     if (is_synced == 'true') {
@@ -312,11 +318,15 @@ function loadFUEPhases(projekt_kurzbz)
 // Set GUI for synchronized projects. (Unable sync button,...)
 function _setGUI_SyncedProjects()
 {
-	$("#panel-projects button").attr("disabled", true);
-	$("#select-organisationseinheit").attr("disabled", 'disabled');
+	_setGUI_disabledButtons();
 
 	$(PROJECT_MSG).text('VERKNÜPFT');
 	$(PROJECT_MSG).removeClass().addClass('text-success');
+}
+
+function _setGUI_disabledButtons(){
+	$("#panel-projects button").attr("disabled", true);
+	$("#select-organisationseinheit").attr("disabled", 'disabled');
 }
 
 // Reset GUI
