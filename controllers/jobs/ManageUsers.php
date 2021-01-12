@@ -91,7 +91,22 @@ class ManageUsers extends JQW_Controller
 			// Log the result
 			if (isError($syncResult))
 			{
-				$this->logError(getCode($syncResult).': '.getError($syncResult));
+				// Save all the errors
+				$errors = getError($syncResult);
+
+				// If it is NOT an array...
+				if (isEmptyArray($errors))
+				{
+					// ...then convert it to an array
+					$errors = array($errors);
+				}
+				// otherwise it is already an array
+
+				// For each error found
+				foreach ($errors as $error)
+				{
+					$this->logError(getCode($syncResult).': '.$error);
+				}
 			}
 			else
 			{
