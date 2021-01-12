@@ -485,6 +485,7 @@ class SyncPaymentsLib
 						$task_id = '';
 						$name = $row_payment->studiengang_kurzbz;
 						$externeReferenz = $row_payment->studiengang_kurzbz;
+
 						if ($row_payment->studiensemester_start < date('Y-m-d'))
 						{
 							// If it is an entry for a old semester set the date to tommorow
@@ -573,6 +574,17 @@ class SyncPaymentsLib
 								),
 								'DataOriginTypeCode' => '4' // E-Commerce
 							)
+						);
+					}
+
+					if($row_payment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
+					{
+						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
+						// andere Zahlungsbedingungen
+						$data['SalesOrder']['mahnsperre'] = '1';
+						$data['SalesOrder']['CashDiscountTerms'] = array(
+							'actionCode' => '01',
+							'Code' => 'z006' // 5 Werktage
 						);
 					}
 
@@ -710,6 +722,11 @@ class SyncPaymentsLib
 				}
 			}
 		}
+		else
+		{
+			$nonBlockingErrorsArray[] = 'Failed to create SalesOrder:'.print_r($manageSalesOrderResult, true);
+		}
+
 		return success($nonBlockingErrorsArray);
 	}
 
