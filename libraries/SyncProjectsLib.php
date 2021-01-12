@@ -1317,6 +1317,7 @@ class SyncProjectsLib
 				s.oe_kurzbz
 			  FROM public.tbl_studiengang s
 			 WHERE s.studiengang_kz < 0
+			 	AND s.aktiv
 		      ORDER BY name
 		');
 
