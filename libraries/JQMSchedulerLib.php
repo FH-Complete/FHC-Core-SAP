@@ -283,6 +283,25 @@ class JQMSchedulerLib
 				)
 				OR
 				EXISTS(SELECT
+					1
+				FROM
+					public.tbl_prestudent
+				WHERE
+					tbl_prestudent.person_id = bk.person_id
+					AND tbl_prestudent.studiengang_kz=10002
+					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+					AND EXISTS(SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
+							AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+					)
+				)
+				OR
+				EXISTS(SELECT
 				1
 				FROM
 					public.tbl_prestudent
@@ -310,4 +329,3 @@ class JQMSchedulerLib
 		return success($jobInput);
 	}
 }
-
