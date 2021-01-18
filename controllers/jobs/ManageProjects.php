@@ -203,6 +203,29 @@ class ManageProjects extends JOB_Controller
 	}
 
 	/**
+	 * Updates and creates projects on SAP side only customs
+	 */
+	public function syncCustomsCustoms($studySemester = null)
+	{
+		$this->logInfo('Start projects custom custom synchronization with SAP ByD');
+
+		// Synchronize projects!
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::CUSTOM_CUSTOM, $studySemester);
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End projects custom custom synchronization with SAP ByD');
+	}
+
+	/**
 	 *
 	 */
 	public function importProjectsDates()
@@ -223,16 +246,6 @@ class ManageProjects extends JOB_Controller
 		}
 
 		$this->logInfo('End projects dates synchronization with SAP ByD');
-	}
-
-	/**
-	 *
-	 */
-	public function mpo()
-	{
-		$mpo = $this->syncprojectslib->mpo();
-
-		var_dump($mpo);
 	}
 }
 

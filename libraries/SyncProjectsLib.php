@@ -21,6 +21,10 @@ class SyncProjectsLib
 	const PROJECT_PERSON_RESPONSIBLE_CUSTOM = 'project_person_responsible_custom';
 	const PROJECT_TYPE_CUSTOM = 'project_type_custom';
 	const PROJECT_CUSTOM_ID_FORMAT = 'project_custom_id_format';
+	const PROJECT_PERSON_RESPONSIBLE_CUSTOM_CUSTOM = 'project_person_responsible_custom_custom';
+	const PROJECT_TYPE_CUSTOM_CUSTOM = 'project_type_custom_custom';
+	const PROJECT_CUSTOM_CUSTOM_ID_FORMAT = 'project_custom_custom_id_format';
+
 	const PROJECT_MANAGE_PURCHASE_ORDER_ENABLED = 'project_manage_purchase_order_enabled';
 
 	// Project types
@@ -50,6 +54,7 @@ class SyncProjectsLib
 	const LEHRE = 'lehre';
 	const LEHRGAENGE = 'lehrgaenge';
 	const CUSTOM = 'custom';
+	const CUSTOM_CUSTOM = 'custom';
 
 	private $_ci; // Code igniter instance
 
@@ -255,6 +260,18 @@ class SyncProjectsLib
 			{
 				// Create custom projects
 				$createResult = $this->_syncCustomProject(
+					$currentOrNextStudySemester,
+					$studySemesterStartDateTS,
+					$studySemesterEndDateTS
+				);
+				if (isError($createResult)) return $createResult;
+			}
+
+			// If it is requested a full sync or only for custom custom
+			if ($type == self::ALL || $type == self::CUSTOM_CUSTOM)
+			{
+				// Create custom custom projects
+				$createResult = $this->_syncCustomCustomProject(
 					$currentOrNextStudySemester,
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS
@@ -2227,7 +2244,7 @@ class SyncProjectsLib
 			}
 
 			// If was not possible to find a valid project object id
-			if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid lehrgaenge project object id');
+			if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid custom project object id');
 
 			// Update project ProjectTaskCollection name
 			$projectName = sprintf('%s %s', $customProject->name, $studySemester);
@@ -2297,6 +2314,187 @@ class SyncProjectsLib
 		}
 
 		return success('Custom projects synchronization ended successfully');
+	}
+
+	/**
+	 *
+	 */
+	private function _syncCustomCustomProject(
+		$studySemester,
+		$studySemesterStartDateTS,
+		$studySemesterEndDateTS
+	)
+	{
+		// Project person responsible
+		$personResponsible = $this->_ci->config->item(self::PROJECT_PERSON_RESPONSIBLE_CUSTOM_CUSTOM);
+		// Project type
+		$type = $this->_ci->config->item(self::PROJECT_TYPE_CUSTOM_CUSTOM);
+
+		$dbModel = new DB_Model();
+
+		// Loads all the custom projects
+		$customResult = $dbModel->execReadOnlyQuery('
+			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
+				UPPER(s0.typ || s0.kurzbz) AS name,
+				(
+					SELECT so.oe_kurzbz_sap
+					  FROM sync.tbl_sap_organisationsstruktur so
+					 WHERE so.oe_kurzbz = \'tlc\'
+				) AS unit_responsible,
+				s0.studiengang_kz
+			  FROM public.tbl_studiengang s0
+			 WHERE s0.studiengang_kz IN(10021, 10027)
+			 UNION
+			SELECT UPPER(s1.typ || s1.kurzbz) AS project_id,
+				UPPER(s1.typ || s1.kurzbz) AS name,
+				(
+					SELECT so.oe_kurzbz_sap
+					  FROM sync.tbl_sap_organisationsstruktur so
+					 WHERE so.oe_kurzbz = \'Auslandsbuero\'
+				) AS unit_responsible,
+				s1.studiengang_kz
+			  FROM public.tbl_studiengang s1
+			 WHERE s1.studiengang_kz IN(10006)
+		');
+
+		// If error occurred while retrieving custom projects from database then return the error
+		if (isError($customResult)) return $customResult;
+		if (!hasData($customResult)) return success('No custom custom projects found in database');
+
+		// For each custom project found in database
+		foreach (getData($customResult) as $customProject)
+		{
+			// Project id
+			$projectId = strtoupper(
+				sprintf(
+					$this->_ci->config->item(self::PROJECT_CUSTOM_CUSTOM_ID_FORMAT),
+					str_replace(' ', '-', $customProject->project_id), // replace blanks with scores
+					$studySemester
+				)
+			);
+
+			// Create the project on ByD
+			$createProjectResult = $this->_ci->ProjectsModel->create(
+				$projectId,
+				$type,
+				$customProject->unit_responsible,
+				$personResponsible,
+				$studySemesterStartDateTS,
+				$studySemesterEndDateTS
+			);
+
+			// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
+			if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+
+			$projectObjectId = null;
+
+			// If the projects is not alredy present it is _not_ needed to sync the database
+			if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+			{
+				// Add entry database into sync table for projects
+				$insertResult = $this->_ci->SAPProjectsCoursesModel->insert(
+					array(
+						'project_id' => $projectId,
+						'project_object_id' => getData($createProjectResult)->ObjectID,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $customProject->studiengang_kz
+					)
+				);
+
+				// If error occurred during insert return database error
+				if (isError($insertResult)) return $insertResult;
+
+				$projectObjectId = getData($createProjectResult)->ObjectID;
+			}
+			else
+			{
+				$projectResult = $this->_ci->SAPProjectsCoursesModel->loadWhere(
+					array(
+						'project_id' => $projectId,
+						'studiensemester_kurzbz' => $studySemester,
+						'studiengang_kz' => $customProject->studiengang_kz
+					)
+				);
+
+				// If an error occurred while getting project info from database return the error itself
+				if (isError($projectResult)) return $projectResult;
+				// If no data found with these parameters
+				if (!hasData($projectResult)) return error($projectId.' project is present in SAP but _not_ in sync.tbl_sap_projects_courses');
+
+				$projectObjectId = getData($projectResult)[0]->project_object_id; // store the project object id
+			}
+
+			// If was not possible to find a valid project object id
+			if (isEmptyString($projectObjectId)) return error('Was _not_ possible to find a valid custom custom project object id');
+
+			// Update project ProjectTaskCollection name
+			$projectName = sprintf('%s %s', $customProject->name, $studySemester);
+			$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
+				$projectObjectId,
+				$projectName
+			);
+
+			// If an error occurred while creating the project on ByD return the error
+			if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+
+			// Set the project as active
+			$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
+
+			// If an error occurred while setting the project as active on ByD
+			// and not because the project was alredy released then return the error
+			if (isError($setActiveResult)
+				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			{
+				return $setActiveResult;
+			}
+
+			// Loads employees for this custom project
+			$customEmployeesResult = $dbModel->execReadOnlyQuery('
+				SELECT lm.mitarbeiter_uid,
+					b.person_id,
+					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
+					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
+					\'0\' AS ma_soll_stunden,
+					\'0\' AS lehre_grobplanung
+				  FROM lehre.tbl_lehreinheitmitarbeiter lm
+				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+				  JOIN public.tbl_studiengang s USING(studiengang_kz)
+				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+				 WHERE l.studiensemester_kurzbz = ?
+				   AND s.studiengang_kz = ?
+			   	   AND m.fixangestellt = TRUE
+				   AND m.personalnummer > 0
+			      GROUP BY lm.mitarbeiter_uid, b.person_id
+			      ORDER BY lm.mitarbeiter_uid
+			', array($studySemester, $customProject->studiengang_kz));
+
+			// If error occurred while retrieving csutom project employee from database then return the error
+			if (isError($customEmployeesResult)) return $customEmployeesResult;
+
+			// If employees are present for this custom project
+			if (hasData($customEmployeesResult))
+			{
+				// For each employee
+				foreach (getData($customEmployeesResult) as $customEmployee)
+				{
+					// Add the employee to this project
+					$addEmployeeResult = $this->_addEmployeeToProject(
+						$customEmployee,
+						$projectObjectId,
+						null, // task object id not present
+						$studySemesterStartDateTS,
+						$studySemesterEndDateTS
+					);
+
+					// If an error occurred then return it
+					if (isError($addEmployeeResult)) return $addEmployeeResult;
+				}
+			}
+		}
+
+		return success('Custom custom projects synchronization ended successfully');
 	}
 
 	/**
@@ -2403,221 +2601,5 @@ class SyncProjectsLib
 		// If here then everything is fine
 		return success('Employee successfully added to this project');
 	}
-
-	public function mpo()
-	{
-		return $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
-			array(
-				'BasicMessageHeader' => array(
-					'UUID' => generateUUID()
-				),
-				'PurchaseOrderMaintainBundle' => array(
-					'actionCode' => '01',
-					'ItemListCompleteTransmissionIndicator' => 'true',
-					'UUID' => generateUUID(),
-					'BusinessTransactionDocumentTypeCode' => '001',
-					'CurrencyCode' => 'EUR',
-					'BillToParty' => array(
-						'actionCode' => '01',
-						'PartyTypeCode' => 154,
-						'PartyKey' => array(
-							'PartyTypeCode' => 200,
-							'PartyID' => '100000'
-						)
-					),
-					'Company' => array(
-						'actionCode' => '01',
-      						'PartyKey' => array(
-							'PartyTypeCode' => 200,
-							'PartyID' => '100000'
-						)
-					),
-					'BuyerParty' => array(
-						'actionCode' => '01',
-						'PartyTypeCode' => 154,
-						'PartyKey' => array(
-							'PartyTypeCode' => 200,
-							'PartyID' => '100000'
-						)
-					),
-					'EmployeeResponsibleParty' => array(
-						'actionCode' => '01',
-						'PartyTypeCode' => 167,
-						'PartyKey' => array(
-							'PartyTypeCode' => 147,
-							'PartyID' => 'BRANDSTA'
-						)
-					),
-					'SellerParty' => array(
-						'actionCode' => '01',
-						'PartyTypeCode' => 266,
-						'PartyKey' => array(
-							'PartyTypeCode' => 147,
-							'PartyID' => '200000'
-						)
-					),
-					'Item' => array(
-						'actionCode' => '01',
-						//'ItemID' => 1,
-						'ItemUUID' => generateUUID(),
-						//'TypeCode' => 19,
-						'Description' => 'Vincenzo Lembo 10005',
-						'Quantity' => array(
-							'unitCode' => 'HUR',
-							'_' => 1
-						),
-						'QuantityTypeCode' => 'HUR',
-						'CostUpperLimitExpectedAmount' => array(
-							'currencyCode' => 'EUR',
-							'_' => 0
-						),
-						'NetAmount' => array(
-							'currencyCode' => 'EUR',
-							'_' => 33
-						),
-						'NetUnitPrice' => array(
-							'Amount' => array(
-								'currencyCode' => 'EUR',
-								'_' => 33
-							),
-							'BaseQuantity' => 1,
-							'BaseQuantityTypeCode' => 'HUR'
-						),
-						'ListUnitPrice' => array(
-							'Amount' => array(
-								'currencyCode' => 'EUR',
-								'_' => 33
-							),
-							'BaseQuantity' => 1,
-							'BaseQuantityTypeCode' => 'HUR'
-						),
-						'FollowUpPurchaseOrderConfirmation' => array(
-							'RequirementCode' => '04'
-						),
-						'FollowUpDelivery' => array(
-							'RequirementCode' => '01',
-							'EmployeeTimeConfirmationRequiredIndicator' => true
-						),
-						'FollowUpInvoice' => array(
-						        'BusinessTransactionDocumentSettlementRelevanceIndicator' => false,
-						        'RequirementCode' => '01',
-						        'EvaluatedReceiptSettlementIndicator' => false,
-							'DeliveryBasedInvoiceVerificationIndicator' => false
-						),
-						//'ShipToLocationAddressHostUUID' => '00163e8c-4600-1eda-b7c7-e302558d2201',
-						'ItemProduct' => array(
-							'actionCode' => '01',
-							'CashDiscountDeductibleIndicator' => false,
-							'ProductCategoryIDKey' => array(
-								'ProductCategoryHierarchyID' => 'ROOT-1',
-								'ProductCategoryInternalID' => '7GMBH'
-							),
-							'ProductKey' => array(
-								'ProductTypeCode' => 2,
-								'ProductIdentifierTypeCode' => 1,
-								'ProductID' => '20000447'
-							)
-						),
-						'ProductRecipientParty' => array(
-							'actionCode' => '01',
-							'PartyKey' => array(
-								'PartyTypeCode' => 147,
-								'PartyID' => 'BISON'
-							)
-						),
-						'ItemAccountingCodingBlockDistribution' => array(
-							'actionCode' => '01',
-							'ValidityDate' => '2020-11-23',
-							'CompanyID' => '100000',
-							//'HostObjectTypeCode' => '001',
-							'TotalAmount' => 33,
-							'TotalQuantity' => array(
-								'unitCode' => 'HUR',
-								'_' => 1
-							),
-							'AccountingCodingBlockAssignment' => array(
-								'Percent' => 100,
-								'Amount' => array(
-									'currencyCode' => 'EUR',
-									'_' => 33
-								),
-								'Quantity' => array(
-									'unitCode' => 'HUR',
-									'_' => 1
-								),
-								'AccountingCodingBlockTypeCode' => 'PRO',
-								'ProjectTaskKey' => array(
-									'TaskID' => 'ADM-MANUALTEST'
-								),
-								'ProjectReference' => array(
-									'ProjectID' => 'ADM-MANUALTEST',
-									'ProjectName' => 'ADM-Manualtest',
-									'ProjectElementID' => 'ADM-MANUALTEST',
-									'ProjectElementName' => 'ADM-Manualtest'
-								),
-								'CompanyID' => '100000'
-							)
-						),
-						'ItemTaxCalculation' => array(
-							'actionCode' => '01',
-							'CountryCode' => 'AT',
-							'TaxationCharacteristicsCode' => array(
-								'listID' => 'AT',
-								'_' => 1
-							),
-							'ItemProductTaxDetails' => array(
-								'UUID' => generateUUID(),
-								'TransactionCurrencyProductTax' => array(
-									'CountryCode' => 'AT',
-									'EventTypeCode' => array(
-										'listID' => 'AT',
-										'_' => 1
-									),
-									'TypeCode' => array(
-										'listID' => 'AT',
-										'_' => 1
-									),
-									'Amount' => array(
-										'currencyCode' => 'EUR',
-										'_' => 0
-									),
-									'InternalAmount' => array(
-										'currencyCode' => 'EUR',
-										'_' => 0
-									),
-									'BaseAmount' => array(
-										'currencyCode' => 'EUR',
-										'_' => 33
-									),
-									'BaseQuantity' => array(
-										'unitCode' => 'HUR',
-										'_' => 1
-									),
-									'DueCategoryCode' => 2,
-									'StatisticRelevanceIndicator' => true
-								)
-							),
-							'ItemTaxationTerms' => array(
-								'actionCode' => '01',
-								'UUID' => generateUUID(),
-								'SellerCountryCode' => 'AT',
-								'SellerTaxID' => 'ATU61910007',
-								'SellerTaxIdentificationNumberTypeCode' => array(
-									'listID' => 'AT',
-									'_' => 1
-								),
-								'BuyerCountryCode' => 'AT',
-								'BuyerTaxID' => 'ATU65565658',
-								'BuyerTaxIdentificationNumberTypeCode' => array(
-									'listID' => 'AT',
-									'_' => 1
-								),
-								'TaxDate' => '2020-11-23'
-							)
-						)
-					)
-				)
-			)
-		);
-	}
 }
+
