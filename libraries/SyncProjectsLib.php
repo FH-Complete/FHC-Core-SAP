@@ -25,7 +25,19 @@ class SyncProjectsLib
 	const PROJECT_TYPE_CUSTOM_CUSTOM = 'project_type_custom_custom';
 	const PROJECT_CUSTOM_CUSTOM_ID_FORMAT = 'project_custom_custom_id_format';
 
+	// Purchase order constants
 	const PROJECT_MANAGE_PURCHASE_ORDER_ENABLED = 'project_manage_purchase_order_enabled';
+	const PROJECT_PURCHASE_ORDER_EMPLOYEE_RESPONSIBLE_FHTW = 'project_purchase_order_employee_responsible_fhtw';
+	const PROJECT_PURCHASE_ORDER_EMPLOYEE_RESPONSIBLE_GMBH = 'project_purchase_order_employee_responsible_gmbh';
+	const PROJECT_PURCHASE_ORDER_BUYER_PARTY_FHTW = 'project_purchase_order_buyer_party_fhtw';
+	const PROJECT_PURCHASE_ORDER_BUYER_PARTY_GMBH = 'project_purchase_order_buyer_party_gmbh';
+	const PROJECT_PURCHASE_ORDER_BILLTO_PARTY_FHTW = 'project_purchase_order_billto_party_fhtw';
+	const PROJECT_PURCHASE_ORDER_BILLTO_PARTY_GMBH = 'project_purchase_order_billto_party_gmbh';
+	const PROJECT_PURCHASE_ORDER_SELLER_PARTY_FHTW = 'project_purchase_order_seller_party_fhtw';
+	const PROJECT_PURCHASE_ORDER_SELLER_PARTY_GMBH = 'project_purchase_order_seller_party_gmbh';
+	const PROJECT_PURCHASE_ORDER_SHIPTO_LOCATION_FHTW = 'project_purchase_order_shipto_location_fhtw';
+	const PROJECT_PURCHASE_ORDER_SHIPTO_LOCATION_GMBH = 'project_purchase_order_shipto_location_gmbh';
+	const PROJECT_PURCHASE_ORDER_RECIPIENT_PARTY = 'project_purchase_order_recipient_party';
 
 	// Project types
 	const ADMIN_FHTW_PROJECT = 'admin_fhtw';
@@ -55,6 +67,8 @@ class SyncProjectsLib
 	const LEHRGAENGE = 'lehrgaenge';
 	const CUSTOM = 'custom';
 	const CUSTOM_CUSTOM = 'custom';
+
+	const GMBH_OU = 'gmbh'; // gmbh organization unit
 
 	private $_ci; // Code igniter instance
 
@@ -231,7 +245,9 @@ class SyncProjectsLib
 					$projectPersonResponsibles,
 					$projectTypes,
 					$studySemesterStartDateTS,
-					$studySemesterEndDateTS
+					$studySemesterEndDateTS,
+					$studySemesterStartDate,
+					$studySemesterEndDate
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -1175,7 +1191,9 @@ class SyncProjectsLib
 		$projectPersonResponsibles,
 		$projectTypes,
 		$studySemesterStartDateTS,
-		$studySemesterEndDateTS
+		$studySemesterEndDateTS,
+		$studySemesterStartDate,
+		$studySemesterEndDate
 	)
 	{
 		$projectId = strtoupper(sprintf($projectIdFormats[self::LEHRE_PROJECT], $studySemester)); // project id
@@ -1265,18 +1283,20 @@ class SyncProjectsLib
 				(SUM(lm.semesterstunden) * 1.5) AS planned_work,
 				(SUM(lm.semesterstunden) * 1.5) AS commited_work,
 				\'0\' AS ma_soll_stunden,
-				\'0\' AS lehre_grobplanung
+				\'0\' AS lehre_grobplanung,
+				bf.oe_kurzbz
 			  FROM lehre.tbl_lehreinheitmitarbeiter lm
 			  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
 			  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
 			  JOIN public.tbl_studiengang s USING(studiengang_kz)
 			  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
 			  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+			  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 			 WHERE l.studiensemester_kurzbz = ?
 			   AND s.typ IN (\'b\', \'m\')
 			   AND m.fixangestellt = TRUE
 			   AND m.personalnummer > 0
-		      GROUP BY lm.mitarbeiter_uid, b.person_id
+		      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
 		', array($studySemester));
 
 		// If error occurred while retrieving teachers from database then return the error
@@ -1299,6 +1319,27 @@ class SyncProjectsLib
 
 				// If an error occurred then return it
 				if (isError($addEmployeeResult)) return $addEmployeeResult;
+
+				// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
+				if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+				{
+					// Create the course object
+					$course = new stdClass();
+					$course->name = $projectName;
+					$course->oe_kurzbz = self::GMBH_OU;
+
+					$purchaseOrder = $this->_purchaseOrderLH(
+						$lehreEmployee,
+						$course,
+						$studySemesterStartDate,
+						$studySemesterEndDate,
+						$projectId,
+						$projectName
+					);
+
+					// If error occurred then return the error
+					if (isError($purchaseOrder)) return $purchaseOrder;
+				}
 			}
 		}
 
@@ -1317,8 +1358,8 @@ class SyncProjectsLib
 		$projectTypes,
 		$studySemesterStartDateTS,
 		$studySemesterEndDateTS,
-		$studySemesterEndDate,
-		$studySemesterStartDate
+		$studySemesterStartDate,
+		$studySemesterEndDate
 	)
 	{
 		$type = $projectTypes[self::LEHRGAENGE_PROJECT]; // Project type
@@ -1488,7 +1529,14 @@ class SyncProjectsLib
 					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
 					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
-						$purchaseOrder = $this->_purchaseOrder($courseEmployee, $course);
+						$purchaseOrder = $this->_purchaseOrderLG(
+							$courseEmployee,
+							$course,
+							$studySemesterStartDate,
+							$studySemesterEndDate,
+							$projectId,
+							$projectName
+						);
 
 						// If error occurred then return the error
 						if (isError($purchaseOrder)) return $purchaseOrder;
@@ -1501,9 +1549,64 @@ class SyncProjectsLib
 	}
 
 	/**
+	 * Purchase order for lehrgaenge
+	 */
+	private function _purchaseOrderLG($courseEmployee, $course, $studySemesterStartDate, $studySemesterEndDate, $projectId, $projectName)
+	{
+		return $this->_purchaseOrder(
+			$courseEmployee,
+			$course,
+			$studySemesterStartDate,
+			$studySemesterEndDate,
+			$projectId,
+			$projectName,
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_BUYER_PARTY_GMBH),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_BILLTO_PARTY_GMBH),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_SELLER_PARTY_FHTW),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_EMPLOYEE_RESPONSIBLE_FHTW),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_SHIPTO_LOCATION_FHTW),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_RECIPIENT_PARTY)
+		);
+	}
+
+	/**
+	 * Purchase order for lehre
+	 */
+	private function _purchaseOrderLH($courseEmployee, $course, $studySemesterStartDate, $studySemesterEndDate, $projectId, $projectName)
+	{
+		return $this->_purchaseOrder(
+			$courseEmployee,
+			$course,
+			$studySemesterStartDate,
+			$studySemesterEndDate,
+			$projectId,
+			$projectName,
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_BUYER_PARTY_FHTW),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_BILLTO_PARTY_FHTW),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_SELLER_PARTY_GMBH),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_EMPLOYEE_RESPONSIBLE_GMBH),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_SHIPTO_LOCATION_GMBH),
+			$this->_ci->config->item(self::PROJECT_PURCHASE_ORDER_RECIPIENT_PARTY)
+		);
+	}
+
+	/**
 	 *
 	 */
-	private function _purchaseOrder($courseEmployee, $course)
+	private function _purchaseOrder(
+		$courseEmployee,
+		$course,
+		$studySemesterStartDate,
+		$studySemesterEndDate,
+		$projectId,
+		$projectName,
+		$purchaseOrderBuyerParty,
+		$purchaseOrderBillTo,
+		$purchaseOrderSellerParty,
+		$purchaseOrderEmployeeResponsible,
+		$purchaseOrderShiptoLocation,
+		$purchaseOrderRecipientParty
+	)
 	{
 		// Get the root organization unit for the employee
 		$employeeOURootResult = $this->_ci->MessageTokenModel->getOERoot($courseEmployee->oe_kurzbz);
@@ -1516,6 +1619,20 @@ class SyncProjectsLib
 
 		// If an error occurred then return it
 		if (isError($courseOURootResult)) return $courseOURootResult;
+
+		// Get the service id for this employee
+		$serviceResult = $this->_ci->SAPServicesModel->loadWhere(array('person_id' => $courseEmployee->person_id));
+
+		// If an error occurred then return it
+		if (isError($serviceResult)) return $serviceResult;
+
+		// Load the SAP eeid from the sync table
+		$sapEeidResult = $this->_ci->SAPMitarbeiterModel->loadWhere(
+			array('mitarbeiter_uid' => $courseEmployee->mitarbeiter_uid
+		));
+
+		// If an error occurred return it
+		if (isError($sapEeidResult)) return $sapEeidResult;
 
 		// If no root organization unit found for the employee
 		if (!hasData($employeeOURootResult))
@@ -1537,6 +1654,26 @@ class SyncProjectsLib
 				);
 			}
 		}
+		// If no service was found for the employee
+		elseif (!hasData($serviceResult))
+		{
+			if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'No service found for employee: '.$courseEmployee->person_id
+				);
+			}
+		}
+		// If no eeid was found for the employee
+		elseif (!hasData($sapEeidResult))
+		{
+			if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'No eeid found for employee: '.$courseEmployee->mitarbeiter_uid
+				);
+			}
+		}
 		else // otherwise
 		{
 			// Employee root organization unit
@@ -1545,13 +1682,151 @@ class SyncProjectsLib
 			// Course root organization unit
 			$courseOURoot = getData($courseOURootResult)[0]->oe_kurzbz;
 
+			// Startdate by default is the study semester start date
+			$startDate = $studySemesterStartDate;
+			// If the study semester start date is in the past
+			if ($studySemesterStartDate <= date('Y-m-d'))
+			{
+				$datetime = new DateTime('tomorrow');
+				$startDate = $datetime->format('Y-m-d');
+			}
+
 			// If the employee belongs to an organization other than that of the project
 			if ($employeeOURoot != $courseOURoot)
 			{
+				// Service id
+				$serviceId = getData($serviceResult)[0]->sap_service_id;
+
+				// Eeid 
+				$eeid = getData($sapEeidResult)[0]->sap_eeid;
+
 				// Place the purchase order
 				$purchaseOrder = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
 					array(
-						// Data
+						'BasicMessageHeader' => array(
+							'UUID' => generateUUID()
+						),
+						'PurchaseOrderMaintainBundle' => array(
+							'actionCode' => '01',
+							'ItemListCompleteTransmissionIndicator' => true,
+							'BusinessTransactionDocumentTypeCode' => '001',
+							'CurrencyCode' => 'EUR',
+							'BuyerParty' => array(
+								'actionCode' => '01',
+								'PartyKey' => array(
+									'PartyID' => $purchaseOrderBuyerParty
+								)
+							),
+							'BillToParty' => array(
+								'actionCode' => '01',
+								'PartyKey' => array(
+									'PartyID' => $purchaseOrderBillTo
+								)
+							),
+							'SellerParty' => array(
+								'actionCode' => '01',
+								'PartyKey' => array(
+									'PartyID' => $purchaseOrderSellerParty
+								)
+							),
+							'EmployeeResponsibleParty' => array(
+								'PartyKey' => array(
+									'PartyID' => $purchaseOrderEmployeeResponsible
+								)
+							),
+							'Item' => array(
+								'actionCode' => '01',
+								'ItemImatListCompleteTransmissionIndicator' => true,
+								'ItemID' => 1,
+								'Quantity' => array(
+									'unitCode' => 'HUR',
+									'_' => $courseEmployee->planned_work
+								),
+								'QuantityTypeCode' => 'TIME',
+								'FollowUpPurchaseOrderConfirmation' => array(
+									'RequirementCode' => '04'
+								),
+								'FollowUpDelivery' => array(
+									'RequirementCode' => '01',
+									'EmployeeTimeConfirmationRequiredIndicator' => true
+								),
+								'FollowUpInvoice' => array(
+									'BusinessTransactionDocumentSettlementRelevanceIndicator' => true,
+									'RequirementCode' => '01',
+									'EvaluatedReceiptSettlementIndicator' => false,
+									'DeliveryBasedInvoiceVerificationIndicator' => false
+								),
+								'ItemProduct' => array(
+									'CashDiscountDeductibleIndicator' => false,
+									'ProductKey' => array(
+										'ProductTypeCode' => 2,
+										'ProductIdentifierTypeCode' => 1,
+										'ProductID' => $serviceId
+									)
+								),
+								'ShipToLocation' => array(
+									'LocationID' => $purchaseOrderShiptoLocation
+								),
+								'ProductRecipientParty' => array(
+									'actionCode' => '01',
+									'PartyKey' => array(
+										'PartyID' => $purchaseOrderRecipientParty
+									)
+								),
+								'ServicePerformerParty' => array(
+									'actionCode' => '01',
+									'PartyKey' => array(
+										'PartyID' => $eeid
+									)
+								),
+								'ItemAccountingCodingBlockDistribution' => array(
+									'actionCode' => '01',
+									'AccountingCodingBlockAssignmentListCompleteTransmissionIndicator' => true,
+									'CompanyID' => $purchaseOrderBuyerParty,
+									'HostObjectTypeCode' => '001',
+									'TotalQuantity' => array(
+										'unitCode' => 'HUR',
+										'_' => $courseEmployee->planned_work
+									),
+									'AccountingCodingBlockAssignment' => array(
+										'CompanyID' => $purchaseOrderBuyerParty,
+										'Percent' => 100.0,
+										'Quantity' => array(
+											'unitCode' => 'HUR',
+											'_' => $courseEmployee->planned_work
+										),
+										'AccountingCodingBlockTypeCode' => 'PRO',
+										'ProjectTaskKey' => array(
+											'TaskID' => $projectId
+										),
+										'ProjectReference' => array(
+											'ProjectID' => $projectId,
+											'ProjectName' => $projectName,
+											'ProjectElementID' => $projectId,
+											'ProjectElementName' => $projectName
+										)
+									)
+								),
+								'ItemScheduleLine' => array(
+									'actionCode' => '01',
+									'ItemScheduleLineID' => 1,
+									'DeliveryPeriod' => array(
+										'StartDateTime' => array(
+											'timeZoneCode' => 'CET',
+											'_' => $startDate.'T00:00:00Z'
+										),
+										'EndDateTime' => array(
+											'timeZoneCode' => 'CET',
+											'_' => $studySemesterEndDate.'T00:00:00Z'
+										)
+									),
+									'Quantity' => array(
+										'unitCode' => 'HUR',
+										'_' => $courseEmployee->planned_work
+									)
+								)
+							)
+						)
 					)
 				);
 
