@@ -486,9 +486,12 @@ class SyncPaymentsLib
 						$name = $row_payment->studiengang_kurzbz;
 						$externeReferenz = $row_payment->studiengang_kurzbz;
 
-						if ($row_payment->studiensemester_start < date('Y-m-d'))
+						if ($row_payment->studiensemester_start < date('Y-m-d')
+						|| $row_payment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 						{
 							// If it is an entry for a old semester set the date to tommorow
+							// Also correct the Date for Type "StudiengebuehrAnzahlung" otherwise the
+							// payment would be to far in the future
 							$date = new DateTime();
 							$date->modify('+1 day');
 							$wunschtermin = $date->format('Y-m-d').'T00:00:00Z';
