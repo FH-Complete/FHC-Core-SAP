@@ -21,9 +21,10 @@ class SyncProjectsLib
 	const PROJECT_PERSON_RESPONSIBLE_CUSTOM = 'project_person_responsible_custom';
 	const PROJECT_TYPE_CUSTOM = 'project_type_custom';
 	const PROJECT_CUSTOM_ID_FORMAT = 'project_custom_id_format';
-	const PROJECT_PERSON_RESPONSIBLE_CUSTOM_CUSTOM = 'project_person_responsible_custom_custom';
-	const PROJECT_TYPE_CUSTOM_CUSTOM = 'project_type_custom_custom';
-	const PROJECT_CUSTOM_CUSTOM_ID_FORMAT = 'project_custom_custom_id_format';
+	const PROJECT_PERSON_RESPONSIBLE_GMBH_CUSTOM = 'project_person_responsible_gmbh_custom';
+	const PROJECT_TYPE_GMBH_CUSTOM = 'project_type_gmbh_custom';
+	const PROJECT_GMBH_CUSTOM_ID_FORMAT = 'project_gmbh_custom_id_format';
+	const PROJECT_GMBH_CUSTOM_ID_LIST = 'project_gmbh_custom_id_list';
 
 	// Purchase order constants
 	const PROJECT_MANAGE_PURCHASE_ORDER_ENABLED = 'project_manage_purchase_order_enabled';
@@ -66,7 +67,7 @@ class SyncProjectsLib
 	const LEHRE = 'lehre';
 	const LEHRGAENGE = 'lehrgaenge';
 	const CUSTOM = 'custom';
-	const CUSTOM_CUSTOM = 'custom';
+	const GMBH_CUSTOM = 'gmbhcustom';
 
 	const GMBH_OU = 'gmbh'; // gmbh organization unit
 
@@ -284,10 +285,10 @@ class SyncProjectsLib
 			}
 
 			// If it is requested a full sync or only for custom custom
-			if ($type == self::ALL || $type == self::CUSTOM_CUSTOM)
+			if ($type == self::ALL || $type == self::GMBH_CUSTOM)
 			{
 				// Create custom custom projects
-				$createResult = $this->_syncCustomCustomProject(
+				$createResult = $this->_syncGmbhCustomProject(
 					$currentOrNextStudySemester,
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS
@@ -1697,7 +1698,7 @@ class SyncProjectsLib
 				// Service id
 				$serviceId = getData($serviceResult)[0]->sap_service_id;
 
-				// Eeid 
+				// Eeid
 				$eeid = getData($sapEeidResult)[0]->sap_eeid;
 
 				// Place the purchase order
@@ -2594,16 +2595,16 @@ class SyncProjectsLib
 	/**
 	 *
 	 */
-	private function _syncCustomCustomProject(
+	private function _syncGmbhCustomProject(
 		$studySemester,
 		$studySemesterStartDateTS,
 		$studySemesterEndDateTS
 	)
 	{
 		// Project person responsible
-		$personResponsible = $this->_ci->config->item(self::PROJECT_PERSON_RESPONSIBLE_CUSTOM_CUSTOM);
+		$personResponsible = $this->_ci->config->item(self::PROJECT_PERSON_RESPONSIBLE_GMBH_CUSTOM);
 		// Project type
-		$type = $this->_ci->config->item(self::PROJECT_TYPE_CUSTOM_CUSTOM);
+		$type = $this->_ci->config->item(self::PROJECT_TYPE_GMBH_CUSTOM);
 
 		$dbModel = new DB_Model();
 
@@ -2611,26 +2612,12 @@ class SyncProjectsLib
 		$customResult = $dbModel->execReadOnlyQuery('
 			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
 				UPPER(s0.typ || s0.kurzbz) AS name,
-				(
-					SELECT so.oe_kurzbz_sap
-					  FROM sync.tbl_sap_organisationsstruktur so
-					 WHERE so.oe_kurzbz = \'tlc\'
-				) AS unit_responsible,
+				200000 AS unit_responsible,
 				s0.studiengang_kz
 			  FROM public.tbl_studiengang s0
-			 WHERE s0.studiengang_kz IN(10021, 10027)
-			 UNION
-			SELECT UPPER(s1.typ || s1.kurzbz) AS project_id,
-				UPPER(s1.typ || s1.kurzbz) AS name,
-				(
-					SELECT so.oe_kurzbz_sap
-					  FROM sync.tbl_sap_organisationsstruktur so
-					 WHERE so.oe_kurzbz = \'Auslandsbuero\'
-				) AS unit_responsible,
-				s1.studiengang_kz
-			  FROM public.tbl_studiengang s1
-			 WHERE s1.studiengang_kz IN(10006)
-		');
+			 WHERE s0.studiengang_kz IN ?
+		', array($this->_ci->config->item(self::PROJECT_GMBH_CUSTOM_ID_LIST))
+		);
 
 		// If error occurred while retrieving custom projects from database then return the error
 		if (isError($customResult)) return $customResult;
@@ -2642,7 +2629,7 @@ class SyncProjectsLib
 			// Project id
 			$projectId = strtoupper(
 				sprintf(
-					$this->_ci->config->item(self::PROJECT_CUSTOM_CUSTOM_ID_FORMAT),
+					$this->_ci->config->item(self::PROJECT_GMBH_CUSTOM_ID_FORMAT),
 					str_replace(' ', '-', $customProject->project_id), // replace blanks with scores
 					$studySemester
 				)
@@ -2877,4 +2864,3 @@ class SyncProjectsLib
 		return success('Employee successfully added to this project');
 	}
 }
-

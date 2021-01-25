@@ -36,6 +36,7 @@ class SyncPaymentsLib
 		// Loads Payment configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -512,7 +513,9 @@ class SyncPaymentsLib
 							}
 
 							// Speziallehrgänge die in der FH sind statt in der GMBH!
-							if ($row_payment->studiengang_kz < 0)
+							if ($row_payment->studiengang_kz < 0
+							 || in_array($row_payment->studiengang_kz, $this->_ci->config->item('project_gmbh_custom_id_list'))
+							)
 							{
 								// Lehrgaenge
 								$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];
