@@ -640,7 +640,7 @@ class SyncUsersLib
 		$dbModel = new DB_Model();
 
 		$dbUsersPersonalData = $dbModel->execReadOnlyQuery('
-			SELECT p.person_id,
+			SELECT distinct p.person_id,
 				p.nachname AS surname,
 				p.vorname AS name,
 				p.anrede AS title,
