@@ -397,29 +397,41 @@ class SyncPaymentsLib
 		{
 			$openPayments = getData($openPaymentsResult);
 
-			foreach ($openPayments as $row)
+			if(is_array($openPayments))
 			{
-				echo "Check SO: $row->sap_sales_order_id ";
-				$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
-				if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
+				foreach ($openPayments as $row)
 				{
-					echo " -> Paid";
-					// paid
-					$this->_ci->KontoModel->setPaid($row->buchungsnr);
-				}
-				else
-				{
-					if(isError($isPaidResult))
+					echo "\nCheck SO: $row->sap_sales_order_id ";
+					$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
+					if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
 					{
-						echo "Error: ".print_r($isPaidResult, true);
+						echo " -> Paid ";
+						// paid
+						$this->_ci->KontoModel->setPaid($row->buchungsnr);
 					}
 					else
 					{
-						echo " -> not Paid";
-						// not paid yet
+						if(isError($isPaidResult))
+						{
+							echo "Error: ".print_r($isPaidResult, true);
+						}
+						else
+						{
+							echo " -> not Paid";
+							// not paid yet
+						}
 					}
+
+					// set last check timestamp
+					$this->_ci->SAPSalesOrderModel->update(
+						array($row->buchungsnr),
+						array(
+							'lastcheck' => 'NOW()',
+						)
+					);
 				}
 			}
+			// else nothing to check
 		}
 		else
 		{
