@@ -1962,7 +1962,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -2242,7 +2242,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz = \'oezuordnung\'
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
