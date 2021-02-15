@@ -36,6 +36,7 @@ class SyncPaymentsLib
 		// Loads Payment configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -396,29 +397,41 @@ class SyncPaymentsLib
 		{
 			$openPayments = getData($openPaymentsResult);
 
-			foreach ($openPayments as $row)
+			if(is_array($openPayments))
 			{
-				echo "Check SO: $row->sap_sales_order_id ";
-				$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
-				if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
+				foreach ($openPayments as $row)
 				{
-					echo " -> Paid";
-					// paid
-					$this->_ci->KontoModel->setPaid($row->buchungsnr);
-				}
-				else
-				{
-					if(isError($isPaidResult))
+					echo "\nCheck SO: $row->sap_sales_order_id ";
+					$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
+					if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
 					{
-						echo "Error: ".print_r($isPaidResult, true);
+						echo " -> Paid ";
+						// paid
+						$this->_ci->KontoModel->setPaid($row->buchungsnr);
 					}
 					else
 					{
-						echo " -> not Paid";
-						// not paid yet
+						if(isError($isPaidResult))
+						{
+							echo "Error: ".print_r($isPaidResult, true);
+						}
+						else
+						{
+							echo " -> not Paid";
+							// not paid yet
+						}
 					}
+
+					// set last check timestamp
+					$this->_ci->SAPSalesOrderModel->update(
+						array($row->buchungsnr),
+						array(
+							'lastcheck' => 'NOW()',
+						)
+					);
 				}
 			}
+			// else nothing to check
 		}
 		else
 		{
@@ -516,7 +529,9 @@ class SyncPaymentsLib
 							}
 
 							// Speziallehrgänge die in der FH sind statt in der GMBH!
-							if ($row_payment->studiengang_kz < 0)
+							if ($row_payment->studiengang_kz < 0
+							 || in_array($row_payment->studiengang_kz, $this->_ci->config->item('project_gmbh_custom_id_list'))
+							)
 							{
 								// Lehrgaenge
 								$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['gmbh'];

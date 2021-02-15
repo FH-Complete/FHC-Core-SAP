@@ -27,8 +27,10 @@ class SAPSalesOrder_model extends DB_Model
 						FROM public.tbl_konto
 						WHERE buchungsnr_verweis=tbl_sap_salesorder.buchungsnr
 					),0)
-				ORDER BY sap_user_id desc, sap_sales_order_id desc
+				ORDER BY lastcheck asc, sap_user_id desc, sap_sales_order_id desc
+				LIMIT 200
 			";
+		//AND lastcheck<=now()-'8 hours'::interval
 
 		$params = array();
 		return $this->execQuery($qry, $params);

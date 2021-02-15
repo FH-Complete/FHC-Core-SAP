@@ -14,6 +14,12 @@ $config['project_id_formats'] = array(
 // Custom projects id format
 $config['project_custom_id_format'] = '%s-%s';
 
+// GMBH Custom Projects Degree Programm ID List
+$config['project_gmbh_custom_id_list'] = array(10021, 10027);
+
+// GMBH custom projects id format
+$config['project_gmbh_custom_id_format'] = '%s-%s';
+
 // Project name formats for each study semester (required)
 $config['project_name_formats'] = array(
 	'admin_fhtw' => 'Admin FHTW %s',		// admin project
@@ -57,6 +63,9 @@ $config['project_person_responsibles'] = array(
 // Project person responsible for custom projects (required)
 $config['project_person_responsible_custom'] = '9';
 
+// Project person responsible for gmbh custom projects (required)
+$config['project_person_responsible_gmbh_custom'] = '9';
+
 // Project types (required)
 $config['project_types'] = array(
 	'admin_fhtw' => 'Z7',	// admin project type
@@ -68,6 +77,31 @@ $config['project_types'] = array(
 // Project type for custom projects (required)
 $config['project_type_custom'] = 'Z3';
 
+// Project type for gmbh custom projects (required)
+$config['project_type_gmbh_custom'] = 'Z2';
+
 // Enable/disable API call ManagePurchaseOrderIn if it is the case
 $config['project_manage_purchase_order_enabled'] = false;
 
+// Purchase order employee responsibles
+$config['project_purchase_order_employee_responsible_fhtw'] = 'BRANDSTA';
+$config['project_purchase_order_employee_responsible_gmbh'] = 'WIRTHS';
+
+// Purchase order buyer parties
+$config['project_purchase_order_buyer_party_fhtw'] = '100000';
+$config['project_purchase_order_buyer_party_gmbh'] = '200000';
+
+// Purchase order buyer parties
+$config['project_purchase_order_billto_party_fhtw'] = '100000';
+$config['project_purchase_order_billto_party_gmbh'] = '200000';
+
+// Purchase order seller parties
+$config['project_purchase_order_seller_party_fhtw'] = '100000';
+$config['project_purchase_order_seller_party_gmbh'] = '200000';
+
+// Purchase order ship to location
+$config['project_purchase_order_shipto_location_fhtw'] = '100200';
+$config['project_purchase_order_shipto_location_gmbh'] = '200000';
+
+// Purchase order recipient party
+$config['project_purchase_order_recipient_party'] = 'GABRIELE';
