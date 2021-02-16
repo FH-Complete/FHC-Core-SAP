@@ -15,6 +15,12 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
+	// Maximum amount of users to be placed in a single job
+	const UPDATE_LENGTH = 200;
+
+	// Update time interval
+	const UPDATE_TIME_INTERVAL = '24 hours';
+
 	/**
 	 * Object initialization
 	 */
@@ -131,8 +137,6 @@ class JQMSchedulerLib
 	 */
 	public function updateUsers()
 	{
-		$jobInput = null;
-
 		$persons = array();
 		$contacts = array();
 		$addresses = array();
@@ -146,7 +150,7 @@ class JQMSchedulerLib
 		$personResult = $dbModel->execReadOnlyQuery('
 			SELECT p.person_id
 			  FROM public.tbl_person p
-			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \'24 hours\'
+			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -163,9 +167,9 @@ class JQMSchedulerLib
 			SELECT ps.person_id
 			  FROM public.tbl_prestudent ps
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
-			 WHERE NOW() - pss.insertamum::timestamptz <= INTERVAL \'24 hours\'
-			    OR NOW() - pss.updateamum::timestamptz <= INTERVAL \'24 hours\'
-			    OR NOW() - pss.datum::timestamptz <= INTERVAL \'24 hours\'
+			 WHERE NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			    OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			    OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
 		      GROUP BY ps.person_id
 		');
 
@@ -181,7 +185,7 @@ class JQMSchedulerLib
 		$contactsResult = $dbModel->execReadOnlyQuery('
 			SELECT k.person_id
 			  FROM public.tbl_kontakt k
-			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \'24 hours\'
+			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
 		      GROUP BY k.person_id
 		');
 
@@ -197,7 +201,7 @@ class JQMSchedulerLib
 		$addressesResult = $dbModel->execReadOnlyQuery('
 			SELECT a.person_id
 			  FROM public.tbl_adresse a
-			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \'24 hours\'
+			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
 		      GROUP BY a.person_id
 		');
 
@@ -207,9 +211,8 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
-		$jobInput = json_encode(array_merge($persons, $contacts, $addresses, $prestudents));
-
-		return success($jobInput);
+		// Return a success that contains all the arrays merged together
+		return success(array_merge($persons, $contacts, $addresses, $prestudents));
 	}
 
 	/**

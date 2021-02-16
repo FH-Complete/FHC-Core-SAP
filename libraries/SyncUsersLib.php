@@ -531,7 +531,19 @@ class SyncUsersLib
 				// If data structure is ok...
 				if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
 				{
-					// Everything is fine!
+					// Store in database the date of the update
+					$update = $this->_ci->SAPStudentsModel->update(
+						array(
+							'person_id' => $userData->person_id,
+							'sap_user_id' => $manageCustomer->Customer->InternalID
+						),
+						array(
+							'last_update' => 'NOW()'
+						)
+					);
+
+					// If database error occurred then return it
+					if (isError($update)) return $update;
 				}
 				else // ...otherwise store a non blocking error and continue with the next user
 				{
@@ -640,15 +652,13 @@ class SyncUsersLib
 		$dbModel = new DB_Model();
 
 		$dbUsersPersonalData = $dbModel->execReadOnlyQuery('
-			SELECT distinct p.person_id,
+			SELECT DISTINCT p.person_id,
 				p.nachname AS surname,
 				p.vorname AS name,
 				p.anrede AS title,
-				s.locale AS language,
+				p.sprache AS language,
 				p.geschlecht AS gender
 			  FROM public.tbl_person p
-		     LEFT JOIN public.tbl_sprache s USING(sprache)
-		     LEFT JOIN public.tbl_prestudent ps USING(person_id)
 			 WHERE p.person_id IN ?
 		', array(
 			getData($users)
@@ -686,11 +696,13 @@ class SyncUsersLib
 
 			// -------------------------------------------------------------------------------------------
 			// Language
+
+			// If the language is english then store the iso code
 			if ($userPersonalData->language == self::ENGLISH_LANGUAGE)
 			{
 				$userPersonalData->language = self::ENGLISH_LANGUAGE_ISO;
 			}
-			else
+			else // otherwise for any other language use the default iso code
 			{
 				$userPersonalData->language = self::DEFAULT_LANGUAGE_ISO;
 			}
@@ -828,9 +840,9 @@ class SyncUsersLib
 					JOIN public.tbl_student USING(prestudent_id)
 					JOIN public.tbl_benutzer ON(uid=student_uid)
 					JOIN public.tbl_prestudentstatus USING(prestudent_id)
-					JOIN public.tbl_studiengang ON(tbl_prestudent.studiengang_kz=tbl_studiengang.studiengang_kz)
+					JOIN public.tbl_studiengang ON(tbl_prestudent.studiengang_kz = tbl_studiengang.studiengang_kz)
 				WHERE
-					tbl_prestudent.person_id=?
+					tbl_prestudent.person_id = ?
 					AND tbl_benutzer.aktiv
 					AND tbl_studiengang.oe_kurzbz NOT IN ?
 				ORDER BY
