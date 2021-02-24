@@ -15,6 +15,8 @@ class SyncPaymentsLib
 	const BUCHUNGSDATUM_SYNC_START = '2019-09-01';
 
 	private $_ci; // Code igniter instance
+	private $_isInvoiceClearedCache; // Cache Invoice Status Results
+	private $_getInvoiceIDFromSalesOrderCache; /// Cache Sales Order results
 
 	/**
 	 * Object initialization
@@ -50,47 +52,64 @@ class SyncPaymentsLib
 	 */
 	public function isSalesOrderPaid($salesOrderId, $studentId)
 	{
-		// Get Invoices for Sales Order
-		$invoiceResult = $this->_getInvoiceIDFromSalesOrder($salesOrderId);
-
-		if (isSuccess($invoiceResult))
+		$id_arr = '';
+		// Take results from cache if available
+		if (isset($this->_getInvoiceIDFromSalesOrderCache[$salesOrderId]))
 		{
-			if (hasData($invoiceResult))
-			{
-				// If there are Invoices, check if there are open amounts for this invoices
-				$id_arr = getData($invoiceResult);
-				foreach ($id_arr as $invoiceId)
-				{
-					// if there are open Amounts, its not cleared
-					$isInvoiceClearedResult = $this->_isInvoiceCleared($studentId, $invoiceId);
-					if (isSuccess($isInvoiceClearedResult))
-					{
-						if (!$isInvoiceClearedResult->retval)
-						{
-							echo "Offene Posten für Rechnung $invoiceId gefunden -> Nicht bezahlt";
-							return success(false);
-						}
-					}
-					else
-					{
-						return error('Invoice Clearance check failed');
-					}
-				}
-
-				// PAID
-				// If all invoices are cleared the SalesOrder is paid
-				return success(true);
-			}
-			else
-			{
-				// If no Invoice is available its not paid;
-				echo "Keine Rechnung gefunden -> nicht bezahlt";
-				return success(false);
-			}
+			$id_arr = $this->_getInvoiceIDFromSalesOrderCache[$salesOrderId];
 		}
 		else
 		{
-			return error("Failed to get Invoices for SalesOrder".print_r($invoiceResult,true));
+			// Get Invoices for Sales Order
+			$invoiceResult = $this->_getInvoiceIDFromSalesOrder($salesOrderId);
+
+			if (isSuccess($invoiceResult))
+			{
+				if (hasData($invoiceResult))
+				{
+					$id_arr = getData($invoiceResult);
+					// Add Data to cache for later usage
+					$this->_getInvoiceIDFromSalesOrderCache[$salesOrderId] = $id_arr;
+				}
+				else
+					$this->_getInvoiceIDFromSalesOrderCache[$salesOrderId] = '';
+			}
+			else
+			{
+				return error("Failed to get Invoices for SalesOrder".print_r($invoiceResult,true));
+			}
+		}
+
+		if(is_array($id_arr))
+		{
+			// If there are Invoices, check if there are open amounts for this invoices
+			foreach ($id_arr as $invoiceId)
+			{
+				// if there are open Amounts, its not cleared
+				$isInvoiceClearedResult = $this->_isInvoiceCleared($studentId, $invoiceId);
+				if (isSuccess($isInvoiceClearedResult))
+				{
+					if (!$isInvoiceClearedResult->retval)
+					{
+						echo "Offene Posten für Rechnung $invoiceId gefunden -> Nicht bezahlt";
+						return success(false);
+					}
+				}
+				else
+				{
+					return error('Invoice Clearance check failed');
+				}
+			}
+
+			// PAID
+			// If all invoices are cleared the SalesOrder is paid
+			return success(true);
+		}
+		else
+		{
+			// If no Invoice is available its not paid;
+			echo "Keine Rechnung gefunden -> nicht bezahlt";
+			return success(false);
 		}
 
 		return error("isSalesOrderPaid in SyncPaymentsLib exited unexpected");
@@ -104,6 +123,13 @@ class SyncPaymentsLib
 	 */
 	private function _isInvoiceCleared($studentId, $invoiceId)
 	{
+		// If we already checked this combination - return the cached results
+		if (isset($this->_isInvoiceClearedCache[$studentId])
+		 && isset($this->_isInvoiceClearedCache[$studentId][$invoiceId]))
+		{
+			return success($this->_isInvoiceClearedCache[$studentId][$invoiceId]);
+		}
+
 		$companyIds = array();
 		$companyIds[] = $this->_ci->config->item('users_payment_company_ids')['fhtw'];
 		$companyIds[] = $this->_ci->config->item('users_payment_company_ids')['gmbh'];
@@ -120,10 +146,10 @@ class SyncPaymentsLib
 					if ($row->CCINHUUID == $invoiceId)
 					{
 						// Invoice found in the List, means there are open amounts, means not fully paid
-
-						// TODO Maybe this is partially paid, so we can set some items of the invoice
+						// Maybe this is partially paid, so we can set some items of the invoice
 						// as paid if we find a solid solution for doing that
 						//echo "Rechnung gefunden in offenen posten -> nicht bezahlt";
+						$this->_isInvoiceClearedCache[$studentId][$invoiceId] = false;
 						return success(false);
 					}
 				}
@@ -131,12 +157,14 @@ class SyncPaymentsLib
 				// There are open Invoices for the Customer, but not for that specific Invoice
 				// so this is set as paid
 				//echo "Offene posten für student aber nicht für diese Rechnung -> bezahlt";
+				$this->_isInvoiceClearedCache[$studentId][$invoiceId] = true;
 				return success(true);
 			}
 			else
 			{
 				// No Data found, means no open amounts for this customer, means everything paid
 				//echo "keine Offenen Posten für den Studenten -> bezahlt";
+				$this->_isInvoiceClearedCache[$studentId][$invoiceId] = true;
 				return success(true);
 			}
 		}
@@ -498,6 +526,7 @@ class SyncPaymentsLib
 						$task_id = '';
 						$name = $row_payment->studiengang_kurzbz;
 						$externeReferenz = $row_payment->studiengang_kurzbz;
+
 						if ($row_payment->studiensemester_start < date('Y-m-d'))
 						{
 							// If it is an entry for a old semester set the date to tommorow
@@ -588,6 +617,17 @@ class SyncPaymentsLib
 								),
 								'DataOriginTypeCode' => '4' // E-Commerce
 							)
+						);
+					}
+
+					if($row_payment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
+					{
+						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
+						// andere Zahlungsbedingungen
+						$data['SalesOrder']['mahnsperre'] = '1';
+						$data['SalesOrder']['CashDiscountTerms'] = array(
+							'actionCode' => '01',
+							'Code' => 'z006' // 5 Werktage
 						);
 					}
 
@@ -725,6 +765,11 @@ class SyncPaymentsLib
 				}
 			}
 		}
+		else
+		{
+			$nonBlockingErrorsArray[] = 'Failed to create SalesOrder:'.print_r($manageSalesOrderResult, true);
+		}
+
 		return success($nonBlockingErrorsArray);
 	}
 
