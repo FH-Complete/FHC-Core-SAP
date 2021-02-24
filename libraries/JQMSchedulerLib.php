@@ -150,7 +150,12 @@ class JQMSchedulerLib
 		$personResult = $dbModel->execReadOnlyQuery('
 			SELECT p.person_id
 			  FROM public.tbl_person p
+			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			   AND (
+				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				OR s.last_update IS NULL
+			)
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -159,7 +164,6 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($personResult)) $persons = getData($personResult);
 
-
 		// Prestudents
 
 		// Get users that have been updated in tbl_prestudent = tbl_prestudentstatus table
@@ -167,9 +171,16 @@ class JQMSchedulerLib
 			SELECT ps.person_id
 			  FROM public.tbl_prestudent ps
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
-			 WHERE NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-			    OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-			    OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE (
+					NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+					OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				    	OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				)
+			   AND (
+				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				OR s.last_update IS NULL
+			)
 		      GROUP BY ps.person_id
 		');
 
@@ -185,7 +196,12 @@ class JQMSchedulerLib
 		$contactsResult = $dbModel->execReadOnlyQuery('
 			SELECT k.person_id
 			  FROM public.tbl_kontakt k
+			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			   AND (
+				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				OR s.last_update IS NULL
+			)
 		      GROUP BY k.person_id
 		');
 
@@ -201,7 +217,12 @@ class JQMSchedulerLib
 		$addressesResult = $dbModel->execReadOnlyQuery('
 			SELECT a.person_id
 			  FROM public.tbl_adresse a
+			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			   AND (
+				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				OR s.last_update IS NULL
+			)
 		      GROUP BY a.person_id
 		');
 
@@ -212,7 +233,7 @@ class JQMSchedulerLib
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
 		// Return a success that contains all the arrays merged together
-		return success(array_merge($persons, $contacts, $addresses, $prestudents));
+		return success(uniquePersonIdArray(array_merge($persons, $contacts, $addresses, $prestudents)));
 	}
 
 	/**
