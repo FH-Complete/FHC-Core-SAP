@@ -216,7 +216,7 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function createTask($parentObjectID, $name, $responsibleCostCentreID)
+	public function createTask($parentObjectID, $name, $responsibleCostCentreID, $duration)
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection(\''.$parentObjectID.'\')/ProjectTask',
@@ -225,6 +225,7 @@ class Projects_model extends ODATAClientModel
 				'ParentObjectID' => $parentObjectID,
 				'Name' => $name,
 				'ResponsibleCostCentreID' => $responsibleCostCentreID,
+				'PlannedDuration' => 'P'.$duration.'D',
 				'MASollStunden1content_KUT' => '1.00000000000000',
 				'MASollStunden1unitCode_KUT' => 'HUR',
 				'LehreGrobplanung1content_KUT' => '20.00000000000000',
@@ -316,6 +317,26 @@ class Projects_model extends ODATAClientModel
 			array(
 				'ObjectID' => $projectObjectId,
 				'TimeConfirmationProfileCode' => '1'
+			)
+		);
+	}
+
+	// --------------------------------------------------------------------------------------------
+	// Public methods PATCH API calls
+
+	/**
+	 * 
+	 */
+	public function setDates($projectObjectId, $startDate, $endDate)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectCollection(\''.$projectObjectId.'\')',
+			ODATAClientLib::HTTP_PATCH_METHOD,
+			array(
+				'ObjectID' => $projectObjectId,
+				'PlannedStartDateTime' => toDate($startDate),
+				'PlannedEndDateTime' => toDate($endDate),
+				'Projektnamelang_KUT' => 'RWE SuMiWuSchi'
 			)
 		);
 	}

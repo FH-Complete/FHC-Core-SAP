@@ -531,7 +531,19 @@ class SyncUsersLib
 				// If data structure is ok...
 				if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
 				{
-					// Everything is fine!
+					// Store in database the date of the update
+					$update = $this->_ci->SAPStudentsModel->update(
+						array(
+							'person_id' => $userData->person_id,
+							'sap_user_id' => $manageCustomer->Customer->InternalID
+						),
+						array(
+							'last_update' => 'NOW()'
+						)
+					);
+
+					// If database error occurred then return it
+					if (isError($update)) return $update;
 				}
 				else // ...otherwise store a non blocking error and continue with the next user
 				{
@@ -640,15 +652,13 @@ class SyncUsersLib
 		$dbModel = new DB_Model();
 
 		$dbUsersPersonalData = $dbModel->execReadOnlyQuery('
-			SELECT p.person_id,
+			SELECT DISTINCT p.person_id,
 				p.nachname AS surname,
 				p.vorname AS name,
 				p.anrede AS title,
-				s.locale AS language,
+				p.sprache AS language,
 				p.geschlecht AS gender
 			  FROM public.tbl_person p
-		     LEFT JOIN public.tbl_sprache s USING(sprache)
-		     LEFT JOIN public.tbl_prestudent ps USING(person_id)
 			 WHERE p.person_id IN ?
 		', array(
 			getData($users)
@@ -686,11 +696,13 @@ class SyncUsersLib
 
 			// -------------------------------------------------------------------------------------------
 			// Language
+
+			// If the language is english then store the iso code
 			if ($userPersonalData->language == self::ENGLISH_LANGUAGE)
 			{
 				$userPersonalData->language = self::ENGLISH_LANGUAGE_ISO;
 			}
-			else
+			else // otherwise for any other language use the default iso code
 			{
 				$userPersonalData->language = self::DEFAULT_LANGUAGE_ISO;
 			}
@@ -812,32 +824,42 @@ class SyncUsersLib
 					$userAllData->prospectIndicator = true;
 				}
 				// else fallback
-
-				// ...get the UID to compose the email address
-				$dbUIDResult = $dbModel->execReadOnlyQuery('
-					SELECT b.uid, sg.oe_kurzbz
-					  FROM public.tbl_benutzer b
-					  JOIN public.tbl_prestudent ps USING (person_id)
-				  	  JOIN public.tbl_studiengang sg USING (studiengang_kz)
-					 WHERE ps.prestudent_id = ?
-					   AND b.aktiv = TRUE
-				', array(getData($resultLastPrestudentstatus)[0]->prestudent_id));
-
-				if (isError($dbUIDResult)) return $dbUIDResult;
-
-				// Loads message configuration
-				$this->_ci->config->load('message');
-
-				// If data are present in database and the organisation unit is NOT in the list
-				// of organisation units that sent only to private emails
-				if (hasData($dbUIDResult)
-					&& array_search(getData($dbUIDResult)[0]->oe_kurzbz, $this->_ci->config->item(self::CFG_OU_RECEIVERS_PRIVATE)) === false)
-				{
-					$userAllData->email = getData($dbUIDResult)[0]->uid.'@'.DOMAIN;
-				}
-				// else no data are present in database -> use the private email -> fallback
-
 			}
+
+			// Try to get Company Mail if available
+
+			// Loads message configuration
+			$this->_ci->config->load('message');
+
+			// ...get the UID to compose the email address
+			$dbUIDResult = $dbModel->execReadOnlyQuery('
+				SELECT
+					uid, tbl_studiengang.oe_kurzbz
+				FROM
+					public.tbl_prestudent
+					JOIN public.tbl_student USING(prestudent_id)
+					JOIN public.tbl_benutzer ON(uid=student_uid)
+					JOIN public.tbl_prestudentstatus USING(prestudent_id)
+					JOIN public.tbl_studiengang ON(tbl_prestudent.studiengang_kz = tbl_studiengang.studiengang_kz)
+				WHERE
+					tbl_prestudent.person_id = ?
+					AND tbl_benutzer.aktiv
+					AND tbl_studiengang.oe_kurzbz NOT IN ?
+				ORDER BY
+					tbl_prestudentstatus.datum desc
+				LIMIT 1
+			', array($userPersonalData->person_id, $this->_ci->config->item(self::CFG_OU_RECEIVERS_PRIVATE)));
+
+			if (isError($dbUIDResult)) return $dbUIDResult;
+
+			// If data are present in database and the organisation unit is NOT in the list
+			// of organisation units that sent only to private emails
+			if (hasData($dbUIDResult))
+			{
+				$userAllData->email = getData($dbUIDResult)[0]->uid.'@'.DOMAIN;
+			}
+			// else no data are present in database -> use the private email -> fallback
+
 
 			// Stores all data for the current user
 			$usersAllDataArray[] = $userAllData;
