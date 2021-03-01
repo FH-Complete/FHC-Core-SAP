@@ -139,6 +139,47 @@ class ManageUsers extends JQW_Controller
 	}
 
 	/**
+	 * Updates the bank accounts data of the synchronized users. It makes use of the sync table sync.tbl_sap_students
+	 * NOTE: this is _not_ going to use any jobs in the jobs queue, this is not part of this job worker,
+	 * but it will log in the JQWs logs
+	 * This method could be called like a standard job or manually
+	 */
+	public function updateBankAccounts()
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: update bank accounts');
+
+		// Starts the update
+		$syncResult = $this->syncuserslib->updateBankAccounts();
+
+		// Log the result
+		if (isError($syncResult))
+		{
+			// Save all the errors
+			$errors = getError($syncResult);
+
+			// If it is NOT an array...
+			if (isEmptyArray($errors))
+			{
+				// ...then convert it to an array
+				$errors = array($errors);
+			}
+			// otherwise it is already an array
+
+			// For each error found
+			foreach ($errors as $error)
+			{
+				$this->logError(getCode($syncResult).': '.$error);
+			}
+		}
+		else
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: update bank accounts');
+	}
+
+	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to find a user with the given email
 	 * and then returns the raw SOAP result
 	 */

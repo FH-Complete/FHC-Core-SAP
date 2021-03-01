@@ -275,6 +275,18 @@ class SyncUsersLib
 					)
 				);
 
+				// If the bank account is present
+				if (!isEmptyString($userData->iban))
+				{
+					$data['Customer']['bankDetailsListCompleteTransmissionIndicator'] = true;
+					$data['Customer']['BankDetails'] = array(
+						'actionCode' => '01',
+						'BankInternalID' => '969',
+						'BankAccountHolderName' => $userData->name.' '.$userData->surname,
+						'BankAccountStandardID' => $userData->iban
+					);
+				}
+
 				// Get the correct address info
 				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
 
@@ -516,6 +528,18 @@ class SyncUsersLib
 					)
 				);
 
+				// If the bank account is present
+				if (!isEmptyString($userData->iban))
+				{
+					$data['Customer']['bankDetailsListCompleteTransmissionIndicator'] = true;
+					$data['Customer']['BankDetails'] = array(
+						'actionCode' => '04',
+						'BankInternalID' => '969',
+						'BankAccountHolderName' => $userData->name.' '.$userData->surname,
+						'BankAccountStandardID' => $userData->iban
+					);
+				}
+
 				// Get the correct address info
 				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
 
@@ -574,6 +598,98 @@ class SyncUsersLib
 		}
 
 		return success('Users data updated successfully');
+	}
+
+	/**
+	 * Updates the bank accounts data of the synchronized users.
+	 * It makes use of the sync table sync.tbl_sap_students
+	 */
+	public function updateBankAccounts()
+	{
+		// Retrieves all bank accounts for the users that are present
+		// in the sync table sync.tbl_sap_students
+		$dbModel = new DB_Model();
+
+		$usersBankData = $dbModel->execReadOnlyQuery('
+			SELECT p.person_id,
+				s.sap_user_id,
+				p.nachname AS surname,
+				p.vorname AS name,
+				b.iban
+			  FROM sync.tbl_sap_students s
+			  JOIN public.tbl_bankverbindung b USING(person_id)
+			  JOIN public.tbl_person p USING(person_id)
+			 WHERE b.iban IS NOT NULL
+		');
+
+		// If an error occurred then return it
+		if (isError($usersBankData)) return $usersBankData;
+		// If no data are present then return a message
+		if (!hasData($usersBankData)) return success('No data available from database');
+
+		// Loops through users bank data
+		foreach (getData($usersBankData) as $userBankData)
+		{
+			$data = array(
+				'BasicMessageHeader' => array(
+					'ID' => generateUID(self::UPDATE_USER_PREFIX),
+					'UUID' => generateUUID()
+				),
+				'Customer' => array(
+					'actionCode' => '04',
+					'bankDetailsListCompleteTransmissionIndicator' => true,
+					'InternalID' => $userBankData->sap_user_id,
+					'BankDetails' => array(
+						'actionCode' => '04',
+						'BankInternalID' => '969',
+						'BankAccountHolderName' => $userBankData->name.' '.$userBankData->surname,
+						'BankAccountStandardID' => str_replace(' ', '', $userBankData->iban)
+					)
+				)
+			);
+
+			// Then update it!
+			$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
+
+			// If an error occurred then return it
+			if (isError($manageCustomerResult)) return $manageCustomerResult;
+
+			// SAP data
+			$manageCustomer = getData($manageCustomerResult);
+
+			// If data structure is ok...
+			if (isset($manageCustomer->Customer) && isset($manageCustomer->Customer->InternalID))
+			{
+				// Success
+			}
+			else // ...otherwise store a non blocking error and continue with the next user
+			{
+				// If it is present a description from SAP then use it
+				if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
+					&& isset($manageCustomer->Log->Item))
+				{
+					if (!isEmptyArray($manageCustomer->Log->Item))
+					{
+						foreach ($manageCustomer->Log->Item as $item)
+						{
+							if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$userBankData->person_id);
+						}
+					}
+					elseif ($manageCustomer->Log->Item->Note)
+					{
+						$this->_ci->LogLibSAP->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userBankData->person_id);
+					}
+				}
+				else
+				{
+					// Default non blocking error
+					$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$userBankData->person_id);
+				}
+				continue;
+			}
+		}
+
+		return success('Users bank accounts data updated successfully');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -860,6 +976,25 @@ class SyncUsersLib
 			}
 			// else no data are present in database -> use the private email -> fallback
 
+			// -------------------------------------------------------------------------------------------
+			// Bank account
+			$this->_ci->load->model('person/Bankverbindung_model', 'BankverbindungModel');
+			$this->_ci->BankverbindungModel->addOrder('updateamum', 'DESC');
+			$this->_ci->BankverbindungModel->addOrder('insertamum', 'DESC');
+			$this->_ci->BankverbindungModel->addLimit(1);
+			$bankResult = $this->_ci->BankverbindungModel->loadWhere(
+				array(
+					'person_id' => $userPersonalData->person_id
+				)
+			);
+
+			$userAllData->iban = null;
+
+			if (isError($bankResult)) return $bankResult;
+			if (hasData($bankResult)) // if a bank account was found
+			{
+				$userAllData->iban = str_replace(' ', '', getData($bankResult)[0]->iban);
+			}
 
 			// Stores all data for the current user
 			$usersAllDataArray[] = $userAllData;
