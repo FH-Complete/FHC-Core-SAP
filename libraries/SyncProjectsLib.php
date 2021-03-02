@@ -1519,7 +1519,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$courseEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2578,7 +2578,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$customEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2745,7 +2745,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$customEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
