@@ -1373,7 +1373,7 @@ class SyncProjectsLib
 				$addEmployeeResult = $this->_addEmployeeToProject(
 					$lehreEmployee,
 					$projectObjectId,
-					null, // task object id not present
+					$projectObjectId,
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS
 				);
