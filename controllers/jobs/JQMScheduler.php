@@ -14,6 +14,9 @@ class JQMScheduler extends JQW_Controller
 	{
 		parent::__construct();
 
+		// Loads SAP common helper
+                $this->load->helper('extensions/FHC-Core-SAP/hlp_sap_common');
+
 		// Loads JQMSchedulerLib
 		$this->load->library('extensions/FHC-Core-SAP/JQMSchedulerLib');
 	}

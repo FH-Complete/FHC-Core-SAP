@@ -106,3 +106,34 @@ function filter($arrayValues, $searchFor, $condition, $operator, $function = '')
 	return $filter;
 }
 
+/**
+ * Removes duplicated elements from the the given array
+ * Array elements: {person_id => int}
+ */
+function uniquePersonIdArray($personIdArray)
+{
+	$uniquePersonIdArray = array(); // returned array
+
+	// For each element of the given array
+	foreach ($personIdArray as $pia)
+	{
+		$found = false; // found flag
+
+		// For each element of the array that will be returned
+		foreach ($uniquePersonIdArray as $upia)
+		{
+			// If the same element is found in the array that will be returned
+			if ($pia->person_id == $upia->person_id)
+			{
+				$found = true; // set the flag as true
+				break; // stop looping
+			}
+		}
+
+		// If the element was not found in the array that will be returned then store it in this array
+		if (!$found) $uniquePersonIdArray[] = $pia;
+	}
+
+	return $uniquePersonIdArray; // return the new array with unique elements
+}
+
