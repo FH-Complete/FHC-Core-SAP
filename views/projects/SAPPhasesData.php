@@ -3,12 +3,13 @@
 // NOTE: This is a pseudo query to be able to start with an empty table.
 // Table will be filled with data by user interaction (ajax call).
 $qry = '
-	SELECT * FROM (VALUES (1, 1, 1, 1, 1)) AS tmp (
+	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1)) AS tmp (
 	"isSynced",
     "projects_timesheets_project",
     "projects_timesheet_id",
     "project_id",
-    "project_task_id"
+    "project_task_id",
+    "name"
 	) LIMIT 0;
 ';
 
@@ -21,7 +22,8 @@ $tableWidgetArray = array(
 		'Synced',
 		'SyncID',
 		'SAP ProjektTimesheetID',
-		'SAP Projekt',
+		'SAP ProjektID',
+		'SAP ProjektTaskID',
 		'SAP Projektphase'
 	),
 	'datasetRepOptions' => '{
@@ -48,7 +50,8 @@ $tableWidgetArray = array(
 		projects_timesheets_project: {visible: false},
 		projects_timesheet_id: {visible: false},
 		project_id: {visible:false},
-		project_task_id: {visible:true}
+		project_task_id: {visible:false},
+		name: {visible:true}
 	}'
 );
 

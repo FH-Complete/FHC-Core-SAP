@@ -10,6 +10,15 @@ const FH_PHASES_TABLE = '[tableuniqueid = FUEPhases] #tableWidgetTabulator';
 const PROJECT_MSG = '#projects-msg';
 const PHASES_MSG = '#projectphases-msg';
 
+const SAP_PROJECT_STATUS_MAP = new Map([
+	['1', 'Planning'],
+	['2', 'Start'],
+	['3', 'Released'],
+	['4', 'Stopped'],
+	['5', 'Closed'],
+	['6', 'Completed']
+]);
+
 var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
 // -----------------------------------------------------------------------------------------------------------------
 // Tabulator table format functions
@@ -95,15 +104,22 @@ function rowSelected_onSAPProject(row)
     var is_synced = row.getData().isSynced;
     var project_id = row.getData().project_id;
     var projects_timesheet_id = row.getData().projects_timesheet_id;
+    var name = row.getData().name;
+    var deleted = row.getData().deleted;
 
     // Reset GUI
     _resetGUI();
 
     // Set SAP project title into input field
-	$("#input-sap-project").val(project_id);
+	$("#input-sap-project").val(name);
 
     // Load SAP phases
     loadSAPPhases(project_id);
+
+    // If SAP project was deleted, disable syncing
+    if (deleted == 'true'){
+	    _setGUI_disabledButtons();
+    }
 
     // If SAP project is synced, get the synced FUE project and FUE phases
     if (is_synced == 'true') {
@@ -152,6 +168,14 @@ function rowSelected_onSAPProject(row)
             $(FH_PHASES_TABLE).tabulator('replaceData');
         }
     }
+
+    // Change Dropdown selection to actual SAP project Organisationseinheit
+    SyncProjects.changeSelectionOrganisationseinheit(projects_timesheet_id);
+
+	SyncProjects.showSAPProjectStatus(projects_timesheet_id);
+
+	SyncProjects.showSAPProjectDeleted(projects_timesheet_id);
+
 }
 
 // Get FH phases and also, if the project is synchronized, the corresponding SAP project and phases.
@@ -191,6 +215,13 @@ function rowSelected_onFUEProject(row)
 
                         // Deselect former selected SAP project row
                         $(SAP_PROJECT_TABLE).tabulator('deselectRow');
+
+	                    // Change Dropdown selection to actual SAP project Organisationseinheit
+	                    SyncProjects.changeSelectionOrganisationseinheit(data.retval.projects_timesheet_id);
+
+	                    SyncProjects.showSAPProjectStatus(data.retval.projects_timesheet_id);
+
+	                    SyncProjects.showSAPProjectDeleted(data.retval.projects_timesheet_id);
 
                         _setGUI_SyncedProjects();
 
@@ -287,18 +318,27 @@ function loadFUEPhases(projekt_kurzbz)
 // Set GUI for synchronized projects. (Unable sync button,...)
 function _setGUI_SyncedProjects()
 {
-	$("#panel-projects button").attr("disabled", true);
-	$("#select-organisationseinheit").attr("disabled", 'disabled');
+	_setGUI_disabledButtons();
 
 	$(PROJECT_MSG).text('VERKNÜPFT');
 	$(PROJECT_MSG).removeClass().addClass('text-success');
+}
+
+function _setGUI_disabledButtons(){
+	$("#panel-projects button").attr("disabled", true);
+	$("#select-organisationseinheit").attr("disabled", 'disabled');
 }
 
 // Reset GUI
 function _resetGUI()
 {
     $("#panel-projects button").attr("disabled", false);
-    $("#select-organisationseinheit").removeAttr("disabled");
+    $("#select-organisationseinheit")
+	    .removeAttr("disabled")
+	    .val('null')
+	    .change();
+	$("#sap-project-status").text('-');
+	$("#sap-project-deleted").text('-');
 
     $(PROJECT_MSG).text('');
 	$(PHASES_MSG).text('');
@@ -587,5 +627,56 @@ $("#select-organisationseinheit").change(function(){
 });
 
 });
+
+var SyncProjects = {
+
+	 // Change OE Dropdown selection
+	changeSelectionOrganisationseinheit: function(projects_timesheet_id) {
+		var data = {
+			'projects_timesheet_id': projects_timesheet_id
+		};
+
+		FHC_AjaxClient.ajaxCallPost(
+			FHC_JS_DATA_STORAGE_OBJECT.called_path + "/getSAPProjectOE",
+			data,
+			{
+				successCallback: function (data, textStatus, jqXHR) {
+					if (!data.error && data.retval) {
+
+						$("#select-organisationseinheit")
+							.val(data.retval.oe_kurzbz)
+							.change();
+					}
+				},
+				errorCallback: function (jqXHR, textStatus, errorThrown) {
+					FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+				}
+			}
+		);
+	},
+
+	// Show SAP project status text
+	showSAPProjectStatus: function(projects_timesheet_id){
+
+		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
+		let status = sap_project_row.getData().status;
+		let status_text = SAP_PROJECT_STATUS_MAP.has(status) ? SAP_PROJECT_STATUS_MAP.get(status) : '-';
+
+		$("#sap-project-status").text(status_text);
+	},
+
+	// Show if SAP project deleted
+	showSAPProjectDeleted: function(projects_timesheet_id){
+
+		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
+		let deleted = sap_project_row.getData().deleted;
+		let deleted_text = (deleted == 'false') ? 'nein' : 'ja';
+
+		$("#sap-project-deleted").text(deleted_text);
+	}
+
+
+
+}
 
 

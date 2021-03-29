@@ -19,7 +19,8 @@ class SyncProjects extends Auth_Controller
 				'syncProjects' => 'basis/projekt:rw',
 				'syncProjectphases' => 'basis/projekt:rw',
 				'createFUEProject' => 'basis/projekt:rw',
-				'createFUEPhase' => 'basis/projekt:rw'
+				'createFUEPhase' => 'basis/projekt:rw',
+				'getSAPProjectOE' => 'basis/projekt:r'
 			)
 		);
 		
@@ -90,6 +91,25 @@ class SyncProjects extends Auth_Controller
 				'project_id' => $result->project_id
 			));
 		}
+	}
+
+	public function getSAPProjectOE()
+	{
+		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+
+		$this->SAPProjectsTimesheetsModel->addJoin('sync.tbl_sap_organisationsstruktur', 'responsible_unit = tbl_sap_organisationsstruktur.oe_kurzbz_sap');
+
+		$result = $this->SAPProjectsTimesheetsModel->loadWhere(array(
+			'projects_timesheet_id' => $projects_timesheet_id
+		));
+
+		if($result = getData($result)[0])
+		{
+			return $this->outputJsonSuccess(array(
+				'oe_kurzbz' => $result->oe_kurzbz
+			));
+		}
+
 	}
 
 	// Load all SAP phases of the given SAP project.
