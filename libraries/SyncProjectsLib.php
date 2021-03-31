@@ -71,6 +71,10 @@ class SyncProjectsLib
 
 	const GMBH_OU = 'gmbh'; // gmbh organization unit
 
+	// Data Services Request URI not found messages
+	const EN_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI';
+	const DE_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI DE';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -628,8 +632,21 @@ class SyncProjectsLib
 					// Get the project tasks
 					$projectTaskResults = $this->_ci->ProjectsModel->getProjectsAndTasks(array($linkedProject->project_object_id));
 
-					// If an error occurred then return it
-					if (isError($projectTaskResults)) return $projectTaskResults;
+					// If an error occurred and it's _not_ Data Services Request URI not found then return it
+					if (isError($projectTaskResults))
+					{
+						if ($this->_isDsruError($projectTaskResults))
+						{
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB('Data Services Request URI not found: '.$linkedProject->project_object_id);
+							}
+						}
+						else
+						{
+							return $projectTaskResults;
+						}
+					}
 
 					// If SAP returned something usable
 					if (hasData($projectTaskResults))
@@ -695,8 +712,21 @@ class SyncProjectsLib
 					// Get all the partecipant for this project from SAP
 					$projectPartecipantResult = $this->_ci->ProjectsModel->getProjectsAndPartecipants(array($linkedProject->project_object_id));
 
-					// If it is an error then return it
-					if (isError($projectPartecipantResult)) return $projectPartecipantResult;
+					// If an error occurred and it's _not_ Data Services Request URI not found then return it
+					if (isError($projectPartecipantResult))
+					{
+						if ($this->_isDsruError($projectPartecipantResult))
+						{
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB('Data Services Request URI not found: '.$linkedProject->project_object_id);
+							}
+						}
+						else
+						{
+							return $projectPartecipantResult;
+						}
+					}
 
 					// If no project were found in SAP log and continue to the next one, should not happen
 					if (!hasData($projectPartecipantResult))
@@ -815,8 +845,23 @@ class SyncProjectsLib
 					// Gets the task service from SAP for the given task object id
 					$taskServiceResult = $this->_ci->ProjectsModel->getProjectTaskService($linkedProject->project_task_object_id);
 
-					// If an error occurred then return the error
-					if (isError($taskServiceResult)) return $taskServiceResult;
+					// If an error occurred and it's _not_ Data Services Request URI not found then return it
+					if (isError($taskServiceResult))
+					{
+						if ($this->_isDsruError($taskServiceResult))
+						{
+							if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+							{
+								$this->_ci->LogLibSAP->logWarningDB(
+									'Data Services Request URI not found: '.$linkedProject->project_task_object_id
+								);
+							}
+						}
+						else
+						{
+							return $taskServiceResult;
+						}
+					}
 
 					// If there are no services for this task
 					if (!hasData($taskServiceResult))
@@ -872,8 +917,23 @@ class SyncProjectsLib
 							// Gets the task from SAP for the given task object id
 							$taskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
 
-							// If an error occurred then return the error
-							if (isError($taskResult)) return $taskResult;
+							// If an error occurred and it's _not_ Data Services Request URI not found then return it
+							if (isError($taskResult))
+							{
+								if ($this->_isDsruError($taskResult))
+								{
+									if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+									{
+										$this->_ci->LogLibSAP->logWarningDB(
+											'Data Services Request URI not found: '.$linkedProject->project_task_object_id
+										);
+									}
+								}
+								else
+								{
+									return $taskResult;
+								}
+							}
 
 							// If this task exists in SAP, should never happen the other way because was previously checked
 							if (hasData($taskResult))
@@ -1313,7 +1373,7 @@ class SyncProjectsLib
 				$addEmployeeResult = $this->_addEmployeeToProject(
 					$lehreEmployee,
 					$projectObjectId,
-					null, // task object id not present
+					$projectObjectId,
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS
 				);
@@ -1519,7 +1579,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$courseEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2578,7 +2638,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$customEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2745,7 +2805,7 @@ class SyncProjectsLib
 					$addEmployeeResult = $this->_addEmployeeToProject(
 						$customEmployee,
 						$projectObjectId,
-						null, // task object id not present
+						$projectObjectId,
 						$studySemesterStartDateTS,
 						$studySemesterEndDateTS
 					);
@@ -2863,4 +2923,15 @@ class SyncProjectsLib
 		// If here then everything is fine
 		return success('Employee successfully added to this project');
 	}
+
+	/**
+	 * Checks if the given error is the Data Services Request URI not found
+	 */
+	private function _isDsruError($error)
+	{
+		// If the error message is the DSRU error message then return true
+		return substr(getError($error), 0, strlen(self::EN_DSRU_ERROR)) == self::EN_DSRU_ERROR
+			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
+	}
 }
+
