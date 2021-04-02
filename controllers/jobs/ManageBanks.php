@@ -41,6 +41,14 @@ class ManageBanks extends JOB_Controller
 	}
 
 	/**
+	 * Method used mostly for testing or debugging, it performs a call to SAP to get all the austrian banks
+	 */
+	public function getAustrianBanks()
+	{
+		var_dump($this->syncbankslib->getAustrianBanks());
+	}
+
+	/**
 	 * Save SAP banks data into the sync table
 	 */
 	public function syncActiveBanks()

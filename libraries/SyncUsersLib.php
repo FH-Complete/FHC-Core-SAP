@@ -275,17 +275,11 @@ class SyncUsersLib
 					)
 				);
 
-				// If the bank account is present
-				if (!isEmptyString($userData->iban))
-				{
-					$data['Customer']['bankDetailsListCompleteTransmissionIndicator'] = true;
-					$data['Customer']['BankDetails'] = array(
-						'actionCode' => '01',
-						'BankInternalID' => '969',
-						'BankAccountHolderName' => $userData->name.' '.$userData->surname,
-						'BankAccountStandardID' => $userData->iban
-					);
-				}
+				// If bank data are present for the current user then they are added to $data
+				// NOTE: here are logged warnings into the database
+				$this->_setUserBankData(
+					$data, $userData->person_id, $userData->name, $userData->surname, $userData->iban, $userData->swift
+				);
 
 				// Get the correct address info
 				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
@@ -528,17 +522,11 @@ class SyncUsersLib
 					)
 				);
 
-				// If the bank account is present
-				if (!isEmptyString($userData->iban))
-				{
-					$data['Customer']['bankDetailsListCompleteTransmissionIndicator'] = true;
-					$data['Customer']['BankDetails'] = array(
-						'actionCode' => '04',
-						'BankInternalID' => '969',
-						'BankAccountHolderName' => $userData->name.' '.$userData->surname,
-						'BankAccountStandardID' => $userData->iban
-					);
-				}
+				// If bank data are present for the current user then they are added to $data
+				// NOTE: here are logged warnings into the database
+				$this->_setUserBankData(
+					$data, $userData->person_id, $userData->name, $userData->surname, $userData->iban, $userData->swift
+				);
 
 				// Get the correct address info
 				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
@@ -615,7 +603,8 @@ class SyncUsersLib
 				s.sap_user_id,
 				p.nachname AS surname,
 				p.vorname AS name,
-				b.iban
+				b.iban,
+				b.bic AS swift
 			  FROM sync.tbl_sap_students s
 			  JOIN public.tbl_bankverbindung b USING(person_id)
 			  JOIN public.tbl_person p USING(person_id)
@@ -630,6 +619,17 @@ class SyncUsersLib
 		// Loops through users bank data
 		foreach (getData($usersBankData) as $userBankData)
 		{
+			$iban = str_replace(' ', '', $userBankData->iban);
+			$swift = str_replace(' ', '', $userBankData->swift);
+
+			// Get the BankInternalID with the given parameters
+			$bankInternalID = $this->_getBankInternalID($userBankData->person_id, $iban, $swift);
+
+			// If a _not_ valid BankInternalID was found then continue to the next user
+			// NOTE: _getBankInternalID logs warnings in case none or many BankInternalID have been found
+			if (isEmptyString($bankInternalID)) continue;
+
+			// Otherwise set the data to proceed with the bank data update on SAP side
 			$data = array(
 				'BasicMessageHeader' => array(
 					'ID' => generateUID(self::UPDATE_USER_PREFIX),
@@ -641,9 +641,9 @@ class SyncUsersLib
 					'InternalID' => $userBankData->sap_user_id,
 					'BankDetails' => array(
 						'actionCode' => '04',
-						'BankInternalID' => '969',
+						'BankInternalID' => $bankInternalID,
 						'BankAccountHolderName' => $userBankData->name.' '.$userBankData->surname,
-						'BankAccountStandardID' => str_replace(' ', '', $userBankData->iban)
+						'BankAccountStandardID' => $iban
 					)
 				)
 			);
@@ -994,6 +994,7 @@ class SyncUsersLib
 			if (hasData($bankResult)) // if a bank account was found
 			{
 				$userAllData->iban = str_replace(' ', '', getData($bankResult)[0]->iban);
+				$userAllData->swift = str_replace(' ', '', getData($bankResult)[0]->bic);
 			}
 
 			// Stores all data for the current user
@@ -1163,4 +1164,134 @@ class SyncUsersLib
 
 		return $addressInformationArray;
 	}
+
+	/**
+	 * Set the user bank data if possible
+	 * NOTE: warnings are logged in database
+	 */
+	private function _setUserBankData(&$data, $person_id, $name, $surname, $iban, $swift)
+	{
+		// If the bank account is present
+		if (!isEmptyString($iban))
+		{
+			// Get the bankInternalID using the given parameters
+			$bankInternalID = $this->_getBankInternalID($person_id, $iban, $swift);
+
+			// If a valid BankInternalID was found
+			// NOTE: _getBankInternalID logs warnings in case none or many BankInternalID have been found
+			if (!isEmptyString($bankInternalID))
+			{
+				$data['Customer']['bankDetailsListCompleteTransmissionIndicator'] = true;
+				$data['Customer']['BankDetails'] = array(
+					'actionCode' => '01',
+					'BankInternalID' => $bankInternalID,
+					'BankAccountHolderName' => $name.' '.$surname,
+					'BankAccountStandardID' => $iban
+				);
+			}
+		}
+	}
+
+	/**
+	 * Get the SAP bank account internal id with the given parameters
+	 * The first attempt is to get the BankInternalID using the national code contained in the user IBAN
+	 * if this IBAN belongs to an austrian bank
+	 * NOTE: logs warnings in case none or many BankInternalID have been found
+	 */
+	private function _getBankInternalID($person_id, $iban, $swift)
+	{
+		$bankInternalID = null; // if a valid BankInternalID was not found then return null
+
+		// Retrieves the SAP bank id with the bank national code
+		$dbModel = new DB_Model();
+
+		// Checks if the IBAN belongs to an autrian bank
+		if (substr($iban, 0, 2) == 'AT')
+		{
+			// Get the bank national code from the IBAN
+			// Austrian IBAN format:
+			// ATkk bbbb bccc cccc cccc
+			// k: check digits
+			// b: national bank code
+			// c: account number
+			$bankNationalCode = substr($iban, 4, 5);
+
+			// Get the BankInternalID from the database using the bank national code
+			$sapBankData = $dbModel->execReadOnlyQuery('
+				SELECT b.sap_bank_id
+				  FROM sync.tbl_sap_banks b
+				 WHERE b.sap_bank_default_national_code = ?
+				',
+				array($bankNationalCode)
+			);
+
+			// If an error occurred then return it
+			if (isError($sapBankData)) return $sapBankData;
+
+			// If no data are present then log a warning in the database
+			if (!hasData($sapBankData))
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'Was not possible to find a valid BankInternalID for user: '.$person_id.
+					' with the bank national code: '.$bankNationalCode
+				);
+			}
+			else // if there are data
+			{
+				// and more then one then log a warning in the database
+				if (count(getData($sapBankData)) > 1)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						'Too many BankInternalID for user: '.$person_id.
+						' with the bank national code: '.$bankNationalCode
+					);
+				}
+				else // a single valid BankInternalID was found
+				{
+					$bankInternalID = getData($sapBankData)[0]->sap_bank_id;
+				}
+			}
+		}
+		else // _not_ an austrian iban
+		{
+			// Get the BankInternalID from the database using the SWIFT code
+			$sapBankData = $dbModel->execReadOnlyQuery('
+				SELECT b.sap_bank_id
+				  FROM sync.tbl_sap_banks b
+				 WHERE b.sap_bank_swift = ?
+				',
+				array($swift)
+			);
+
+			// If an error occurred then return it
+			if (isError($sapBankData)) return $sapBankData;
+
+			// If no data are present then log a warning in the database
+			if (!hasData($sapBankData))
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'Was not possible to find a valid BankInternalID for user: '.$person_id.
+					' with the SWIFT code: '.$swift
+				);
+			}
+			else // if there are data
+			{
+				// and more then one then log a warning in the database
+				if (count(getData($sapBankData)) > 1)
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						'Too many BankInternalID for user: '.$person_id.
+						' with the SWIFT code: '.$swift
+					);
+				}
+				else // a single valid BankInternalID was found
+				{
+					$bankInternalID = getData($sapBankData)[0]->sap_bank_id;
+				}
+			}
+		}
+
+		return $bankInternalID;
+	}
 }
+

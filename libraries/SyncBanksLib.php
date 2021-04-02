@@ -66,6 +66,14 @@ class SyncBanksLib
 	}
 
 	/**
+	 * Get all the austrian banks data
+	 */
+	public function getAustrianBanks()
+	{
+		return $this->_ci->BanksModel->getAustrianBanks();
+	}
+
+	/**
 	 * Save active SAP banks data into the sync table
 	 */
 	public function syncActiveBanks()
@@ -88,12 +96,29 @@ class SyncBanksLib
 			// For each bank data
 			foreach (getData($activeBanks) as $bank)
 			{
+				$bankNationalCode = null; // default national code value
+
+				// If the bank attribute BankDirectoryEntryNationalBankIdentification it is _not_ an empty array
+				if (!isEmptyArray($bank->BankDirectoryEntryNationalBankIdentification))
+				{
+					// For each BankDirectoryEntryNationalBankIdentification
+					foreach ($bank->BankDirectoryEntryNationalBankIdentification as $bdenbi)
+					{
+						// If it is the default bank national code
+						if ($bdenbi->DefaultIndicator === true)
+						{
+							$bankNationalCode = $bdenbi->BankRoutingID;
+						}
+					}
+				}
+
 				// Insert SAP bank data into database
 				$insert = $this->_ci->SAPBanksModel->insert(
 					array(
 						'sap_bank_id' => $bank->BankInternalID,
 						'sap_bank_swift' => $bank->BankStandardID,
-						'sap_bank_name' => $bank->OrganisationFormattedName
+						'sap_bank_name' => $bank->OrganisationFormattedName,
+						'sap_bank_default_national_code' => $bankNationalCode
 					)
 				);
 

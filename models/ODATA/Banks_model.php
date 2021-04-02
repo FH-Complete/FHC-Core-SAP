@@ -30,7 +30,8 @@ class Banks_model extends ODATAClientModel
 		// ODATA call parameters
 		$odataParameters = array(
 			'$orderby' => 'BankInternalID',
-			'$top' => 999999
+			'$top' => 999999,
+			'$expand' => 'BankDirectoryEntryNationalBankIdentification'
 		);
 
 		// If the given parameter is a valid not empty array
@@ -58,6 +59,7 @@ class Banks_model extends ODATAClientModel
 		$odataParameters = array(
 			'$orderby' => 'BankInternalID',
 			'$top' => 999999,
+			'$expand' => 'BankDirectoryEntryNationalBankIdentification',
 			'$filter' => sprintf(
 				'(LifeCycleStatusCode eq \'2\' and StartDate lt datetime\'%s\' and EndDate gt datetime\'%s\')',
 				$currentDate,
@@ -69,6 +71,32 @@ class Banks_model extends ODATAClientModel
 		if (!isEmptyArray($bankIds))
 		{
 			// Concatenates the previous filter string with this one
+			$odataParameters['$filter'] .= ' and '.filter($bankIds, 'BankInternalID', 'eq', 'or');
+		}
+
+		return $this->_call(
+			self::URI_PREFIX.'BankDirectoryEntryRootCollection',
+			ODATAClientLib::HTTP_GET_METHOD,
+			$odataParameters
+		);
+	}
+
+	/**
+	 * Get all the austrian banks data
+	 */
+	public function getAustrianBanks($bankIds = null)
+	{
+		// ODATA call parameters
+		$odataParameters = array(
+			'$orderby' => 'BankInternalID',
+			'$top' => 999999,
+			'$expand' => 'BankDirectoryEntryNationalBankIdentification',
+			'$filter' => '(CountryCode eq \'AT\')'
+		);
+
+		// If the given parameter is a valid not empty array
+		if (!isEmptyArray($bankIds))
+		{
 			$odataParameters['$filter'] .= ' and '.filter($bankIds, 'BankInternalID', 'eq', 'or');
 		}
 
