@@ -135,7 +135,7 @@ function rowSelected_onSAPProject(row)
                     if (!data.error && data.retval) {
 
                     	// Set FH project title into input field
-                        $("#input-fue-project").val(data.retval.titel);
+                        $("#input-fue-project").val(data.retval.titel + " (" + data.retval.projekt_kurzbz + ")");
 
                         $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
                         $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
@@ -208,7 +208,7 @@ function rowSelected_onFUEProject(row)
                     if (!data.error && data.retval)
                     {
 	                    // Set SAP project title into input field
-                        $("#input-sap-project").val(data.retval.project_id);
+                        $("#input-sap-project").val(data.retval.name + " (" + data.retval.project_id + ')');
 
                         $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
                         $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
@@ -522,7 +522,7 @@ $("#btn-create-project").click(function () {
                     $(FH_PROJECT_TABLE).tabulator(
                         'addRow',
                         JSON.stringify({
-                            projekt_id: data.retval.projekt_id, titel: data.retval.titel, isSynced: 'true'})
+                            projekt_id: data.retval.projekt_id, titel: data.retval.titel + " (" + data.retval.projekt_kurzbz + ")", isSynced: 'true'})
                     );
 
                     // Update SAP project sync status
@@ -531,7 +531,7 @@ $("#btn-create-project").click(function () {
                         JSON.stringify([{projects_timesheet_id: projects_timesheet_id, isSynced: 'true'}])
                     );
 
-	                $("#input-fue-project").val(data.retval.titel);
+	                $("#input-fue-project").val(data.retval.titel + " (" + data.retval.projekt_kurzbz + ")");
 
                     $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
                     $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');

@@ -7,7 +7,7 @@ $qry = '
 				END AS "isSynced",
 				projects_timesheet_id,
 				project_id,
-				name,
+				CONCAT(name, \' (\' ,project_id ,\')\') as name,
 				status,
 				deleted
 	FROM    	sync.tbl_sap_projects_timesheets

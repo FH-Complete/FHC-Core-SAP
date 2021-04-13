@@ -7,7 +7,7 @@ $qry = '
 				END AS "isSynced",
 				projekt_id,
 				projekt_kurzbz,
-				titel
+				CONCAT(titel, \' (\' ,projekt_kurzbz ,\')\') as titel
 	FROM 		fue.tbl_projekt
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projekt_id)
 	WHERE 		synctbl.projektphase_id IS NULL

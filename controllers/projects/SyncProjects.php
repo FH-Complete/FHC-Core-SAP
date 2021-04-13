@@ -67,7 +67,8 @@ class SyncProjects extends Auth_Controller
 			return $this->outputJsonSuccess(array(
 				'projekt_id' => $result->projekt_id,
 				'projekt_kurzbz' => $result->projekt_kurzbz,
-				'titel' => $result->titel
+				'titel' => $result->titel,
+				'beschreibung' => $result->beschreibung
 			));
 		}
 	}
@@ -88,7 +89,8 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonSuccess(array(
 				'projects_timesheet_id' => $result->projects_timesheet_id,
-				'project_id' => $result->project_id
+				'project_id' => $result->project_id,
+				'name' => $result->name
 			));
 		}
 	}
@@ -276,10 +278,10 @@ class SyncProjects extends Auth_Controller
 		$result = $this->ProjektModel->insert(
 			array(
 				'projekt_kurzbz' => $retval->project_id,
-				'titel' => $retval->project_id,
+				'titel' => $retval->name,
 				'beginn' => $retval->start_date,
 				'ende' => $retval->end_date,
-				'beschreibung' => $retval->project_id,
+				'beschreibung' => $retval->name,
 				'oe_kurzbz' => $oe_kurzbz
 			)
 		);
@@ -291,7 +293,8 @@ class SyncProjects extends Auth_Controller
 
 		// Get returning projekt_id of created FUE project
 		$projekt_id = $result->retval;
-		$titel = $retval->project_id;
+		$titel = $retval->name;
+		$projekt_kurzbz = $retval->project_id;
 
 		// Synchronize SAP and FUE project
 		$result = $this->ProjectsTimesheetsProjectModel->insert(array(
@@ -305,6 +308,7 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonSuccess(array(
 				'projekt_id' => $projekt_id,
+				'projekt_kurzbz' => $projekt_kurzbz,
 				'titel' => $titel
 			));
 		}
@@ -341,6 +345,7 @@ class SyncProjects extends Auth_Controller
 
 			    $project_id = $retval->project_id;
 			    $project_task_id = $retval->project_task_id;
+			    $project_name = $retval->name;
 			    $start_date = $retval->start_date;
 			    $end_date = $retval->end_date;
 
@@ -376,8 +381,8 @@ class SyncProjects extends Auth_Controller
 			    // -----------------------------------------------------------------------------------------------------
 			    $result = $this->ProjektphaseModel->insert(array(
 					    'projekt_kurzbz' => $projekt_kurzbz,
-					    'bezeichnung' => $project_task_id,
-					    'beschreibung' => $project_task_id,
+					    'bezeichnung' => $project_name,
+					    'beschreibung' => $project_name,
 					    'start' => $start_date,
 					    'ende' => $end_date,
 					    'typ' => 'Projektphase'
@@ -405,7 +410,7 @@ class SyncProjects extends Auth_Controller
 				    $json []= (array(
 					    'projects_timesheet_id' => $projects_timesheet_id,
 					    'projektphase_id' => $projektphase_id,
-					    'bezeichnung' => $project_task_id
+					    'bezeichnung' => $project_name
 				    ));
 			    }
 			    else
