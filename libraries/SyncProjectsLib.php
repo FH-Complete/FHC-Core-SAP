@@ -55,6 +55,8 @@ class SyncProjectsLib
 	const PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME = 'PRO_PROJ_TEMPLATE:103';
 	const PROJECT_SERVICE_NOT_EXITSTS = 'PRO_PROJ_TEMPLATE:031';
 	const PROJECT_SERVICE_TIME_BASED_NOT_VALID = 'PRO_PROJ_TEMPLATE:014';
+	const PROJECT_NOT_ENABLED = 'AP_ESI_COMMON:106';
+	const PROJECT_TASK_NOT_ENABLED = 'AP_ESI_COMMON:106';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -2088,7 +2090,23 @@ class SyncProjectsLib
 						);
 
 						// If an error occurred while creating the project task on ByD return the error
-						if (isError($createTaskResult)) return $createTaskResult;
+						if (isError($createTaskResult))
+						{
+							// If a blocking error then return the error
+							if (getCode($createTaskResult) != self::PROJECT_NOT_ENABLED)
+							{
+								return $createTaskResult;
+							}
+							else // if non blocking error then log it
+							{
+								if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+								{
+									$this->_ci->LogLibSAP->logWarningDB(getError($createTaskResult));
+								}
+
+								continue; // NOTE: skip to the next task!
+							}
+						}
 
 						// Add entry database into sync table for projects
 						$insertResult = $this->_ci->SAPProjectsCostcentersModel->insert(
@@ -2372,7 +2390,23 @@ class SyncProjectsLib
 							);
 
 							// If an error occurred while creating the project task on ByD return the error
-							if (isError($createTaskResult)) return $createTaskResult;
+							if (isError($createTaskResult))
+							{
+								// If a blocking error then return the error
+								if (getCode($createTaskResult) != self::PROJECT_NOT_ENABLED)
+								{
+									return $createTaskResult;
+								}
+								else // if non blocking error then log it
+								{
+									if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+									{
+										$this->_ci->LogLibSAP->logWarningDB(getError($createTaskResult));
+									}
+
+									continue; // NOTE: skip to the next task!
+								}
+							}
 
 							// Add entry database into sync table for projects
 							$insertResult = $this->_ci->SAPProjectsCostcentersModel->insert(
@@ -2867,7 +2901,8 @@ class SyncProjectsLib
 					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
 						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
 						&& getCode($addEmployeeResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
-						&& getCode($addEmployeeResult) != self::PROJECT_SERVICE_NOT_EXITSTS)
+						&& getCode($addEmployeeResult) != self::PROJECT_SERVICE_NOT_EXITSTS
+						&& getCode($addEmployeeResult) != self::PROJECT_NOT_ENABLED)
 					{
 						return $addEmployeeResult; // return the error
 					}
@@ -2903,7 +2938,8 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EMPLOYED_LIFE_TIME
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_NOT_EXITSTS
-							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID)
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
+							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
 							return $addEmployeeToTaskResult; // return the error
 						}
