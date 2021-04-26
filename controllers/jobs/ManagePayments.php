@@ -60,6 +60,9 @@ class ManagePayments extends JQW_Controller
 		$this->syncpaymentslib->setPaid();
 	}
 
+	/**
+	 *
+	 */
 	public function createGutschrift()
 	{
 		$jobType = 'SAPPaymentGutschrift';
@@ -191,3 +194,4 @@ class ManagePayments extends JQW_Controller
 		$this->logInfo('End data synchronization with SAP ByD: Payments');
 	}
 }
+

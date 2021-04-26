@@ -7,7 +7,7 @@ require_once APPPATH.'/models/extensions/FHC-Core-SAP/ODATAClientModel.php';
  */
 class Employee_model extends ODATAClientModel
 {
-	const URI_PREFIX = 'odata/analytics/ds/Hcmempb.svc/Hcmempb';
+	const URI_PREFIX = 'odata/analytics/ds/Hcmempb.svc/';
 
 	/**
 	 * Object initialization
@@ -28,7 +28,7 @@ class Employee_model extends ODATAClientModel
 	public function getAllEmployees()
 	{
 		return $this->_call(
-			self::URI_PREFIX,
+			self::URI_PREFIX.'Hcmempb',
 			ODATAClientLib::HTTP_GET_METHOD,
 			array(
 				'$select' => 'C_EeId,C_BusinessUserId'
