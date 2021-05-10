@@ -1932,7 +1932,11 @@ class SyncProjectsLib
 		);
 
 		// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
-		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			$createProjectResult->retval = 'Create project: '.$createProjectResult->retval;
+			return $createProjectResult;
+		}
 
 		$projectObjectId = null;
 
@@ -1985,6 +1989,7 @@ class SyncProjectsLib
 			}
 			else
 			{
+				$updateTaskCollectionResult->retval = 'Set project name: '.$updateTaskCollectionResult->retval;
 				return $updateTaskCollectionResult;
 			}
 		}
@@ -1996,7 +2001,11 @@ class SyncProjectsLib
 			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
 
 			// If an error occurred while setting the project time recording
-			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
+			if (isError($setTimeRecordingOffResult))
+			{
+				$setTimeRecordingOffResult->retval = 'Set time recording off: '.$setTimeRecordingOffResult->retval;
+				return $setTimeRecordingOffResult;
+			}
 		}
 
 		// Set the project as active
@@ -2008,6 +2017,7 @@ class SyncProjectsLib
 		{
 			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
+				$setActiveResult->retval = 'Set project active: '.$setActiveResult->retval;
 				return $setActiveResult;
 			}
 			else // otherwise log it
@@ -2103,6 +2113,7 @@ class SyncProjectsLib
 							// If a blocking error then return the error
 							if (getCode($createTaskResult) != self::PROJECT_NOT_ENABLED)
 							{
+								$createTaskResult->retval = 'Create task: '.$createTaskResult->retval;
 								return $createTaskResult;
 							}
 							else // if non blocking error then log it
@@ -2909,6 +2920,7 @@ class SyncProjectsLib
 						&& getCode($addEmployeeResult) != self::PROJECT_SERVICE_NOT_EXITSTS
 						&& getCode($addEmployeeResult) != self::PROJECT_NOT_ENABLED)
 					{
+						$addEmployeeResult->retval = 'Add employee to a project: '.$addEmployeeResult->retval;
 						return $addEmployeeResult; // return the error
 					}
 					else // if non blocking error then log it
@@ -2947,6 +2959,7 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
+							$addEmployeeToTaskResult->retval = 'Add employee to a task: '.$addEmployeeToTaskResult->retval;
 							return $addEmployeeToTaskResult; // return the error
 						}
 						else // if non blocking error then log it
