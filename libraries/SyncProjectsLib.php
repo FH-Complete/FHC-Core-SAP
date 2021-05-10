@@ -1331,8 +1331,7 @@ class SyncProjectsLib
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			return $setActiveResult;
 		}
@@ -1534,8 +1533,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -1970,6 +1968,27 @@ class SyncProjectsLib
 		// If was not possible to get a valid project object id
 		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
 
+		// Update project ProjectTaskCollection name
+		$projectName = sprintf($projectNameFormats[self::ADMIN_FHTW_PROJECT], $studySemester);
+		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
+			$projectObjectId,
+			$projectName
+		);
+
+		// If an error occurred while creating the project on ByD return the error
+		if (isError($updateTaskCollectionResult))
+		{
+			// If the project is not found on SAP
+			if ($this->_isDsruError($updateTaskCollectionResult))
+			{
+				return error('The project object id stored in database is not valid anymore');
+			}
+			else
+			{
+				return $updateTaskCollectionResult;
+			}
+		}
+
 		// If the projects does not exist then update the time recording attribute
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
@@ -1980,23 +1999,12 @@ class SyncProjectsLib
 			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
 		}
 
-		// Update project ProjectTaskCollection name
-		$projectName = sprintf($projectNameFormats[self::ADMIN_FHTW_PROJECT], $studySemester);
-		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
-			$projectObjectId,
-			$projectName
-		);
-
-		// If an error occurred while creating the project on ByD return the error
-		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
-
 		// Set the project as active
 		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
@@ -2291,8 +2299,7 @@ class SyncProjectsLib
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
@@ -2631,8 +2638,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -2798,8 +2804,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -2933,6 +2938,7 @@ class SyncProjectsLib
 					{
 						// - Not because of an already existing employee in this project
 						// - Not because of not existing employee
+						// - Not because of not existing task
 						if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
 							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
