@@ -57,6 +57,7 @@ class SyncProjectsLib
 	const PROJECT_SERVICE_TIME_BASED_NOT_VALID = 'PRO_PROJ_TEMPLATE:014';
 	const PROJECT_NOT_ENABLED = 'AP_ESI_COMMON:106';
 	const PROJECT_TASK_NOT_ENABLED = 'AP_ESI_COMMON:106';
+	const PROJECT_TASK_READ_ONLY = 'AP_ESI_COMMON:107';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -175,6 +176,12 @@ class SyncProjectsLib
 			// Last or current study semester
 			$currentOrNextStudySemester = getData($currentOrNextStudySemesterResult)[0]->studiensemester_kurzbz;
 
+			// Get the next study semester
+			$nextStudySemesterResult = $this->_ci->StudiensemesterModel->getNextFrom($currentOrNextStudySemester);
+
+			// If an error occurred then return it
+			if (isError($nextStudySemesterResult)) return $nextStudySemesterResult;
+
 			// Project structures are optionals and are used to create tasks for a project
 			$projectStructures = $this->_ci->config->item(self::PROJECT_STRUCTURES);
 			// Project ID format
@@ -194,10 +201,10 @@ class SyncProjectsLib
 			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterStartDateTS = $dateTime->getTimestamp(); // project start date
 
-			// Get study semester end date
-			$studySemesterEndDate = getData($currentOrNextStudySemesterResult)[0]->ende;
-			// Get study semester end date in timestamp format
-			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
+			// Get study semester end date (it's the start date of the next study semester)
+			$studySemesterEndDate = getData($nextStudySemesterResult)[0]->start;
+			// Get study semester end date in timestamp format (it's the start date of the next study semester)
+			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($nextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
 			// If it is requested a full sync or only for admin FHTW
@@ -1160,6 +1167,99 @@ class SyncProjectsLib
 
 		// If everything was fine
 		return success('All dates for linked project have been imported successfully');
+	}
+
+	/**
+	 *
+	 */
+	public function updateProjectDates($projectName, $startDate, $endDate)
+	{
+		// Get start date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $startDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$startDateTS = $dateTime->getTimestamp(); // project start date
+
+		// Get end date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $endDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$endDateTS = $dateTime->getTimestamp(); // project end date
+
+		$dbModel = new DB_Model();
+
+		// Gets 
+		$projectResults = $dbModel->execReadOnlyQuery('
+			SELECT p.project_object_id
+			  FROM sync.tbl_sap_projects p
+			 WHERE p.project_id = ?
+			',
+			array($projectName)
+		);
+
+		// If an error occurred then return it
+		if (isError($projectResults)) return $projectResults;
+
+		// If no data were found then return an error
+		if (!hasData($projectResults)) return error('No project found with such a name!');
+
+		// If more then one project have been found
+		if (count(getData($projectResults)) > 1) return error('Too many projects found with this name');
+
+		// Update the project dates
+		$updateProjectDatesResult = $this->_ci->ProjectsModel->setDates(
+			getData($projectResults)[0]->project_object_id,
+			$startDate.'T00:00:00Z',
+			$endDate.'T00:00:00Z'
+		);
+
+		// If an error occurred then return it
+		if (isError($updateProjectDatesResult)) return $updateProjectDatesResult;
+
+		// If the project was successfully updated then loads all the tasks for such project
+                $tasksResults = $dbModel->execReadOnlyQuery('
+			SELECT pc.project_task_object_id,
+				pc.project_task_id
+                          FROM sync.tbl_sap_projects_costcenters pc
+                         WHERE pc.project_object_id = ?
+			   AND pc.project_object_id != pc.project_task_object_id
+                        ',
+                        array(getData($projectResults)[0]->project_object_id)
+                );
+
+		// If this project has tasks
+		if (hasData($tasksResults))
+		{
+			// For each task set the days
+			foreach (getData($tasksResults) as $task)
+			{
+				// Update the task duration in days
+				$updateTaskDatesResult = $this->_ci->ProjectsModel->setTaskDates(
+					$task->project_task_object_id,
+					round(($endDateTS - $startDateTS) / 60 / 60 / 24) + 1
+				);
+
+				// If an error occurred then...
+				if (isError($updateTaskDatesResult))
+				{
+					// ...check if it is a _not_ blocking error
+					if (getCode($updateTaskDatesResult) == self::PROJECT_TASK_READ_ONLY)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Project task is read only: '.$task->project_task_id);
+					}
+					else // ...if it a blocking error then return it
+					{
+						return $updateTaskDatesResult;
+					}
+				}
+			}
+		}
+		// else this project doesn't have any task
+
+		// If everything was fine
+		return success('Project dates have been successfully updated');
 	}
 
 	// --------------------------------------------------------------------------------------------
