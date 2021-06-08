@@ -30,7 +30,6 @@ $tableWidgetArray = array(
 		index: "projects_timesheet_id",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 	    selectable: true,
         selectableRangeMode: "click",
 		selectablePersistence: false,
