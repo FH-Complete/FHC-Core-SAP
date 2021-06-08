@@ -39,7 +39,6 @@ $tableWidgetArray = array(
 		rowClick: function(e, row){
             func_rowClick_onSAPProject(e, row);
         },
-		tableWidgetHeader: false,
 		rowSelected: function(row){
 			rowSelected_onSAPProject(row);
 		},

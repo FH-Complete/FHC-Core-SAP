@@ -29,7 +29,6 @@ $tableWidgetArray = array(
 		layout: "fitColumns",
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
-		tableWidgetHeader: false,
 		selectable: true,     
         selectableRangeMode: "click",
 		selectablePersistence: false,
