@@ -1052,7 +1052,6 @@ class SyncProjectsLib
 						}
 						continue;
 					}
-
 					// SAP project
 					$project = getData($projectResult)[0];
 
@@ -1086,7 +1085,8 @@ class SyncProjectsLib
 						),
 						array(
 							'beginn' => date('Y-m-d', toTimestamp($project->PlannedStartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime))
+							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime)-86400)
+							// Remove one day (86400 sec) because API delivers wrong date
 						)
 					);
 
@@ -1097,9 +1097,15 @@ class SyncProjectsLib
 				{
 					// Get the project data from SAP
 					$projectTaskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
-
 					// If an error occurred then return it
-					if (isError($projectTaskResult)) return $projectTaskResult;
+					if (isError($projectTaskResult))
+					{
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						}
+						continue;
+					}
 
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
@@ -1144,7 +1150,8 @@ class SyncProjectsLib
 						),
 						array(
 							'start' => date('Y-m-d', toTimestamp($projectTask->StartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime))
+							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime)-86400)
+							// Remove one day (86400 sec) because API delivers wrong date
 						)
 					);
 
@@ -2989,4 +2996,3 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
-
