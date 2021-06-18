@@ -5,7 +5,7 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 /**
  * Job to import employees data from SAP Business by Design
  */
-class ManageEmployees extends JOB_Controller
+class ManageEmployees extends JQW_Controller
 {
 	/**
 	 * Controller initialization
@@ -45,6 +45,47 @@ class ManageEmployees extends JOB_Controller
 		}
 
 		$this->logInfo('End employee ids import from SAP ByD');
+	}
+
+	/**
+	 * 
+	 */
+	public function create()
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: create employees');
+
+		// Gets the latest jobs
+		$lastJobs = $this->getLastJobs(SyncEmployeesLib::SAP_EMPLOYEES_CREATE);
+		if (isError($lastJobs))
+		{
+			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncEmployeesLib::SAP_EMPLOYEES_CREATE);
+		}
+		else
+		{
+			// Get all the jobs in the queue
+			$syncResult = $this->syncemployeeslib->create(mergeUidArray(getData($lastJobs)));
+
+			// Log the result
+			if (isError($syncResult))
+			{
+				$this->logError(getCode($syncResult).': '.getError($syncResult));
+			}
+			else
+			{
+				$this->logInfo(getData($syncResult));
+			}
+
+			// Update jobs properties values
+			$this->updateJobs(
+				getData($lastJobs), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+				array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+			);
+			
+			if (hasData($lastJobs)) $this->updateJobsQueue(SyncEmployeesLib::SAP_EMPLOYEES_CREATE, getData($lastJobs));
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: create employees');
 	}
 }
 

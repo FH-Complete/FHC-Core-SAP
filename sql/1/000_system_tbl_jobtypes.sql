@@ -5,6 +5,7 @@ INSERT INTO system.tbl_jobtypes (type, description) VALUES
 ('SAPPaymentGutschrift', 'Credit payments on SAP Business by design'),
 ('SAPUsersCreate', 'Create new users on SAP Business by design'),
 ('SAPUsersUpdate', 'Update users on SAP Business by design'),
-('SyncTimesheetFromSAP', 'Synchronize employees time sheets in FH from SAP')
+('SyncTimesheetFromSAP', 'Synchronize employees time sheets in FH from SAP'),
+('SAPEmployeesCreate', 'Create employee on SAP Business by design')
 ON CONFLICT (type) DO NOTHING;
 

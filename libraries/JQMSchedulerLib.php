@@ -13,6 +13,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
+	const JOB_TYPE_SAP_NEW_EMPLOYEES = 'SAPEmployeesCreate';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	// Maximum amount of users to be placed in a single job
@@ -352,4 +353,41 @@ class JQMSchedulerLib
 
 		return success($jobInput);
 	}
+
+	/**
+	 * 
+	 */
+	public function newEmployess($hours = null)
+	{
+		$jobInput = null;
+
+		$timeInterval = '24';
+		if (is_number($hours)) $timeInterval = $hours;
+
+		$dbModel = new DB_Model();
+
+		//
+		$newUsersResult = $dbModel->execReadOnlyQuery('
+			SELECT m.mitarbeiter_uid AS uid
+			  FROM public.tbl_person p
+			  JOIN public.tbl_benutzer b USING(person_id)
+			  JOIN public.tbl_mitarbeiter n ON (m.mitarbeiter_uid = b.uid)
+			 WHERE m.fixangestellt = TRUE
+			   AND b.aktiv = TRUE
+			   AND ...
+			   AND NOW() - m.insertamum <= INTERVAL \''.$timeInterval.' hours\'
+		');
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($newUsersResult)) return $newUsersResult;
+
+		// If new users are present
+		if (hasData($newUsersResult))
+		{
+			$jobInput = json_encode(getData($newUsersResult));
+		}
+
+		return success($jobInput);
+	}
 }
+

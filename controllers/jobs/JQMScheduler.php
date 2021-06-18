@@ -194,4 +194,46 @@ class JQMScheduler extends JQW_Controller
 
 		$this->logInfo('End job queue scheduler FHC-Core-SAP->newPayments');
 	}
+
+	/**
+	 *
+	 */
+	public function newEmployees($hours = null)
+	{
+		$this->logInfo('Start job queue scheduler FHC-Core-SAP->newEmployees');
+
+		// Generates the input for the new job
+		$jobInputResult = $this->jqmschedulerlib->newEmployees($hours);
+
+		// If an error occured then log it
+		if (isError($jobInputResult))
+		{
+			$this->logError(getError($jobInputResult));
+		}
+		else
+		{
+			// If a job input were generated
+			if (hasData($jobInputResult))
+			{
+				// Add the new job to the jobs queue
+				$addNewJobResult = $this->addNewJobsToQueue(
+					JQMSchedulerLib::JOB_TYPE_SAP_NEW_EMPLOYEES, // job type
+					$this->generateJobs( // gnerate the structure of the new job
+						JobsQueueLib::STATUS_NEW,
+						getData($jobInputResult)
+					)
+				);
+
+				// If error occurred return it
+				if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+			}
+			else // otherwise log info
+			{
+				$this->logInfo('There are no jobs to generate');
+			}
+		}
+
+		$this->logInfo('End job queue scheduler FHC-Core-SAP->newEmployees');
+	}
 }
+
