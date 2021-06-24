@@ -15,6 +15,9 @@ class SyncPaymentsLib
 	const CREATE_PAYMENT_PREFIX = 'CP';
 	const BUCHUNGSDATUM_SYNC_START = '2019-09-01';
 
+	// Credit memo sales order
+	const CREDIT_MEMO_SOI = 'CREDIT MEMO';
+
 	private $_ci; // Code igniter instance
 	private $_isInvoiceClearedCache; // Cache Invoice Status Results
 	private $_getInvoiceIDFromSalesOrderCache; // Cache Sales Order results
@@ -315,22 +318,15 @@ class SyncPaymentsLib
 				if (isset($creditMemoResult->CustomerInvoiceRequest)
 				 && isset($creditMemoResult->CustomerInvoiceRequest->BaseBusinessTransactionDocumentID))
 				{
-					// Mark Entry in FAS as payed
-					$kontoResult = $this->_ci->KontoModel->insert(
+					$salesOrderResult = $this->_ci->SAPSalesOrderModel->insert(
 						array(
-							'person_id' => $singlePayment->person_id,
-							'studiengang_kz' => $singlePayment->studiengang_kz,
-							'studiensemester_kurzbz' => $singlePayment->studiensemester_kurzbz,
-							'buchungsnr_verweis' => $singlePayment->buchungsnr,
-							'betrag' => $singlePayment->betrag*(-1),
-							'buchungsdatum' => date('Y-m-d'),
-							'buchungstext' => $singlePayment->buchungstext,
-							'buchungstyp_kurzbz' => $singlePayment->buchungstyp_kurzbz
+							'buchungsnr' => $singlePayment->buchungsnr,
+							'sap_sales_order_id' => self::CREDIT_MEMO_SOI.' '.$singlePayment->person_id
 						)
 					);
 
 					// If an error occurred then return it
-					if (isError($kontoResult)) return $kontoResult;
+					if (isError($salesOrderResult)) return $salesOrderResult;
 				}
 				else // ...otherwise store a non blocking error
 				{
