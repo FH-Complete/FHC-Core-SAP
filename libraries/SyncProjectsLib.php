@@ -1389,8 +1389,11 @@ class SyncProjectsLib
 				// If an error occurred then return it
 				if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-				// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-				if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+				// If the employee was successfully added to this project
+				// and it is _not_ an alredy existing employee in this project
+				// and if config entry that enables the purchase orders is true
+				if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+					&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 				{
 					// Create the course object
 					$course = new stdClass();
@@ -1594,8 +1597,11 @@ class SyncProjectsLib
 					// If an error occurred then return it
 					if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+					// If the employee was successfully added to this project
+					// and it is _not_ an alredy existing employee in this project
+					// and if config entry that enables the purchase orders is true
+					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+						&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
 						$purchaseOrder = $this->_purchaseOrderLG(
 							$courseEmployee,
@@ -1891,6 +1897,11 @@ class SyncProjectsLib
 									'Quantity' => array(
 										'unitCode' => 'HUR',
 										'_' => $courseEmployee->planned_work
+									)
+								),
+								'ItemDeliveryTerms' => array(
+									'QuantityTolerance' => array(
+										'OverPercentUnlimitedIndicator' => true
 									)
 								)
 							)
@@ -2983,7 +2994,8 @@ class SyncProjectsLib
 		}
 
 		// If here then everything is fine
-		return success('Employee successfully added to this project');
+		// NOTE: it returns even the code of the latest attempt to add the employee to the project
+		return success('Employee successfully added to this project', getCode($addEmployeeResult));
 	}
 
 	/**
