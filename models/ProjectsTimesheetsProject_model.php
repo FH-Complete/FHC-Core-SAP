@@ -9,7 +9,7 @@ class ProjectsTimesheetsProject_model extends DB_Model
 	{
 		parent::__construct();
 		$this->dbTable = 'sync.tbl_projects_timesheets_project';
-		$this->pk = array('projects_timesheets_project_id');
+		$this->pk = 'projects_timesheets_project_id';
 	}
 
 	/**
@@ -38,7 +38,9 @@ class ProjectsTimesheetsProject_model extends DB_Model
 	            projects_timesheet_id,
 	            project_id,
 	            project_task_id,
-	            name
+	            name,
+	            status,
+	            deleted
 			FROM        sap_projectphases
 	        LEFT JOIN   sync.tbl_projects_timesheets_project USING (projects_timesheet_id)
 	        ORDER BY    projects_timesheets_project_id, project_task_id;

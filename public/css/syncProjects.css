@@ -12,7 +12,7 @@
     border: solid 2px grey;
 }
 
-#btn-sync-projects, #btn-sync-phases, #btn-create-project, #btn-create-phase
+#btn-sync-projects, #btn-sync-phases, #btn-create-project, #btn-create-phase, #btn-desync-phases
 {
     width: 180px;
 }

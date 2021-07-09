@@ -19,6 +19,14 @@ const SAP_PROJECT_STATUS_MAP = new Map([
 	['6', 'Completed']
 ]);
 
+const SAP_PHASES_STATUS_MAP = new Map([
+	['2', 'Approved'],
+	['3', 'Stopped'],
+	['4', 'Closed'],
+	['6', 'Completed']
+]);
+
+
 var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
 // -----------------------------------------------------------------------------------------------------------------
 // Tabulator table format functions
@@ -315,6 +323,21 @@ function loadFUEPhases(projekt_kurzbz)
 
 }
 
+function rowSelected_onSAPPhases(row)
+{
+	var projects_timesheet_id = row.getData().projects_timesheet_id;
+	var is_synced = row.getData().isSynced;
+	_resetPhaseGUI();
+
+	if (is_synced == 'true')
+	{
+		_setGUI_SyncedPhases();
+	}
+	SyncProjects.showSAPPhasesStatus(projects_timesheet_id);
+	SyncProjects.showSAPPhasesDeleted(projects_timesheet_id);
+}
+
+
 // Set GUI for synchronized projects. (Unable sync button,...)
 function _setGUI_SyncedProjects()
 {
@@ -342,8 +365,32 @@ function _resetGUI()
 
     $(PROJECT_MSG).text('');
 	$(PHASES_MSG).text('');
+	_resetPhaseGUI();
 }
 
+function _resetPhaseGUI()
+{
+	$("#panel-projectphases button").attr("disabled", false);
+	$("#panel-projectphases #btn-desync-phases").attr("disabled", true);
+
+	$("#sap-projectphase-status").text('-');
+	$("#sap-projectphase-deleted").text('-');
+	$(PHASES_MSG).text('');
+	$(PHASES_MSG).text('');
+}
+
+function _setGUI_SyncedPhases()
+{
+	_setGUI_disabledPhasesButtons();
+
+	$(PHASES_MSG).text('VERKNÜPFT');
+	$(PHASES_MSG).removeClass().addClass('text-success');
+}
+
+function _setGUI_disabledPhasesButtons(){
+	$("#panel-projectphases button").attr("disabled", true);
+	$("#panel-projectphases #btn-desync-phases").attr("disabled", false);
+}
 
 $(function() {
 
@@ -471,6 +518,8 @@ $("#btn-sync-phases").click(function () {
                     // Print success message
                     // FHC_DialogLib.alertSuccess("Phasen wurden verknüpft.");
                 }
+
+                _resetPhaseGUI();
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
                 FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
@@ -610,7 +659,7 @@ $("#btn-create-phase").click(function () {
                                     isSynced: 'true'}])
                             );
                         }
-
+						_resetPhaseGUI();
                         // Print success message
                         // FHC_DialogLib.alertSuccess("Phase wurde erstellt und verknüpft.");
                     }
@@ -625,6 +674,60 @@ $("#btn-create-phase").click(function () {
 $("#select-organisationseinheit").change(function(){
 	organisationseinheit_selected = $(this).val();
 });
+
+$('#btn-desync-phases').click(function() {
+
+	var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
+
+	if (sap_phases_data.length === 0) {
+		FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Phase aus.');
+		return;
+	}
+
+	var projects_timesheet_id = sap_phases_data[0].projects_timesheet_id;
+
+	if (projects_timesheet_id === null) {
+		FHC_DialogLib.alertInfo('Die ausgewählte SAP Phase ist nicht verknüpft.');
+		return;
+	}
+
+	var data = {
+		'projects_timesheet_id': projects_timesheet_id
+	};
+
+	FHC_AjaxClient.ajaxCallPost(
+		FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjectphases",
+		data,
+		{
+			successCallback: function (data, textStatus, jqXHR) {
+
+				if (FHC_AjaxClient.isError(data))
+					FHC_DialogLib.alertWarning(data.retval);
+
+				if (FHC_AjaxClient.isSuccess(data))
+				{
+					$(SAP_PHASES_TABLE).tabulator(
+						'updateData',
+						JSON.stringify([{projects_timesheet_id: data.retval.projects_timesheet_id, isSynced: 'false'}])
+					);
+
+					$(FH_PHASES_TABLE).tabulator(
+						'updateData',
+						JSON.stringify([{projektphase_id: data.retval.projektphase_id, isSynced: 'false'}])
+					);
+
+					var row = $(FH_PHASES_TABLE).tabulator('getRow', data.retval.projektphase_id);
+
+					_resetPhaseGUI();
+				}
+			},
+			errorCallback: function (jqXHR, textStatus, errorThrown) {
+				FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+			}
+		}
+	);
+
+})
 
 });
 
@@ -673,7 +776,26 @@ var SyncProjects = {
 		let deleted_text = (deleted == 'false') ? 'nein' : 'ja';
 
 		$("#sap-project-deleted").text(deleted_text);
-	}
+	},
+
+	showSAPPhasesStatus: function(projects_timesheet_id){
+
+		let sap_phases_row = $(SAP_PHASES_TABLE).tabulator('getRow', projects_timesheet_id);
+		let status = sap_phases_row.getData().status;
+		let status_text = SAP_PHASES_STATUS_MAP.has(status) ? SAP_PHASES_STATUS_MAP.get(status) : '-';
+
+		$("#sap-projectphase-status").text(status_text);
+	},
+
+	showSAPPhasesDeleted: function(projects_timesheet_id){
+
+		let sap_phases_row = $(SAP_PHASES_TABLE).tabulator('getRow', projects_timesheet_id);
+		let deleted = sap_phases_row.getData().deleted;
+
+		let deleted_text = (deleted === false) ? 'nein' : 'ja';
+
+		$("#sap-projectphase-deleted").text(deleted_text);
+	},
 
 
 

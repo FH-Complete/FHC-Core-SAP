@@ -3,13 +3,15 @@
 // NOTE: This is a pseudo query to be able to start with an empty table.
 // Table will be filled with data by user interaction (ajax call).
 $qry = '
-	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1)) AS tmp (
+	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1, 1, 1)) AS tmp (
 	"isSynced",
     "projects_timesheets_project",
     "projects_timesheet_id",
     "project_id",
     "project_task_id",
-    "name"
+    "name",
+	"status",
+	"deleted"
 	) LIMIT 0;
 ';
 
@@ -24,7 +26,9 @@ $tableWidgetArray = array(
 		'SAP ProjektTimesheetID',
 		'SAP ProjektID',
 		'SAP ProjektTaskID',
-		'SAP Projektphase'
+		'SAP Projektphase',
+		'Status',
+		'Deleted'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
@@ -35,9 +39,9 @@ $tableWidgetArray = array(
 	    selectable: true,
         selectableRangeMode: "click",
 		selectablePersistence: false,
-		selectableCheck: function(row){
-            return func_selectableCheck(row);
-        },
+        rowSelected: function(row){
+			rowSelected_onSAPPhases(row);
+		},
         rowUpdated: function(row){
             resortTable(row);
         },
@@ -48,10 +52,13 @@ $tableWidgetArray = array(
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
 		projects_timesheets_project: {visible: false},
+		projects_timesheets_project_id: {visible: false},
 		projects_timesheet_id: {visible: false},
 		project_id: {visible:false},
 		project_task_id: {visible:false},
-		name: {visible:true}
+		name: {visible:true},
+		status: {visible:false},
+		deleted: {visible:false}
 	}'
 );
 

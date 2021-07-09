@@ -159,6 +159,17 @@ $this->load->view(
 
                             </div>
 
+							<div class="panel-heading">
+								<div class="row">
+									<div class="col-xs-6">
+										<small><span class="text-muted">SAP Projektphasestatus: </span></small><b><span id="sap-projectphase-status" class="pull-right text-uppercase">-</span></b>
+									</div>
+									<div class="col-xs-6">
+										<small><span class="text-muted">SAP Projektphase gelöscht: </span></small><b><span id="sap-projectphase-deleted" class="pull-right text-uppercase">-</span></b>
+									</div>
+								</div>
+							</div>
+
                             <div class="panel-heading">
                                 <div class="row">
                                     <div class="col-xs-5">
@@ -180,6 +191,17 @@ $this->load->view(
                                     </div>
                                 </div>
                             </div>
+
+							<div class="panel-heading">
+								<div class="row">
+									<div class="col-xs-5">
+										<small><span class="text-muted">Verknüpfung auflösen</span></small>
+									</div>
+									<div class="col-xs-7">
+										<button id="btn-desync-phases" class="btn btn-default pull-right">Auflösen</button>
+									</div>
+								</div>
+							</div>
 
                             <div class="panel-body">
                                 <div class="col-xs-6">
