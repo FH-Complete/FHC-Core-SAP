@@ -52,10 +52,12 @@ class ManageEmployees extends JQW_Controller
 	 */
 	public function create()
 	{
-		$this->logInfo('Start data synchronization with SAP ByD: create employees');
+		//$this->logInfo('Start data synchronization with SAP ByD: create employees');
 
 		// Gets the latest jobs
 		$lastJobs = $this->getLastJobs(SyncEmployeesLib::SAP_EMPLOYEES_CREATE);
+		$syncResult = $this->syncemployeeslib->create(mergeUidArray(getData($lastJobs)));
+
 		if (isError($lastJobs))
 		{
 			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncEmployeesLib::SAP_EMPLOYEES_CREATE);
@@ -87,5 +89,6 @@ class ManageEmployees extends JQW_Controller
 
 		$this->logInfo('End data synchronization with SAP ByD: create employees');
 	}
+
 }
 

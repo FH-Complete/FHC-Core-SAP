@@ -7,6 +7,10 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class SyncEmployeesLib
 {
+	// Jobs types used by this lib
+	const SAP_EMPLOYEES_CREATE = 'SAPEmployeesCreate';
+	const SAP_EMPLOYEES_UPDATE = 'SAPEmployeesUpdate';
+
 	const CREATE_EMP_PREFIX = 'CE';
 
 	// Genders
@@ -21,6 +25,9 @@ class SyncEmployeesLib
 	const DEFAULT_LANGUAGE_ISO = 'DE'; // Default language ISO
 	const ENGLISH_LANGUAGE = 'English'; // English language
 	const ENGLISH_LANGUAGE_ISO = 'EN'; // English language ISO
+
+	const SAP_TYPE_PERMANENT = 1;
+	const SAP_TYPE_TEMPORARY = 2;
 
 	private $_ci; // Code igniter instance
 
@@ -56,6 +63,8 @@ class SyncEmployeesLib
 
 		// Loads model ManagePersonnelHiringInModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePersonnelHiringIn_model', 'ManagePersonnelHiringInModel');
+
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryEmployeeIn_model', 'QueryEmployeeInModel');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -138,51 +147,52 @@ class SyncEmployeesLib
 	public function create($emps)
 	{
 		// If the given array of person ids is empty stop here
-		if (isEmptyArray($users)) return success('No users to be created');
+		if (isEmptyArray($emps)) return success('No employees to be created');
 
 		// Remove the already created users performing a diff between the given person ids and those present
 		// in the sync table. If no errors and the diff array is not empty then continues, otherwise a message
 		// is returned
-		$diffUsers = $this->_removeCreatedUsers($users);
+		$diffUsers = $this->_removeCreatedUsers($emps);
 		if (isError($diffUsers)) return $diffUsers;
 		if (!hasData($diffUsers)) return success('No users to be created after diff');
 
 		// Retrieves all users data
-		$usersAllData = $this->_getAllUsersData($diffUsers);
+		$empsAllData = $this->_getAllUsersData($diffUsers);
 
-		if (isError($usersAllData)) return $usersAllData;
-		if (!hasData($usersAllData)) return error('No data available for the given users');
+		if (isError($empsAllData)) return $empsAllData;
+		if (!hasData($empsAllData)) return error('No data available for the given users');
 
 		// Loops through users data
-		foreach (getData($usersAllData) as $userData)
+		foreach (getData($empsAllData) as $empData)
 		{
-			// If an email address was not found for this user...
-			if (isEmptyString($userData-><something mandatory>))
+			// If an email address was not found for this employee...
+			/*if (isEmptyString($empData->email))
 			{
-				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid email address for user: '.$userData->person_id);
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid email address for employee: '.$empData->person_id);
 				continue; // ...and continue to the next one
 			}
 
 			// If not a valid ort or gemeinde is present
 			// If ort is not present or it is an empty string
-			if (!isset($userData->ort) || (isset($userData->ort) && isEmptyString($userData->ort)))
+			if (!isset($empData->ort) || (isset($empData->ort) && isEmptyString($empData->ort)))
 			{
 				// If also the gemeinde is not present or it is an empty string
-				if (!isset($userData->gemeinde) || (isset($userData->gemeinde) && isEmptyString($userData->gemeinde)))
+				if (!isset($empData->gemeinde) || (isset($empData->gemeinde) && isEmptyString($empData->gemeinde)))
 				{
-					$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid ort or gemeinde for user: '.$userData->person_id);
+					$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a valid ort or gemeinde for employee: '.$empData->person_id);
 					continue; // ...and continue to the next one
 				}
 			}
 
 			// Checks if the current employee is already present in SAP
-			$userDataSAP = $this->_employeesExistsBySomething($userData-><criteria>);
+			$empDataSAP = $this->_employeesExistsByEmailSAP($empData->email);
 
 			// If an error occurred then return it
-			if (isError($userDataSAP)) return $userDataSAP;
+			if (isError($empDataSAP)) return $empDataSAP;*/
 
-			// If the current user is not present in SAP
-			if (!hasData($userDataSAP))
+			$empDataSAP = null;
+			// If the current employee is not present in SAP
+			if (!hasData($empDataSAP))
 			{
 				$data = array(
 					'BasicMessageHeader' => array(
@@ -191,46 +201,72 @@ class SyncEmployeesLib
 					),
 					'PersonnelHiring' => array(
 						'actionCode' => '01',
-						'ObjectNodeSenderTechnicalID' => '',
+						'HireDate' => $empData->startDate,
+						'LeavingDate' => $empData->endDate,
 						'Employee' => array(
-							'GivenName' => $userData->name,
-							'FamilyName' => $userData->surname,
-							'BirthName' => $userData->surname,
-							'NonVerbalCommunicationLanguageCode' => $userData->language,
-							'GenderCode' => $userData->gender
+							'GivenName' => $empData->name,
+							'FamilyName' => $empData->surname,
+							'GenderCode' => $empData->gender,
+							'BirthDate' => $empData->bday,
+							'PrivateAddress' => array(
+								'CountryCode' => $empData->country,
+								'CityName' => $empData->city,
+								'StreetPostalCode' => $empData->zip,
+								'StreetName' => $empData->street
+							)
 						),
-						...
-						...
-						...
+						'Employment' => array(
+							'CountryCode' => 'AT'
+						),
+						'WorkAgreement' => array(
+							'TypeCode' => $empData->typeCode,
+							'AdministrativeCategoryCode' => 2,
+							'AgreedWorkingHoursRate' => array(
+								'DecimalValue' => $empData->decimalValue,
+								'BaseMeasureUnitCode' => 'WEE'
+							),
+							'OrganisationalCentreID' => '100021',
+							'JobID' => 'MAIST'
+						)
+
 					)
 				);
 
 				// Then create it!
-				$manageCustomerResult = $this->_ci->ManagePersonnelHiringInModel->maintainBundle($data);
+				$manageCustomerResult = $this->_ci->ManagePersonnelHiringInModel->MaintainBundle($data);
+
 
 				// If an error occurred then return it
 				if (isError($manageCustomerResult)) return $manageCustomerResult;
 
-				var_dump($manageCustomer);exit;
+
 
 				// SAP data
 				$manageCustomer = getData($manageCustomerResult);
 
 				// If data structure is ok...
-				if (isset($manageCustomer->PersonnelHiring) && isset($manageCustomer->PersonnelHiring->InternalID))
+				if (isset($manageCustomer->PersonnelHiring) && isset($manageCustomer->PersonnelHiring->UUID))
 				{
+
+					$sapEmployeeResult = $this->getEmployeeAfterCreation($empData->name, $empData->surname, date('Y-m-d'));
+
+					if (isError($sapEmployeeResult)) return $sapEmployeeResult;
+
+					$sapEmployee = getData($sapEmployeeResult);
+
+					/*$this->updateEmployee($sapEmployee->BasicData->EmployeeID, $empData);
 					// Store in database the couple person_id sap_user_id
 					$insert = $this->_ci->SAPMitarbeiterModel->insert(
 						array(
-							'miterbeiter_id' => $userData->person_id,
-							'sap_ee_id' => $manageCustomer->PersonnelHiring->InternalID
+							'miterbeiter_id' => $empData->person_id,
+							'sap_ee_id' => $sapEmployee->BasicData->EmployeeID
 						)
 					);
 
 					// If database error occurred then return it
-					if (isError($insert)) return $insert;
+					if (isError($insert)) return $insert;*/
 				}
-				else // ...otherwise store a non blocking error and continue with the next user
+				else // ...otherwise store a non blocking error and continue with the next employee
 				{
 					// If it is present a description from SAP then use it
 					if (isset($manageCustomer->Log) && isset($manageCustomer->Log->Item)
@@ -240,30 +276,30 @@ class SyncEmployeesLib
 						{
 							foreach ($manageCustomer->Log->Item as $item)
 							{
-								if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$userData->person_id);
+								if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note.' for employee: '.$empData->person_id);
 							}
 						}
 						elseif ($manageCustomer->Log->Item->Note)
 						{
-							$this->_ci->LogLibSAP->logWarningDB($manageCustomer->Log->Item->Note.' for user: '.$userData->person_id);
+							$this->_ci->LogLibSAP->logWarningDB($manageCustomer->Log->Item->Note.' for employee: '.$empData->person_id);
 						}
 					}
 					else
 					{
 						// Default non blocking error
-						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$userData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for employee: '.$empData->person_id);
 					}
 					continue;
 				}
 			}
 			else // Add the already existing employee to the sync table
 			{
-				$sapCustomer = getData($userDataSAP); // get SAP customer data
+				$sapCustomer = getData($empDataSAP); // get SAP customer data
 
 				// Store in database the couple person_id sap_user_id
 				$insert = $this->_ci->SAPStudentsModel->insert(
 					array(
-						'uid_id' => $userData->uid_id,
+						'uid_id' => $empData->uid_id,
 						'sap_eeid' => $sapCustomer->EeID
 					)
 				);
@@ -319,15 +355,15 @@ class SyncEmployeesLib
 		// Loops through the given users and depending on the value of the parameter initialFoundValue
 		// removes created (initialFoundValue == false) or not created (initialFoundValue == true) users
 		// from the users parameter
-		for ($i = 0; $i < count($users); $i++)
+		for ($i = 0; $i < count($emps); $i++)
 		{
 			$found = $initialFoundValue; // initial value is the same as initialFoundValue
 
 			if (hasData($dbSyncdUsers)) // only if data are present in database
 			{
-				foreach (getData($dbSyncdUsers) as $dbSyncUser) // for each synced user
+				foreach (getData($dbSyncdUsers) as $dbSyncUser) // for each synced employee
 				{
-					if ($users[$i] == $dbSyncUser->person_id)
+					if ($emps[$i] == $dbSyncUser->mitarbeiter_uid)
 					{
 						$found = !$initialFoundValue; // opposite value of initialFoundValue
 						break;
@@ -335,29 +371,30 @@ class SyncEmployeesLib
 				}
 			}
 
-			if (!$found) $diffUsersArray[] = $users[$i]; // if not found then add to diffUsersArray array
+			if (!$found) $diffUsersArray[] = $emps[$i]; // if not found then add to diffUsersArray array
 		}
 
 		return success($diffUsersArray);
 	}
 
 	/**
-	 * Retrieves all the data needed to create/update a user on SAP side
+	 * Retrieves all the data needed to create/update a employee on SAP side
 	 */
 	private function _getAllUsersData($emps)
 	{
-		$usersAllDataArray = array(); // returned array
+		$empsAllDataArray = array(); // returned array
 
 		// Retrieves users personal data from database
 		$dbModel = new DB_Model();
 
-		$dbUsersPersonalData = $dbModel->execReadOnlyQuery('
+		$dbEmpsPersonalData = $dbModel->execReadOnlyQuery('
 			SELECT DISTINCT p.person_id,
 				p.nachname AS surname,
 				p.vorname AS name,
 				p.anrede AS title,
 				p.sprache AS language,
 				p.geschlecht AS gender,
+				p.gebdatum AS bday,
 				b.uid AS uid
 			  FROM public.tbl_person p
 			  JOIN public.tbl_benutzer b USING(person_id)
@@ -366,50 +403,50 @@ class SyncEmployeesLib
 			getData($emps)
 		));
 
-		if (isError($dbUsersPersonalData)) return $dbUsersPersonalData;
-		if (!hasData($dbUsersPersonalData)) return error('The provided person ids are not present in database');
+		if (isError($dbEmpsPersonalData)) return $dbEmpsPersonalData;
+		if (!hasData($dbEmpsPersonalData)) return error('The provided person ids are not present in database');
 
 		// Loops through users personal data
-		foreach (getData($dbUsersPersonalData) as $userPersonalData)
+		foreach (getData($dbEmpsPersonalData) as $empPersonalData)
 		{
 			// -------------------------------------------------------------------------------------------
 			// Gender
 			//
 			// Male
-			if ($userPersonalData->gender == self::FHC_GENDER_MALE)
+			if ($empPersonalData->gender == self::FHC_GENDER_MALE)
 			{
-				$userPersonalData->gender = self::SAP_GENDER_MALE;
+				$empPersonalData->gender = self::SAP_GENDER_MALE;
 			}
 			// Female
-			elseif ($userPersonalData->gender == self::FHC_GENDER_FEMALE)
+			elseif ($empPersonalData->gender == self::FHC_GENDER_FEMALE)
 			{
-				$userPersonalData->gender = self::SAP_GENDER_FEMALE;
+				$empPersonalData->gender = self::SAP_GENDER_FEMALE;
 			}
 			// Non binary
-			elseif ($userPersonalData->gender == self::FHC_GENDER_NON_BINARY)
+			elseif ($empPersonalData->gender == self::FHC_GENDER_NON_BINARY)
 			{
-				$userPersonalData->gender = self::SAP_GENDER_NON_BINARY;
+				$empPersonalData->gender = self::SAP_GENDER_NON_BINARY;
 			}
 			// Unknown
 			else
 			{
-				$userPersonalData->gender = self::SAP_GENDER_UNKNOWN;
+				$empPersonalData->gender = self::SAP_GENDER_UNKNOWN;
 			}
 
 			// -------------------------------------------------------------------------------------------
 			// Language
 
 			// If the language is english then store the iso code
-			if ($userPersonalData->language == self::ENGLISH_LANGUAGE)
+			if ($empPersonalData->language == self::ENGLISH_LANGUAGE)
 			{
-				$userPersonalData->language = self::ENGLISH_LANGUAGE_ISO;
+				$empPersonalData->language = self::ENGLISH_LANGUAGE_ISO;
 			}
 			else // otherwise for any other language use the default iso code
 			{
-				$userPersonalData->language = self::DEFAULT_LANGUAGE_ISO;
+				$empPersonalData->language = self::DEFAULT_LANGUAGE_ISO;
 			}
 
-			$userAllData = $userPersonalData; // Stores current user personal data
+			$empAllData = $empPersonalData; // Stores current employee personal data
 
 			// -------------------------------------------------------------------------------------------
 			// Address
@@ -420,24 +457,23 @@ class SyncEmployeesLib
 			$this->_ci->AdresseModel->addLimit(1);
 			$addressResult = $this->_ci->AdresseModel->loadWhere(
 				array(
-					'person_id' => $userPersonalData->person_id, 'zustelladresse' => true
+					'person_id' => $empPersonalData->person_id, 'zustelladresse' => true
 				)
 			);
-
-			$userAllData->country = '';
 
 			if (isError($addressResult)) return $addressResult;
 			if (hasData($addressResult)) // if an address was found
 			{
-				$userAllData->country = getData($addressResult)[0]->iso3166_1_a2;
-				$userAllData->strasse = getData($addressResult)[0]->strasse;
-				$userAllData->plz = getData($addressResult)[0]->plz;
-				$userAllData->ort = getData($addressResult)[0]->ort;
+				$empAllData->country = getData($addressResult)[0]->iso3166_1_a2;
+				$empAllData->street = getData($addressResult)[0]->strasse;
+				$empAllData->zip = getData($addressResult)[0]->plz;
+				$empAllData->city = getData($addressResult)[0]->ort;
 			}
+
 
 			// -------------------------------------------------------------------------------------------
 			// Email
-
+/*
 			// Fallback on the private email
 			$this->_ci->load->model('person/Kontakt_model', 'KontaktModel');
 			$this->_ci->KontaktModel->addOrder('updateamum', 'DESC');
@@ -445,84 +481,103 @@ class SyncEmployeesLib
 			$this->_ci->KontaktModel->addLimit(1);
 			$kontaktResult = $this->_ci->KontaktModel->loadWhere(
 				array(
-					'person_id' => $userPersonalData->person_id, 'kontakttyp' => 'email', 'zustellung' => true
+					'person_id' => $empPersonalData->person_id, 'kontakttyp' => 'email', 'zustellung' => true
 				)
 			);
 
 			if (isError($kontaktResult)) return $kontaktResult;
 			if (hasData($kontaktResult)) // if an email was found
 			{
-				$userAllData->privateEmail = getData($kontaktResult)[0]->kontakt;
+				$empAllData->privateEmail = getData($kontaktResult)[0]->kontakt;
 			}
 			else // otherwise set the email as null, it should be checked later every time before using it
 			{
-				$userAllData->privateEmail = null;
+				$empAllData->privateEmail = null;
+			}*/
+/*
+			// Company Mail
+			$empAllData->email = $empPersonalData->uid.'@'.DOMAIN;
+
+			// -------------------------------------------------------------------------------------------
+			// Bank
+			$this->_ci->load->model('person/Bankverbindung_model', 'BankverbindungModel');
+			$this->_ci->BankverbindungModel->addOrder('updateamum', 'DESC');
+			$this->_ci->BankverbindungModel->addOrder('insertamum', 'DESC');
+			$this->_ci->BankverbindungModel->addLimit(1);
+			$bankResult = $this->_ci->BankverbindungModel->loadWhere(
+				array(
+					'person_id' => $empPersonalData->person_id, 'verrechnung' => true
+				)
+			);
+			$empAllData->bank = getData($bankResult)[0];
+
+			if (isError($bankResult)) return $bankResult;
+			if (hasData($bankResult)) // if an email was found
+			{
+				$empAllData->email = getData($bankResult)[0]->kontakt;
+			}
+			else // otherwise set the email as null, it should be checked later every time before using it
+			{
+				$userAllData->email = null;
+			}*/
+
+
+			// -------------------------------------------------------------------------------------------
+			// Bisverwendung
+
+			$this->_ci->load->model('codex/bisverwendung_model', 'BisverwendungModel');
+			$bisResult = $this->_ci->BisverwendungModel->getLast($empPersonalData->uid);
+
+
+			if (isError($bisResult)) return $bisResult;
+			if (hasData($bisResult)) // if an email was found
+			{
+				$empAllData->startDate = getData($bisResult)[0]->beginn;
+				$empAllData->endDate = getData($bisResult)[0]->ende;
+				$empAllData->decimalValue = getData($bisResult)[0]->vertragsstunden;
 			}
 
-			// Get Company Mail if available
-			$userAllData->email = userPersonalData->uid.'@'.DOMAIN;
-
-			// Stores all data for the current user
-			$usersAllDataArray[] = $userAllData;
-		}
-
-		return success($usersAllDataArray); // everything was fine!
-	}
-
-	/**
-	 * Checks on SAP side if a user already exists with the given email address
-	 * Returns a success object with the found user data, otherwise with a false value
-	 * In case of error then an error object is returned
-	 */
-	private function _employeesExistsBySomething($<criteria>)
-	{
-		$queryCustomerResult = $this->getUserByEmail($email);
-
-		if (isError($queryCustomerResult)) return $queryCustomerResult;
-		if (!hasData($queryCustomerResult)) return error('Something went wrong while checking if a user is present using email adress');
-
-		// Get data from then returned object
-		$queryCustomer = getData($queryCustomerResult);
-
-		// Checks the structure of then returned object
-		if (isset($queryCustomer->ProcessingConditions)
-			&& isset($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue))
-		{
-			// Returns the customer object a user is present in SAP with the given email, otherwise an empty success
-			if ($queryCustomer->ProcessingConditions->ReturnedQueryHitsNumberValue > 0
-				&& ($queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_PREPARATION
-				|| $queryCustomer->Customer->LifeCycleStatusCode == self::USER_STATUS_ACTIVE))
+			if (is_null($empAllData->endDate))
 			{
-				return success($queryCustomer->Customer);
+				$empAllData->typeCode = self::SAP_TYPE_PERMANENT;
 			}
 			else
 			{
-				return success();
+				$empAllData->typeCode = self::SAP_TYPE_TEMPORARY;
 			}
+			// Stores all data for the current employee
+			$empsAllDataArray[] = $empAllData;
+
 		}
-		else
-		{
-			return error('The returned SAP object is not correctly structured');
-		}
+
+		return success($empsAllDataArray); // everything was fine!
 	}
 
-	/**
-	 * Return the raw result of SAP->QueryCustomerIn->FindByCommunicationData->SelectionByEmailURI
-	 */
-	public function getUserByEmail($email)
+	public function getEmployeeAfterCreation($name, $surname, $date)
 	{
-		// Calls SAP to find a user with the given email
-		return $this->_ci->QueryCustomerInModel->findByCommunicationData(
+		return $this->_ci->QueryEmployeeInModel->findByIdentification(
 			array(
-				'CustomerSelectionByCommunicationData' => array(
-					'SelectionByEmailURI' => array(
-						'LowerBoundaryEmailURI' => $email,
+				'EmployeeBasicDataSelectionByIdentification' => array(
+					'SelectionByEmployeeGivenName' => array(
+						'LowerBoundaryEmployeeGivenName' => $name,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					),
+					'SelectionByEmployeeFamilyName' => array(
+						'LowerBoundaryEmployeeFamilyName' => $surname,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					),
+					'SelectionByCreatedSinceDate' => array(
+						'LowerBoundaryEmployeeCreatedSinceDate' => $date,
 						'InclusionExclusionCode' => 'I',
 						'IntervalBoundaryTypeCode' => 1
 					)
+
 				),
 				'ProcessingConditions' => array(
-					'QueryHitsUnlimitedIndicator' => true
+					'QueryHitsUnlimitedIndicator' => false,
+					'QueryHitsMaximumNumberValue' => 1,
 				)
 			)
 		);

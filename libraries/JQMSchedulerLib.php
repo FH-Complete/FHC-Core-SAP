@@ -357,25 +357,23 @@ class JQMSchedulerLib
 	/**
 	 * 
 	 */
-	public function newEmployess($hours = null)
+	public function newEmployees($hours = null)
 	{
 		$jobInput = null;
 
 		$timeInterval = '24';
-		if (is_number($hours)) $timeInterval = $hours;
+		if (is_numeric($hours)) $timeInterval = $hours;
 
 		$dbModel = new DB_Model();
 
 		//
 		$newUsersResult = $dbModel->execReadOnlyQuery('
 			SELECT m.mitarbeiter_uid AS uid
-			  FROM public.tbl_person p
-			  JOIN public.tbl_benutzer b USING(person_id)
-			  JOIN public.tbl_mitarbeiter n ON (m.mitarbeiter_uid = b.uid)
-			 WHERE m.fixangestellt = TRUE
-			   AND b.aktiv = TRUE
-			   AND ...
-			   AND NOW() - m.insertamum <= INTERVAL \''.$timeInterval.' hours\'
+			FROM public.tbl_person p
+			JOIN public.tbl_benutzer b USING(person_id)
+			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
+			WHERE b.aktiv = TRUE
+			AND NOW() - m.insertamum <= INTERVAL \''.$timeInterval.' hours\'
 		');
 
 		// If error occurred while retrieving new users from database then return the error
