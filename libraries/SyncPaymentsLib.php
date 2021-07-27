@@ -18,6 +18,12 @@ class SyncPaymentsLib
 	// Credit memo sales order
 	const CREDIT_MEMO_SOI = 'CREDIT MEMO';
 
+	// Incoming/outgoing grant config entry name
+	const INCOMING_OUTGOING_GRANT = 'payments_incoming_outgoing_grant';
+
+	// International office sales unit party id config entry name
+	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
+
 	private $_ci; // Code igniter instance
 	private $_isInvoiceClearedCache; // Cache Invoice Status Results
 	private $_getInvoiceIDFromSalesOrderCache; // Cache Sales Order results
@@ -166,7 +172,7 @@ class SyncPaymentsLib
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($personIdArray)) return success('No gutschrift to be created');
 
-		// For eache person id
+		// For each person id
 		foreach ($personIdArray as $person_id)
 		{
 			// Get the SAP user id for this person
@@ -227,23 +233,32 @@ class SyncPaymentsLib
 				// Here the service id!
 				$service_id = getData($serviceIdResult)[0]->service_id;
 
-				// Get the sales unit party
-				$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
+				// By default get the sales unit party id from the configs
+				$salesUnitPartyID = $this->_ci->config->item(self::INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID);
 
-				// If an error occurred then return it
-				if (isError($salesUnitPartyIDResult)) return $salesUnitPartyIDResult;
-
-				// If no data have been found
-				if (!hasData($salesUnitPartyIDResult))
+				// If the buchungstyp_kurzbz is _not_ for an incoming/outgoing grant
+				// then get the sales unit party id from database
+				if ($singlePayment->buchungstyp_kurzbz != $this->_ci->config->item(self::INCOMING_OUTGOING_GRANT))
 				{
-					// Then log it
-					$this->_ci->LogLibSAP->logWarningDB('Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz);
-					continue; // and continue to the next one
+					// Get the sales unit party
+					$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
+
+					// If an error occurred then return it
+					if (isError($salesUnitPartyIDResult)) return $salesUnitPartyIDResult;
+
+					// If no data have been found
+					if (!hasData($salesUnitPartyIDResult))
+					{
+						// Then log it
+						$this->_ci->LogLibSAP->logWarningDB('Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz);
+						continue; // and continue to the next one
+					}
+
+					// Here the salesUnitPartyID!
+					$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
 				}
 
-				// Here the salesUnitPartyID!
-				$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
-
+				// Builds the data structure for the SOAP call
 				$data = array(
 					'BusinessDocumentBasicMessageHeader' => array(
 						'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),

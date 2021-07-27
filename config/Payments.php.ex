@@ -22,3 +22,9 @@ $config['payments_sales_unit_custom'] = '100003';
 // after this date - because there are no projects available
 $config['payments_studiensemester_start_max_date'] = '2021-01-01';
 
+// Incoming/outgoing grant
+$config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
+
+// International office sales unit party id (aka organization unit id)
+$config['payments_international_office_sales_unit_party_id'] = '100097';
+
