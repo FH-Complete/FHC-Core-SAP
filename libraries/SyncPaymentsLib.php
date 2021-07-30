@@ -303,7 +303,7 @@ class SyncPaymentsLib
 								)
 							),
 							'Quantity' => '1',
-							'QuantityTypeCode' => 'EA',
+							'QuantityTypeCode' => 'EA',/*
 							'AccountingCodingBlockAssignment' => array(
 								'AccountingCodingBlock' => array(
 									'ProjectReference' => array(
@@ -315,7 +315,7 @@ class SyncPaymentsLib
 										'ProjectID' => 'COURSES-ESW-WS2020'
 									)
 								)
-							)
+							)*/
 						)
 					)
 				);
@@ -324,7 +324,10 @@ class SyncPaymentsLib
 				$manageCustomerInvoiceRequestInResult = $this->_ci->ManageCustomerInvoiceRequestInModel->MaintainBundle($data);
 
 				// If an error occurred then return it
-				if (!isError($manageCustomerInvoiceRequestInResult)) return $manageCustomerInvoiceRequestInResult;
+				if (isError($manageCustomerInvoiceRequestInResult))
+				{
+					return $manageCustomerInvoiceRequestInResult;
+				}
 
 				// SAP data
 				$creditMemoResult = getData($manageCustomerInvoiceRequestInResult);
@@ -333,15 +336,32 @@ class SyncPaymentsLib
 				if (isset($creditMemoResult->CustomerInvoiceRequest)
 				 && isset($creditMemoResult->CustomerInvoiceRequest->BaseBusinessTransactionDocumentID))
 				{
+					// Mark Entry in FAS as payed
+					$kontoResult = $this->_ci->KontoModel->insert(
+						array(
+							'person_id' => $singlePayment->person_id,
+							'studiengang_kz' => $singlePayment->studiengang_kz,
+							'studiensemester_kurzbz' => $singlePayment->studiensemester_kurzbz,
+							'buchungsnr_verweis' => $singlePayment->buchungsnr,
+							'betrag' => $singlePayment->betrag*(-1),
+							'buchungsdatum' => date('Y-m-d'),
+							'buchungstext' => $singlePayment->buchungstext,
+							'buchungstyp_kurzbz' => $singlePayment->buchungstyp_kurzbz
+						)
+					);
+
+					if (isError($kontoResult)) return $kontoResult;
+
+					/*
 					$salesOrderResult = $this->_ci->SAPSalesOrderModel->insert(
 						array(
 							'buchungsnr' => $singlePayment->buchungsnr,
 							'sap_sales_order_id' => self::CREDIT_MEMO_SOI.' '.$singlePayment->person_id
 						)
 					);
-
 					// If an error occurred then return it
 					if (isError($salesOrderResult)) return $salesOrderResult;
+					*/
 				}
 				else // ...otherwise store a non blocking error
 				{
@@ -1047,4 +1067,3 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
-
