@@ -247,4 +247,27 @@ class ManageProjects extends JOB_Controller
 
 		$this->logInfo('End projects dates synchronization with SAP ByD');
 	}
+
+	/**
+	 *
+	 */
+	public function updateProjectDates($projectName, $startDate, $endDate)
+	{
+		$this->logInfo('Start project '.$projectName.' dates update on SAP ByD');
+
+		// Import SAP projects ids
+		$updateResult = $this->syncprojectslib->updateProjectDates($projectName, $startDate, $endDate);
+
+		// If an error occurred then log it
+		if (isError($updateResult))
+		{
+			$this->logError(getCode($updateResult).': '.getError($updateResult));
+		}
+		else // otherwise
+		{
+			$this->logInfo(getData($updateResult));
+		}
+
+		$this->logInfo('End project '.$projectName.' dates update on SAP ByD');
+	}
 }

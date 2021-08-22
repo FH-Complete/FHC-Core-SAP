@@ -321,6 +321,21 @@ class Projects_model extends ODATAClientModel
 		);
 	}
 
+	/**
+	 * 
+	 */
+	public function setTaskDates($taskObjectID, $duration)
+	{
+		return $this->_call(
+			self::URI_PREFIX.'ProjectTaskCollection(\''.$taskObjectID.'\')',
+			ODATAClientLib::HTTP_MERGE_METHOD,
+			array(
+				'ObjectID' => $taskObjectID,
+				'PlannedDuration' => 'P'.$duration.'D'
+			)
+		);
+	}
+
 	// --------------------------------------------------------------------------------------------
 	// Public methods PATCH API calls
 
@@ -334,9 +349,8 @@ class Projects_model extends ODATAClientModel
 			ODATAClientLib::HTTP_PATCH_METHOD,
 			array(
 				'ObjectID' => $projectObjectId,
-				'PlannedStartDateTime' => toDate($startDate),
-				'PlannedEndDateTime' => toDate($endDate),
-				'Projektnamelang_KUT' => 'RWE SuMiWuSchi'
+				'PlannedStartDateTime' => $startDate,
+				'PlannedEndDateTime' => $endDate
 			)
 		);
 	}
