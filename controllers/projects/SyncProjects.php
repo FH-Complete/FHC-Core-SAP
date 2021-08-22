@@ -19,10 +19,11 @@ class SyncProjects extends Auth_Controller
 				'syncProjects' => 'basis/projekt:rw',
 				'syncProjectphases' => 'basis/projekt:rw',
 				'createFUEProject' => 'basis/projekt:rw',
-				'createFUEPhase' => 'basis/projekt:rw'
+				'createFUEPhase' => 'basis/projekt:rw',
+				'getSAPProjectOE' => 'basis/projekt:r'
 			)
 		);
-		
+
 		// Load models
 		$this->load->model('project/Projekt_model', 'ProjektModel');
 		$this->load->model('project/Projektphase_model', 'ProjektphaseModel');
@@ -31,7 +32,7 @@ class SyncProjects extends Auth_Controller
 
 		// Load libraries
 		$this->load->library('WidgetLib');
-		
+
 		// Load language phrases
 		$this->loadPhrases(
 			array(
@@ -39,12 +40,12 @@ class SyncProjects extends Auth_Controller
 				'lehre'
 			)
 		);
-		
+
 		$this->_setAuthUID(); // sets property uid
-		
+
 		$this->setControllerId(); // sets the controller id
 	}
-	
+
 	public function index()
 	{
 		$this->load->view('extensions/FHC-Core-SAP/projects/syncProjects.php');
@@ -66,7 +67,8 @@ class SyncProjects extends Auth_Controller
 			return $this->outputJsonSuccess(array(
 				'projekt_id' => $result->projekt_id,
 				'projekt_kurzbz' => $result->projekt_kurzbz,
-				'titel' => $result->titel
+				'titel' => $result->titel,
+				'beschreibung' => $result->beschreibung
 			));
 		}
 	}
@@ -87,9 +89,29 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonSuccess(array(
 				'projects_timesheet_id' => $result->projects_timesheet_id,
-				'project_id' => $result->project_id
+				'project_id' => $result->project_id,
+				'name' => $result->name
 			));
 		}
+	}
+
+	public function getSAPProjectOE()
+	{
+		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+
+		$this->SAPProjectsTimesheetsModel->addJoin('sync.tbl_sap_organisationsstruktur', 'responsible_unit = tbl_sap_organisationsstruktur.oe_kurzbz_sap');
+
+		$result = $this->SAPProjectsTimesheetsModel->loadWhere(array(
+			'projects_timesheet_id' => $projects_timesheet_id
+		));
+
+		if($result = getData($result)[0])
+		{
+			return $this->outputJsonSuccess(array(
+				'oe_kurzbz' => $result->oe_kurzbz
+			));
+		}
+
 	}
 
 	// Load all SAP phases of the given SAP project.
@@ -193,7 +215,7 @@ class SyncProjects extends Auth_Controller
 		$sap_project_projects_timesheet_id = $retval->projects_timesheet_id;
 		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($sap_project_projects_timesheet_id);
 		$isSynced_FUEProject = $this->ProjectsTimesheetsProjectModel->isSynced_FUEProject($projekt_id);
-		
+
 		if (!$isSynced_SAPProject || !$isSynced_FUEProject)
 		{
 			return $this->outputJsonError('Bitte synchronisieren Sie erst die Projekte');
@@ -256,10 +278,10 @@ class SyncProjects extends Auth_Controller
 		$result = $this->ProjektModel->insert(
 			array(
 				'projekt_kurzbz' => $retval->project_id,
-				'titel' => $retval->project_id,
+				'titel' => $retval->name,
 				'beginn' => $retval->start_date,
 				'ende' => $retval->end_date,
-				'beschreibung' => $retval->project_id,
+				'beschreibung' => $retval->name,
 				'oe_kurzbz' => $oe_kurzbz
 			)
 		);
@@ -271,7 +293,8 @@ class SyncProjects extends Auth_Controller
 
 		// Get returning projekt_id of created FUE project
 		$projekt_id = $result->retval;
-		$titel = $retval->project_id;
+		$titel = $retval->name;
+		$projekt_kurzbz = $retval->project_id;
 
 		// Synchronize SAP and FUE project
 		$result = $this->ProjectsTimesheetsProjectModel->insert(array(
@@ -285,6 +308,7 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonSuccess(array(
 				'projekt_id' => $projekt_id,
+				'projekt_kurzbz' => $projekt_kurzbz,
 				'titel' => $titel
 			));
 		}
@@ -321,6 +345,7 @@ class SyncProjects extends Auth_Controller
 
 			    $project_id = $retval->project_id;
 			    $project_task_id = $retval->project_task_id;
+			    $project_name = $retval->name;
 			    $start_date = $retval->start_date;
 			    $end_date = $retval->end_date;
 
@@ -356,8 +381,8 @@ class SyncProjects extends Auth_Controller
 			    // -----------------------------------------------------------------------------------------------------
 			    $result = $this->ProjektphaseModel->insert(array(
 					    'projekt_kurzbz' => $projekt_kurzbz,
-					    'bezeichnung' => $project_task_id,
-					    'beschreibung' => $project_task_id,
+					    'bezeichnung' => mb_substr($project_name, 0, 32),
+					    'beschreibung' => $project_name,
 					    'start' => $start_date,
 					    'ende' => $end_date,
 					    'typ' => 'Projektphase'
@@ -385,7 +410,7 @@ class SyncProjects extends Auth_Controller
 				    $json []= (array(
 					    'projects_timesheet_id' => $projects_timesheet_id,
 					    'projektphase_id' => $projektphase_id,
-					    'bezeichnung' => $project_task_id
+					    'bezeichnung' => $project_name
 				    ));
 			    }
 			    else
@@ -408,14 +433,14 @@ class SyncProjects extends Auth_Controller
 
 	// -----------------------------------------------------------------------------------------------------------------
 	// Private methods
-	
+
 	/**
 	 * Retrieve the UID of the logged user and checks if it is valid
 	 */
 	private function _setAuthUID()
 	{
 		$this->_uid = getAuthUID();
-		
+
 		if (!$this->_uid) show_error('User authentification failed');
 	}
 }

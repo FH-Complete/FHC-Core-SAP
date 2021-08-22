@@ -68,13 +68,13 @@ $this->load->view(
                     <div class="col-xs-offset-1 col-xs-10">
                         <div id="panel-projects" class="panel panel-default">
 
-                            <div class="panel-heading">
+                            <div class="panel-heading panel-title">
                                 <div class="row">
-                                    <div class="col-xs-3">
-                                        <strong>PROJEKTE</strong>
+                                    <div class="col-xs-3 h4">
+                                        PROJEKTE
                                     </div>
-                                    <div class="col-xs-9 text-right">
-                                        <strong><span id="projects-msg"></span></strong>
+                                    <div class="col-xs-9 text-right h4">
+                                        <span id="projects-msg"></span>
                                     </div>
                                 </div>
                             </div>
@@ -94,6 +94,17 @@ $this->load->view(
                                 <br>
                             </div>
 
+									<div class="panel-heading">
+										<div class="row">
+											<div class="col-xs-6">
+												<small><span class="text-muted">SAP Projektstatus: </span></small><b><span id="sap-project-status" class="pull-right text-uppercase">-</span></b>
+											</div>
+											<div class="col-xs-6">
+												<small><span class="text-muted">SAP Projekt gelöscht: </span></small><b><span id="sap-project-deleted" class="pull-right text-uppercase">-</span></b>
+											</div>
+										</div>
+									</div>
+
                             <div class="panel-heading">
                                 <div class="row">
                                     <div class="col-xs-4">
@@ -112,7 +123,7 @@ $this->load->view(
                                     </div>
                                     <div class="col-xs-8">
                                         <button id="btn-create-project" class="btn btn-default pull-right">Neu & Verknüpfen</button>
-                                        <div class="form-group">
+                                        <div class="form-group pull-right" style="margin-right: 10px;">
 		                                    <?php
 		                                    echo $this->widgetlib->widget(
 			                                    'Organisationseinheit_widget',
@@ -136,13 +147,13 @@ $this->load->view(
                     <div class="col-xs-offset-1 col-xs-10">
                         <div id="panel-projectphases" class="panel panel-default">
 
-                            <div class="panel-heading">
+                            <div class="panel-heading panel-title">
                                 <div class="row">
-                                    <div class="col-xs-3">
-                                        <strong>Projektphasen</strong>
+                                    <div class="col-xs-3 h4">
+                                        PROJEKTPHASEN
                                     </div>
-                                    <div class="col-xs-9 text-right">
-                                        <strong><span id="projectphases-msg"></span></strong>
+                                    <div class="col-xs-9 text-right h4">
+                                        <span id="projectphases-msg"></span>
                                     </div>
                                 </div>
 

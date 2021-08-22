@@ -37,7 +37,8 @@ class ProjectsTimesheetsProject_model extends DB_Model
 	            projects_timesheets_project_id,
 	            projects_timesheet_id,
 	            project_id,
-	            project_task_id
+	            project_task_id,
+	            name
 			FROM        sap_projectphases
 	        LEFT JOIN   sync.tbl_projects_timesheets_project USING (projects_timesheet_id)
 	        ORDER BY    projects_timesheets_project_id, project_task_id;
