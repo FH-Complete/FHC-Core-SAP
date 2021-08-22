@@ -23,7 +23,7 @@ class SyncProjects extends Auth_Controller
 				'getSAPProjectOE' => 'basis/projekt:r'
 			)
 		);
-		
+
 		// Load models
 		$this->load->model('project/Projekt_model', 'ProjektModel');
 		$this->load->model('project/Projektphase_model', 'ProjektphaseModel');
@@ -32,7 +32,7 @@ class SyncProjects extends Auth_Controller
 
 		// Load libraries
 		$this->load->library('WidgetLib');
-		
+
 		// Load language phrases
 		$this->loadPhrases(
 			array(
@@ -40,12 +40,12 @@ class SyncProjects extends Auth_Controller
 				'lehre'
 			)
 		);
-		
+
 		$this->_setAuthUID(); // sets property uid
-		
+
 		$this->setControllerId(); // sets the controller id
 	}
-	
+
 	public function index()
 	{
 		$this->load->view('extensions/FHC-Core-SAP/projects/syncProjects.php');
@@ -215,7 +215,7 @@ class SyncProjects extends Auth_Controller
 		$sap_project_projects_timesheet_id = $retval->projects_timesheet_id;
 		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($sap_project_projects_timesheet_id);
 		$isSynced_FUEProject = $this->ProjectsTimesheetsProjectModel->isSynced_FUEProject($projekt_id);
-		
+
 		if (!$isSynced_SAPProject || !$isSynced_FUEProject)
 		{
 			return $this->outputJsonError('Bitte synchronisieren Sie erst die Projekte');
@@ -381,7 +381,7 @@ class SyncProjects extends Auth_Controller
 			    // -----------------------------------------------------------------------------------------------------
 			    $result = $this->ProjektphaseModel->insert(array(
 					    'projekt_kurzbz' => $projekt_kurzbz,
-					    'bezeichnung' => $project_name,
+					    'bezeichnung' => mb_substr($project_name, 0, 32),
 					    'beschreibung' => $project_name,
 					    'start' => $start_date,
 					    'ende' => $end_date,
@@ -433,14 +433,14 @@ class SyncProjects extends Auth_Controller
 
 	// -----------------------------------------------------------------------------------------------------------------
 	// Private methods
-	
+
 	/**
 	 * Retrieve the UID of the logged user and checks if it is valid
 	 */
 	private function _setAuthUID()
 	{
 		$this->_uid = getAuthUID();
-		
+
 		if (!$this->_uid) show_error('User authentification failed');
 	}
 }

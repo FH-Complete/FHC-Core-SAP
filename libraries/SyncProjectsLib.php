@@ -57,6 +57,7 @@ class SyncProjectsLib
 	const PROJECT_SERVICE_TIME_BASED_NOT_VALID = 'PRO_PROJ_TEMPLATE:014';
 	const PROJECT_NOT_ENABLED = 'AP_ESI_COMMON:106';
 	const PROJECT_TASK_NOT_ENABLED = 'AP_ESI_COMMON:106';
+	const PROJECT_TASK_READ_ONLY = 'AP_ESI_COMMON:107';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -175,6 +176,12 @@ class SyncProjectsLib
 			// Last or current study semester
 			$currentOrNextStudySemester = getData($currentOrNextStudySemesterResult)[0]->studiensemester_kurzbz;
 
+			// Get the next study semester
+			$nextStudySemesterResult = $this->_ci->StudiensemesterModel->getNextFrom($currentOrNextStudySemester);
+
+			// If an error occurred then return it
+			if (isError($nextStudySemesterResult)) return $nextStudySemesterResult;
+
 			// Project structures are optionals and are used to create tasks for a project
 			$projectStructures = $this->_ci->config->item(self::PROJECT_STRUCTURES);
 			// Project ID format
@@ -194,10 +201,10 @@ class SyncProjectsLib
 			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterStartDateTS = $dateTime->getTimestamp(); // project start date
 
-			// Get study semester end date
-			$studySemesterEndDate = getData($currentOrNextStudySemesterResult)[0]->ende;
-			// Get study semester end date in timestamp format
-			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
+			// Get study semester end date (it's the start date of the next study semester)
+			$studySemesterEndDate = getData($nextStudySemesterResult)[0]->start;
+			// Get study semester end date in timestamp format (it's the start date of the next study semester)
+			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($nextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
 			// If it is requested a full sync or only for admin FHTW
@@ -1052,7 +1059,6 @@ class SyncProjectsLib
 						}
 						continue;
 					}
-
 					// SAP project
 					$project = getData($projectResult)[0];
 
@@ -1086,7 +1092,8 @@ class SyncProjectsLib
 						),
 						array(
 							'beginn' => date('Y-m-d', toTimestamp($project->PlannedStartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime))
+							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime)-86400)
+							// Remove one day (86400 sec) because API delivers wrong date
 						)
 					);
 
@@ -1097,9 +1104,15 @@ class SyncProjectsLib
 				{
 					// Get the project data from SAP
 					$projectTaskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
-
 					// If an error occurred then return it
-					if (isError($projectTaskResult)) return $projectTaskResult;
+					if (isError($projectTaskResult))
+					{
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
+						}
+						continue;
+					}
 
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
@@ -1144,7 +1157,8 @@ class SyncProjectsLib
 						),
 						array(
 							'start' => date('Y-m-d', toTimestamp($projectTask->StartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime))
+							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime)-86400)
+							// Remove one day (86400 sec) because API delivers wrong date
 						)
 					);
 
@@ -1160,6 +1174,99 @@ class SyncProjectsLib
 
 		// If everything was fine
 		return success('All dates for linked project have been imported successfully');
+	}
+
+	/**
+	 *
+	 */
+	public function updateProjectDates($projectName, $startDate, $endDate)
+	{
+		// Get start date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $startDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$startDateTS = $dateTime->getTimestamp(); // project start date
+
+		// Get end date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $endDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$endDateTS = $dateTime->getTimestamp(); // project end date
+
+		$dbModel = new DB_Model();
+
+		// Gets 
+		$projectResults = $dbModel->execReadOnlyQuery('
+			SELECT p.project_object_id
+			  FROM sync.tbl_sap_projects p
+			 WHERE p.project_id = ?
+			',
+			array($projectName)
+		);
+
+		// If an error occurred then return it
+		if (isError($projectResults)) return $projectResults;
+
+		// If no data were found then return an error
+		if (!hasData($projectResults)) return error('No project found with such a name!');
+
+		// If more then one project have been found
+		if (count(getData($projectResults)) > 1) return error('Too many projects found with this name');
+
+		// Update the project dates
+		$updateProjectDatesResult = $this->_ci->ProjectsModel->setDates(
+			getData($projectResults)[0]->project_object_id,
+			$startDate.'T00:00:00Z',
+			$endDate.'T00:00:00Z'
+		);
+
+		// If an error occurred then return it
+		if (isError($updateProjectDatesResult)) return $updateProjectDatesResult;
+
+		// If the project was successfully updated then loads all the tasks for such project
+                $tasksResults = $dbModel->execReadOnlyQuery('
+			SELECT pc.project_task_object_id,
+				pc.project_task_id
+                          FROM sync.tbl_sap_projects_costcenters pc
+                         WHERE pc.project_object_id = ?
+			   AND pc.project_object_id != pc.project_task_object_id
+                        ',
+                        array(getData($projectResults)[0]->project_object_id)
+                );
+
+		// If this project has tasks
+		if (hasData($tasksResults))
+		{
+			// For each task set the days
+			foreach (getData($tasksResults) as $task)
+			{
+				// Update the task duration in days
+				$updateTaskDatesResult = $this->_ci->ProjectsModel->setTaskDates(
+					$task->project_task_object_id,
+					round(($endDateTS - $startDateTS) / 60 / 60 / 24) + 1
+				);
+
+				// If an error occurred then...
+				if (isError($updateTaskDatesResult))
+				{
+					// ...check if it is a _not_ blocking error
+					if (getCode($updateTaskDatesResult) == self::PROJECT_TASK_READ_ONLY)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Project task is read only: '.$task->project_task_id);
+					}
+					else // ...if it a blocking error then return it
+					{
+						return $updateTaskDatesResult;
+					}
+				}
+			}
+		}
+		// else this project doesn't have any task
+
+		// If everything was fine
+		return success('Project dates have been successfully updated');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -1331,8 +1438,7 @@ class SyncProjectsLib
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			return $setActiveResult;
 		}
@@ -1383,8 +1489,11 @@ class SyncProjectsLib
 				// If an error occurred then return it
 				if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-				// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-				if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+				// If the employee was successfully added to this project
+				// and it is _not_ an alredy existing employee in this project
+				// and if config entry that enables the purchase orders is true
+				if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+					&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 				{
 					// Create the course object
 					$course = new stdClass();
@@ -1534,8 +1643,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -1589,8 +1697,11 @@ class SyncProjectsLib
 					// If an error occurred then return it
 					if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+					// If the employee was successfully added to this project
+					// and it is _not_ an alredy existing employee in this project
+					// and if config entry that enables the purchase orders is true
+					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+						&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
 						$purchaseOrder = $this->_purchaseOrderLG(
 							$courseEmployee,
@@ -1887,6 +1998,11 @@ class SyncProjectsLib
 										'unitCode' => 'HUR',
 										'_' => $courseEmployee->planned_work
 									)
+								),
+								'ItemDeliveryTerms' => array(
+									'QuantityTolerance' => array(
+										'OverPercentUnlimitedIndicator' => true
+									)
 								)
 							)
 						)
@@ -1934,7 +2050,11 @@ class SyncProjectsLib
 		);
 
 		// If an error occurred while creating the project on ByD, and the error is not project already exists, then return the error
-		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR) return $createProjectResult;
+		if (isError($createProjectResult) && getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			$createProjectResult->retval = 'Create project: '.$createProjectResult->retval;
+			return $createProjectResult;
+		}
 
 		$projectObjectId = null;
 
@@ -1970,16 +2090,6 @@ class SyncProjectsLib
 		// If was not possible to get a valid project object id
 		if (isEmptyString($projectObjectId)) return error('Was not possible to get the project object id for project: '.$projectId);
 
-		// If the projects does not exist then update the time recording attribute
-		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
-		{
-			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
-
-			// If an error occurred while setting the project time recording
-			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
-		}
-
 		// Update project ProjectTaskCollection name
 		$projectName = sprintf($projectNameFormats[self::ADMIN_FHTW_PROJECT], $studySemester);
 		$updateTaskCollectionResult = $this->_ci->ProjectsModel->updateTaskCollection(
@@ -1988,18 +2098,44 @@ class SyncProjectsLib
 		);
 
 		// If an error occurred while creating the project on ByD return the error
-		if (isError($updateTaskCollectionResult)) return $updateTaskCollectionResult;
+		if (isError($updateTaskCollectionResult))
+		{
+			// If the project is not found on SAP
+			if ($this->_isDsruError($updateTaskCollectionResult))
+			{
+				return error('The project object id stored in database is not valid anymore');
+			}
+			else
+			{
+				$updateTaskCollectionResult->retval = 'Set project name: '.$updateTaskCollectionResult->retval;
+				return $updateTaskCollectionResult;
+			}
+		}
+
+		// If the projects does not exist then update the time recording attribute
+		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
+		{
+			// Update the time recording attribute of the project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+
+			// If an error occurred while setting the project time recording
+			if (isError($setTimeRecordingOffResult))
+			{
+				$setTimeRecordingOffResult->retval = 'Set time recording off: '.$setTimeRecordingOffResult->retval;
+				return $setTimeRecordingOffResult;
+			}
+		}
 
 		// Set the project as active
 		$setActiveResult = $this->_ci->ProjectsModel->setActive($projectObjectId);
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
+				$setActiveResult->retval = 'Set project active: '.$setActiveResult->retval;
 				return $setActiveResult;
 			}
 			else // otherwise log it
@@ -2095,6 +2231,7 @@ class SyncProjectsLib
 							// If a blocking error then return the error
 							if (getCode($createTaskResult) != self::PROJECT_NOT_ENABLED)
 							{
+								$createTaskResult->retval = 'Create task: '.$createTaskResult->retval;
 								return $createTaskResult;
 							}
 							else // if non blocking error then log it
@@ -2291,8 +2428,7 @@ class SyncProjectsLib
 
 		// If an error occurred while setting the project as active on ByD
 		// and not because the project was alredy released then return the error
-		if (isError($setActiveResult)
-			&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+		if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 		{
 			if (getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
@@ -2631,8 +2767,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -2798,8 +2933,7 @@ class SyncProjectsLib
 
 			// If an error occurred while setting the project as active on ByD
 			// and not because the project was alredy released then return the error
-			if (isError($setActiveResult)
-				&& getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
+			if (isError($setActiveResult) && getCode($setActiveResult) != self::RELEASE_PROJECT_ERROR)
 			{
 				return $setActiveResult;
 			}
@@ -2904,6 +3038,7 @@ class SyncProjectsLib
 						&& getCode($addEmployeeResult) != self::PROJECT_SERVICE_NOT_EXITSTS
 						&& getCode($addEmployeeResult) != self::PROJECT_NOT_ENABLED)
 					{
+						$addEmployeeResult->retval = 'Add employee to a project: '.$addEmployeeResult->retval;
 						return $addEmployeeResult; // return the error
 					}
 					else // if non blocking error then log it
@@ -2933,6 +3068,7 @@ class SyncProjectsLib
 					{
 						// - Not because of an already existing employee in this project
 						// - Not because of not existing employee
+						// - Not because of not existing task
 						if (getCode($addEmployeeToTaskResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_EMPLOYEE_NOT_EXISTS
 							&& getCode($addEmployeeToTaskResult) != self::PARTECIPANT_TASK_EXISTS_ERROR
@@ -2941,6 +3077,7 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
+							$addEmployeeToTaskResult->retval = 'Add employee to a task: '.$addEmployeeToTaskResult->retval;
 							return $addEmployeeToTaskResult; // return the error
 						}
 						else // if non blocking error then log it
@@ -2957,7 +3094,8 @@ class SyncProjectsLib
 		}
 
 		// If here then everything is fine
-		return success('Employee successfully added to this project');
+		// NOTE: it returns even the code of the latest attempt to add the employee to the project
+		return success('Employee successfully added to this project', getCode($addEmployeeResult));
 	}
 
 	/**
@@ -2970,4 +3108,3 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
-
