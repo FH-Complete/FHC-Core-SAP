@@ -7,7 +7,7 @@ $qry = '
 				END AS "isSynced",
 				projekt_id,
 				projekt_kurzbz,
-				CONCAT(titel, \' (\' ,projekt_kurzbz ,\')\') as titel
+				titel
 	FROM 		fue.tbl_projekt
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projekt_id)
 	WHERE 		synctbl.projektphase_id IS NULL
@@ -24,16 +24,20 @@ $tableWidgetArray = array(
 	'columnsAliases' => array(
 		'Synced',
 		'ProjektTimesheet-ID',
-		'Projekt-Kurzbz',
-		'Projekt'
+		'FH Projekt-ID',
+		'FH Projekt'
 	),
 	'datasetRepOptions' => '{
 		index: "projekt_id",
+		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
+		initialHeaderFilter:[
+            {field:"isSynced", value:"false"} // set default isSynced filter to "false"
+        ],
 		rowClick: function(e, row){
             func_rowClick_onFHProject(e, row);
         },
@@ -52,10 +56,11 @@ $tableWidgetArray = array(
 	    }
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 100},
+		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
 		projekt_id: {visible: false},
-		projekt_kurzbz: {visible: false},
-		titel: {headerFilter:"input"}
+		projekt_id: {visible: false},
+		projekt_kurzbz: {headerFilter:"input", tooltip: true},
+		titel: {headerFilter:"input", tooltip: true}
 	}'
 );
 

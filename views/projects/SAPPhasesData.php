@@ -3,13 +3,18 @@
 // NOTE: This is a pseudo query to be able to start with an empty table.
 // Table will be filled with data by user interaction (ajax call).
 $qry = '
-	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1)) AS tmp (
+	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)) AS tmp (
 	"isSynced",
+	"status",
     "projects_timesheets_project",
     "projects_timesheet_id",
     "project_id",
+    "start_date",
+    "end_date",
     "project_task_id",
-    "name"
+    "name",
+    "projektphase_id",
+    "bezeichnung"
 	) LIMIT 0;
 ';
 
@@ -20,14 +25,20 @@ $tableWidgetArray = array(
 	'datasetRepresentation' => 'tabulator',
 	'columnsAliases' => array(
 		'Synced',
+		'Status',
 		'SyncID',
 		'SAP ProjektTimesheetID',
 		'SAP ProjektID',
-		'SAP ProjektTaskID',
-		'SAP Projektphase'
+		'Start',
+		'Ende',
+		'SAP Phase-ID',
+		'SAP Phase',
+		'FH Phase-ID',
+		'FH Phase'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
+		height: "300px",
 		layout: "fitColumns",
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
@@ -47,11 +58,19 @@ $tableWidgetArray = array(
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
+		status: {
+			formatter:"lookup",
+			formatterParams:getSAPProjectStatusbezeichnung
+		},
 		projects_timesheets_project: {visible: false},
 		projects_timesheet_id: {visible: false},
 		project_id: {visible:false},
-		project_task_id: {visible:false},
-		name: {visible:true}
+		start_date: {visible: true, mutator: mut_formatStringDate},
+		end_date: {visible: true, mutator: mut_formatStringDate},
+		project_task_id: {visible: true, tooltip: true},
+		name: {visible: true, tooltip: true},
+		projektphase_id: {visible: true, tooltip: true},
+		bezeichnung: {visible: true, tooltip: true}
 	}'
 );
 

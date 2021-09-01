@@ -34,13 +34,19 @@ class ProjectsTimesheetsProject_model extends DB_Model
 					WHEN projects_timesheets_project_id IS NOT NULL THEN \'true\'
 					ELSE \'false\'
 		        END AS "isSynced",
+		        status,
 	            projects_timesheets_project_id,
 	            projects_timesheet_id,
 	            project_id,
+	            start_date::date,
+	            end_date::date,
 	            project_task_id,
-	            name
+	            name,
+	            tbl_projektphase.projektphase_id,
+				tbl_projektphase.bezeichnung
 			FROM        sap_projectphases
 	        LEFT JOIN   sync.tbl_projects_timesheets_project USING (projects_timesheet_id)
+            LEFT JOIN fue.tbl_projektphase ON (tbl_projektphase.projektphase_id = tbl_projects_timesheets_project.projektphase_id)
 	        ORDER BY    projects_timesheets_project_id, project_task_id;
 		';
 

@@ -10,16 +10,32 @@ const FH_PHASES_TABLE = '[tableuniqueid = FUEPhases] #tableWidgetTabulator';
 const PROJECT_MSG = '#projects-msg';
 const PHASES_MSG = '#projectphases-msg';
 
-const SAP_PROJECT_STATUS_MAP = new Map([
-	['1', 'Planning'],
-	['2', 'Start'],
-	['3', 'Released'],
-	['4', 'Stopped'],
-	['5', 'Closed'],
-	['6', 'Completed']
-]);
+const SAP_PROJECT_STATUSBEZEICHNUNG = {
+    "": "Alle",
+    "1": "Planning",
+    "2": "Start",
+    "3": "Released",
+    "4": "Stopped",
+    "5": "Closed",
+    "6": "Completed"
+};
 
 var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
+
+// -----------------------------------------------------------------------------------------------------------------
+// Mutators - setter methods to manipulate table data when entering the tabulator
+// -----------------------------------------------------------------------------------------------------------------
+
+// Converts string date postgre style to string DD.MM.YYYY.
+// This will allow correct filtering.
+var mut_formatStringDate = function(value, data, type, params, component) {
+    if (value != null)
+    {
+        var d = new Date(value);
+        return ("0" + (d.getDate())).slice(-2)  + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();
+    }
+}
+
 // -----------------------------------------------------------------------------------------------------------------
 // Tabulator table format functions
 // -----------------------------------------------------------------------------------------------------------------
@@ -78,6 +94,13 @@ function func_rowClick_onFHProject(e, row)
 	}
 }
 
+/**
+ * Return nice readable sap projekt/phasenstatus instead of numeric value
+ * @returns {{"": string, "1": string, "2": string, "3": string, "4": string, "5": string, "6": string}}
+ */
+function getSAPProjectStatusbezeichnung() {
+    return SAP_PROJECT_STATUSBEZEICHNUNG;
+}
 // Resort table on row update and add row
 function resortTable(row)
 {
@@ -168,14 +191,6 @@ function rowSelected_onSAPProject(row)
             $(FH_PHASES_TABLE).tabulator('replaceData');
         }
     }
-
-    // Change Dropdown selection to actual SAP project Organisationseinheit
-    SyncProjects.changeSelectionOrganisationseinheit(projects_timesheet_id);
-
-	SyncProjects.showSAPProjectStatus(projects_timesheet_id);
-
-	SyncProjects.showSAPProjectDeleted(projects_timesheet_id);
-
 }
 
 // Get FH phases and also, if the project is synchronized, the corresponding SAP project and phases.
@@ -215,13 +230,6 @@ function rowSelected_onFUEProject(row)
 
                         // Deselect former selected SAP project row
                         $(SAP_PROJECT_TABLE).tabulator('deselectRow');
-
-	                    // Change Dropdown selection to actual SAP project Organisationseinheit
-	                    SyncProjects.changeSelectionOrganisationseinheit(data.retval.projects_timesheet_id);
-
-	                    SyncProjects.showSAPProjectStatus(data.retval.projects_timesheet_id);
-
-	                    SyncProjects.showSAPProjectDeleted(data.retval.projects_timesheet_id);
 
                         _setGUI_SyncedProjects();
 
@@ -346,6 +354,8 @@ function _resetGUI()
 
 
 $(function() {
+// Init tooltip
+$('[data-toggle="tooltip"]').tooltip();
 
 // Synchronize SAP and FH project.
 $("#btn-sync-projects").click(function () {
@@ -628,55 +638,6 @@ $("#select-organisationseinheit").change(function(){
 
 });
 
-var SyncProjects = {
 
-	 // Change OE Dropdown selection
-	changeSelectionOrganisationseinheit: function(projects_timesheet_id) {
-		var data = {
-			'projects_timesheet_id': projects_timesheet_id
-		};
-
-		FHC_AjaxClient.ajaxCallPost(
-			FHC_JS_DATA_STORAGE_OBJECT.called_path + "/getSAPProjectOE",
-			data,
-			{
-				successCallback: function (data, textStatus, jqXHR) {
-					if (!data.error && data.retval) {
-
-						$("#select-organisationseinheit")
-							.val(data.retval.oe_kurzbz)
-							.change();
-					}
-				},
-				errorCallback: function (jqXHR, textStatus, errorThrown) {
-					FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
-				}
-			}
-		);
-	},
-
-	// Show SAP project status text
-	showSAPProjectStatus: function(projects_timesheet_id){
-
-		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
-		let status = sap_project_row.getData().status;
-		let status_text = SAP_PROJECT_STATUS_MAP.has(status) ? SAP_PROJECT_STATUS_MAP.get(status) : '-';
-
-		$("#sap-project-status").text(status_text);
-	},
-
-	// Show if SAP project deleted
-	showSAPProjectDeleted: function(projects_timesheet_id){
-
-		let sap_project_row = $(SAP_PROJECT_TABLE).tabulator('getRow', projects_timesheet_id);
-		let deleted = sap_project_row.getData().deleted;
-		let deleted_text = (deleted == 'false') ? 'nein' : 'ja';
-
-		$("#sap-project-deleted").text(deleted_text);
-	}
-
-
-
-}
 
 

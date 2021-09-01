@@ -37,168 +37,59 @@ $this->load->view(
 <?php echo $this->widgetlib->widget('NavigationWidget'); ?>
 <div id="page-wrapper">
 	<div class="container-fluid">
-		<!-- title & helper link -->
+		<!-- title -->
 		<div class="row">
 			<div class="col-lg-12 page-header">
 				<h3>Projekt Synchronisation</h3>
 			</div>
 		</div>
-        <div class="row">
-            <div class="col-xs-3">
-                <h4 class="text-center">SAP Projekte</h4>
-            </div>
-            <div class="col-xs-6">
-                <h4 class="text-center">Verknüpfung</h4>
-            </div>
-            <div class="col-xs-3">
-                <h4 class="text-center">FH Projekte</h4>
-            </div>
-        </div>
 		<div class="row">
-            <!--  LEFT COLUMN  -->
+			<div class="col-xs-9">
+				<h4>SAP Projekt Überblick</small></h4>
+			</div>
 			<div class="col-xs-3">
-				<div class="row">
-					<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPProjectsData.php'); ?>
+				<h4>FH Projekte</h4>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-xs-8">
+				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPProjectsData.php'); ?>
+			</div>
+			<div class="col-xs-1 text-center">
+				<div class="btn-group btn-group-vertical btn-group-lg" style="margin-top: 15%;">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><span style="font-size: xx-large; font-weight: bold">+</span></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
 				</div>
 			</div>
-            <!--  MIDDLE COLUMN  -->
-			<div class="col-xs-6">
-                <br>
-                <div class="row">
-                    <div class="col-xs-offset-1 col-xs-10">
-                        <div id="panel-projects" class="panel panel-default">
-
-                            <div class="panel-heading panel-title">
-                                <div class="row">
-                                    <div class="col-xs-3 h4">
-                                        PROJEKTE
-                                    </div>
-                                    <div class="col-xs-9 text-right h4">
-                                        <span id="projects-msg"></span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="panel-heading">
-                                <br>
-                                <div class="row">
-                                    <div class="col-xs-6">
-                                        <input type="text" id="input-sap-project"
-                                               data-sap-project-syncStatus="false" placeholder="SAP Projekt..." readonly>
-                                    </div>
-                                    <div class="col-xs-6">
-                                        <input type="text" id="input-fue-project"
-                                               data-fue-project-syncStatus="false" placeholder="FH Projekt..." readonly>
-                                    </div>
-                                </div>
-                                <br>
-                            </div>
-
-									<div class="panel-heading">
-										<div class="row">
-											<div class="col-xs-6">
-												<small><span class="text-muted">SAP Projektstatus: </span></small><b><span id="sap-project-status" class="pull-right text-uppercase">-</span></b>
-											</div>
-											<div class="col-xs-6">
-												<small><span class="text-muted">SAP Projekt gelöscht: </span></small><b><span id="sap-project-deleted" class="pull-right text-uppercase">-</span></b>
-											</div>
-										</div>
-									</div>
-
-                            <div class="panel-heading">
-                                <div class="row">
-                                    <div class="col-xs-4">
-                                        <small><span class="text-muted">SAP Projekt mit FH Projekt verknüpfen</span></small>
-                                    </div>
-                                    <div class="col-xs-8">
-                                        <button id="btn-sync-projects" class="btn btn-default pull-right">Verknüpfen</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="panel-heading">
-                                <div class="row">
-                                    <div class="col-xs-4">
-                                        <small><span class="text-muted">SAP Projekt als FH Projekt erstellen & verknüpfen</span></small>
-                                    </div>
-                                    <div class="col-xs-8">
-                                        <button id="btn-create-project" class="btn btn-default pull-right">Neu & Verknüpfen</button>
-                                        <div class="form-group pull-right" style="margin-right: 10px;">
-		                                    <?php
-		                                    echo $this->widgetlib->widget(
-			                                    'Organisationseinheit_widget',
-			                                    array(
-				                                    DropdownWidget::SELECTED_ELEMENT => '',
-			                                    ),
-			                                    array(
-				                                    'id' => 'select-organisationseinheit'
-			                                    )
-		                                    );
-		                                    ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <br>
-                <div class="row">
-                    <div class="col-xs-offset-1 col-xs-10">
-                        <div id="panel-projectphases" class="panel panel-default">
-
-                            <div class="panel-heading panel-title">
-                                <div class="row">
-                                    <div class="col-xs-3 h4">
-                                        PROJEKTPHASEN
-                                    </div>
-                                    <div class="col-xs-9 text-right h4">
-                                        <span id="projectphases-msg"></span>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div class="panel-heading">
-                                <div class="row">
-                                    <div class="col-xs-5">
-                                        <small><span class="text-muted">SAP Projektphase mit FH Projektphase verknüpfen</span></small>
-                                    </div>
-                                    <div class="col-xs-7">
-                                        <button id="btn-sync-phases" class="btn btn-default pull-right">Verknüpfen</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="panel-heading">
-                                <div class="row">
-                                    <div class="col-xs-5">
-                                        <small><span class="text-muted">SAP Projektphase als FH Projektphase erstellen & verknüpfen</span></small>
-                                    </div>
-                                    <div class="col-xs-7">
-                                        <button id="btn-create-phase" class="btn btn-default pull-right">Neu & Verknüpfen</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="panel-body">
-                                <div class="col-xs-6">
-                                    <?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPPhasesData.php'); ?>
-                                </div>
-                                <div class="col-xs-6">
-                                    <?php $this->load->view('extensions/FHC-Core-SAP/projects/FHPhasesData.php'); ?>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-			</div>
-            <!--  RIGHT COLUMN  -->
 			<div class="col-xs-3">
-                <div class="row">
-					<?php $this->load->view('extensions/FHC-Core-SAP/projects/FHProjectsData.php'); ?>
-                </div>
+				<?php $this->load->view('extensions/FHC-Core-SAP/projects/FHProjectsData.php'); ?>
+			</div>
+		</div>
+		<br>
+		<div class="row">
+			<div class="col-xs-12">
+				<div class="col-xs-9">
+					<h4>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: -</small></h4>
+				</div>
+				<div class="col-xs-3">
+					<h4>FH Projektphasen<small> | Verknüpftes FH Projekt: -</small></h4>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-xs-8">
+				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPPhasesData.php'); ?>
+			</div>
+			<div class="col-xs-1 text-center">
+				<div class="btn-group btn-group-vertical btn-group-lg" style="margin-top: 15%;">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><span style="font-size: xx-large; font-weight: bold">+</span></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
+				</div>
+			</div>
+			<div class="col-xs-3">
+				<?php $this->load->view('extensions/FHC-Core-SAP/projects/FHPhasesData.php'); ?>
 			</div>
 		</div>
 	</div><!--/.container-fluid -->
