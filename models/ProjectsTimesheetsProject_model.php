@@ -27,6 +27,7 @@ class ProjectsTimesheetsProject_model extends DB_Model
 					FROM    sync.tbl_sap_projects_timesheets
 					WHERE   project_id = ?
 	                AND     project_task_id IS NOT NULL
+	                AND     deleted = FALSE
 				)
 
 			SELECT
@@ -43,7 +44,8 @@ class ProjectsTimesheetsProject_model extends DB_Model
 	            project_task_id,
 	            name,
 	            tbl_projektphase.projektphase_id,
-				tbl_projektphase.bezeichnung
+				tbl_projektphase.bezeichnung,
+				time_recording
 			FROM        sap_projectphases
 	        LEFT JOIN   sync.tbl_projects_timesheets_project USING (projects_timesheet_id)
             LEFT JOIN fue.tbl_projektphase ON (tbl_projektphase.projektphase_id = tbl_projects_timesheets_project.projektphase_id)

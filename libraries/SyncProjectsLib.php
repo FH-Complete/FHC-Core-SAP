@@ -78,6 +78,10 @@ class SyncProjectsLib
 	const EN_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI';
 	const DE_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI DE';
 
+	// SAP time recording values
+	const TIME_RECORDING_ON = '2';
+	const TIME_RECORDING_OFF = '1';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -470,14 +474,22 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
 					{
-						// If the current task is the project itself then update the name and skip to the next one
+						// If true it means the time recording is enabled on SAP and vice versa
+						$timeRecording = $projectTask->TimeConfirmationProfileCode == self::TIME_RECORDING_ON;
+
+						// If the current task is the project itself then update:
+						// - name
+						// - time recording
+						// and skip to the next one
 						if ($project->ProjectID == $projectTask->ID)
 						{
-							// Updates only the name
+
+							// Updates only the name and time recording
 							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 								$projects_timesheet_id,
 								array(
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording
 								)
 							);
 
@@ -524,7 +536,8 @@ class SyncProjectsLib
 									'updateamum' => 'NOW()',
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording
 								)
 							);
 
@@ -545,7 +558,8 @@ class SyncProjectsLib
 									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording
 								)
 							);
 
@@ -977,9 +991,9 @@ class SyncProjectsLib
 	}
 
 	/**
-	 *
+	 * Updates tables fue.*project* using data from sync.tbl_sap_projects_timesheets
 	 */
-	public function importProjectsDates()
+	public function updateFUEProjects()
 	{
 		$dbModel = new DB_Model();
 
@@ -1044,8 +1058,12 @@ class SyncProjectsLib
 				// If a FHC project was linked to a SAP project
 				if ($linkedProject->projektphase_id == null)
 				{
-					// Get the project data from SAP
-					$projectResult = $this->_ci->ProjectsModel->getProjects(array($linkedProject->project_object_id));
+					// Get the project data from sync.tbl_sap_projects_timesheets
+					$projectResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_object_id' => $linkedProject->project_object_id
+						)
+					);
 
 					// If an error occurred then return it
 					if (isError($projectResult)) return $projectResult;
@@ -1059,6 +1077,7 @@ class SyncProjectsLib
 						}
 						continue;
 					}
+
 					// SAP project
 					$project = getData($projectResult)[0];
 
@@ -1091,9 +1110,11 @@ class SyncProjectsLib
 							'projekt_kurzbz' => $projekt->projekt_kurzbz
 						),
 						array(
-							'beginn' => date('Y-m-d', toTimestamp($project->PlannedStartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime)-86400)
-							// Remove one day (86400 sec) because API delivers wrong date
+							'beginn' => $project->start_date,
+							'ende' => $project->end_date,
+							'titel' => $project->name,
+							'beschreibung' => $project->name,
+							'zeitaufzeichnung' => $project->time_recording
 						)
 					);
 
@@ -1102,17 +1123,15 @@ class SyncProjectsLib
 				}
 				else // otherwise if a SAP task was linked to a FHC phase
 				{
-					// Get the project data from SAP
-					$projectTaskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
+					// Get the task data from sync.tbl_sap_projects_timesheets
+					$projectTaskResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_task_object_id' => $linkedProject->project_task_object_id
+						)
+					);
+
 					// If an error occurred then return it
-					if (isError($projectTaskResult))
-					{
-						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
-						{
-							$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
-						}
-						continue;
-					}
+					if (isError($projectTaskResult)) return $projectTaskResult;
 
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
@@ -1125,7 +1144,7 @@ class SyncProjectsLib
 					}
 
 					// SAP project task
-					$projectTask = getData($projectTaskResult);
+					$projectTask = getData($projectTaskResult)[0];
 
 					// Checks if the project phase exists
 					$projektPhaseResult = $this->_ci->ProjektphaseModel->loadWhere(
@@ -1156,9 +1175,11 @@ class SyncProjectsLib
 							'projektphase_id' => $projektPhase->projektphase_id
 						),
 						array(
-							'start' => date('Y-m-d', toTimestamp($projectTask->StartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime)-86400)
-							// Remove one day (86400 sec) because API delivers wrong date
+							'start' => $projectTask->start_date,
+							'ende' => $projectTask->end_date,
+							'bezeichnung' => substr($projectTask->name, 0, 32),
+							'beschreibung' => $projectTask->name,
+							'zeitaufzeichnung' => $projectTask->time_recording
 						)
 					);
 
@@ -2115,8 +2136,8 @@ class SyncProjectsLib
 		// If the projects does not exist then update the time recording attribute
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
-			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+			// Set the time recording off for this project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_OFF);
 
 			// If an error occurred while setting the project time recording
 			if (isError($setTimeRecordingOffResult))
@@ -2222,7 +2243,8 @@ class SyncProjectsLib
 							$projectObjectId,
 							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 							$costCenter->oe_kurzbz_sap,
-							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
+							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
+							self::TIME_RECORDING_ON
 						);
 
 						// If an error occurred while creating the project task on ByD return the error
@@ -2522,7 +2544,8 @@ class SyncProjectsLib
 								$projectObjectId,
 								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 								$costCenter->oe_kurzbz_sap,
-								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
+								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
+								self::TIME_RECORDING_ON
 							);
 
 							// If an error occurred while creating the project task on ByD return the error

@@ -56,8 +56,8 @@ $this->load->view(
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPProjectsData.php'); ?>
 			</div>
 			<div class="col-xs-1 text-center">
-				<div class="btn-group btn-group-vertical btn-group-lg" style="margin-top: 15%;">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><span style="font-size: xx-large; font-weight: bold">+</span></button>
+				<div class="btn-group btn-group-vertical btn-group" style="margin-top: 15%;">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><i class="fa fa-plus fa-2x" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
 				</div>
@@ -82,8 +82,8 @@ $this->load->view(
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPPhasesData.php'); ?>
 			</div>
 			<div class="col-xs-1 text-center">
-				<div class="btn-group btn-group-vertical btn-group-lg" style="margin-top: 15%;">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><span style="font-size: xx-large; font-weight: bold">+</span></button>
+				<div class="btn-group btn-group-vertical btn-group" style="margin-top: 15%;">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><i class="fa fa-plus fa-2x" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
 				</div>
