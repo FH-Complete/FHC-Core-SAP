@@ -71,30 +71,6 @@ function func_rowClick_onSAPProject(e, row)
 }
 
 /**
- * Empty project title input field and phases when deselecting FH project.
- * NOTE: used rowClick callback instead of rowDeselect callback, because rowDeselect would be triggered also when
- * using 'deselectRow' programmatically and this would cause unwanted behaviour.
- */
-function func_rowClick_onFHProject(e, row)
-{
-	var is_synced = row.getData().isSynced;
-
-	if (!row.isSelected())
-	{
-		$("#input-fue-project").val('');
-		$(FH_PHASES_TABLE).tabulator('replaceData');
-
-		if (is_synced == 'true' ||  $("#input-sap-project").attr('data-sap-project-syncStatus') == 'true')
-		{
-			$("#input-sap-project").val('');
-			$(SAP_PHASES_TABLE).tabulator('replaceData');
-
-			_resetGUI();
-		}
-	}
-}
-
-/**
  * Return nice readable sap projekt/phasenstatus instead of numeric value
  * @returns {{"": string, "1": string, "2": string, "3": string, "4": string, "5": string, "6": string}}
  */

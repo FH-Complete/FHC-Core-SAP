@@ -38,9 +38,6 @@ $tableWidgetArray = array(
 		initialHeaderFilter:[
             {field:"isSynced", value:"false"} // set default isSynced filter to "false"
         ],
-		rowClick: function(e, row){
-            func_rowClick_onFHProject(e, row);
-        },
 		tableWidgetHeader: false,
 	    rowUpdated: function(row){
             resortTable(row);
