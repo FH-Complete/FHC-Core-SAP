@@ -128,23 +128,14 @@ function rowSelected_onSAPProject(row)
     var project_id = row.getData().project_id;
     var projects_timesheet_id = row.getData().projects_timesheet_id;
     var name = row.getData().name;
-    var deleted = row.getData().deleted;
 
-    // Reset GUI
-    _resetGUI();
-
-    // Set SAP project title into input field
-	$("#input-sap-project").val(name);
+    // Display SAP project name
+	$("#span-sap-project").text(name);
 
     // Load SAP phases
     loadSAPPhases(project_id);
 
-    // If SAP project was deleted, disable syncing
-    if (deleted == 'true'){
-	    _setGUI_disabledButtons();
-    }
-
-    // If SAP project is synced, get the synced FUE project and FUE phases
+    // If SAP project is synced, get the synced FUE project name and project phases
     if (is_synced == 'true') {
         var data = {
             'projects_timesheet_id': projects_timesheet_id
@@ -155,21 +146,15 @@ function rowSelected_onSAPProject(row)
             data,
             {
                 successCallback: function (data, textStatus, jqXHR) {
-                    if (!data.error && data.retval) {
+                    if (FHC_AjaxClient.hasData(data)) {
 
-                    	// Set FH project title into input field
-                        $("#input-fue-project").val(data.retval.titel + " (" + data.retval.projekt_kurzbz + ")");
+                        data = FHC_AjaxClient.getData(data);
 
-                        $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
-                        $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
+                        // Display synced FH project name
+                        $("#span-fh-project").text(data.titel != null ? data.titel : data.projekt_kurzbz);
 
-                        // Deselect former selected FUE project row
-                        $(FH_PROJECT_TABLE).tabulator('deselectRow');
-
-                        // Load FUE phases
-                        loadFUEPhases(data.retval.projekt_kurzbz);
-
-                        _setGUI_SyncedProjects();
+                        // Load FH Phases table
+                        loadFUEPhases(data.projekt_kurzbz);
 
                     }
                 },
@@ -181,15 +166,11 @@ function rowSelected_onSAPProject(row)
     }
     else
     {
-        $("#input-sap-project").attr('data-sap-project-syncStatus', 'false');
+        // Reset synced FH project name
+        $("#span-fh-project").text('-');
 
-        // if projects of last selection were synced
-        if($("#input-fue-project").attr('data-fue-project-syncStatus') == 'true')
-        {
-            $("#input-fue-project").val('');
-            $(FH_PROJECT_TABLE).tabulator('deselectRow');
-            $(FH_PHASES_TABLE).tabulator('replaceData');
-        }
+        // Empty FH phases table
+        $(FH_PHASES_TABLE).tabulator('replaceData');
     }
 }
 

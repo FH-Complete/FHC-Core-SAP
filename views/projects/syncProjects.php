@@ -70,10 +70,10 @@ $this->load->view(
 		<div class="row">
 			<div class="col-xs-12">
 				<div class="col-xs-9">
-					<h4>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: -</small></h4>
+					<h4>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></h4>
 				</div>
 				<div class="col-xs-3">
-					<h4>FH Projektphasen<small> | Verknüpftes FH Projekt: -</small></h4>
+					<h4>FH Projektphasen<small> | Verknüpftes FH Projekt: <span id="span-fh-project">-</span></small></h4>
 				</div>
 			</div>
 		</div>
