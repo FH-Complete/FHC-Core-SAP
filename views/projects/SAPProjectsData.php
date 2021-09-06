@@ -60,9 +60,6 @@ $tableWidgetArray = array(
 		initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
         ],
-		rowClick: function(e, row){
-            func_rowClick_onSAPProject(e, row);
-        },
 		tableWidgetHeader: false,
 		rowSelected: function(row){
 			rowSelected_onSAPProject(row);
