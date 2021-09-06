@@ -145,17 +145,13 @@ function loadSAPPhases(project_id)
         data,
         {
             successCallback: function (data, textStatus, jqXHR) {
-                if (!data.error) {
-                    if(data.retval != null)
-                    {
-                        $(SAP_PHASES_TABLE).tabulator('replaceData', data.retval);
-                    }
-                    else
-                    {
-                        // FHC_DialogLib.alertInfo("SAP-Projekt hat keine Phasen");
-                        // $(PHASES_MSG).text(project_id + ' hat keine Phasen');
-                        $(SAP_PHASES_TABLE).tabulator('replaceData');
-                    }
+                if(FHC_AjaxClient.hasData(data))
+                {
+                    $(SAP_PHASES_TABLE).tabulator('replaceData', data.retval);
+                }
+                else
+                {
+                    $(SAP_PHASES_TABLE).tabulator('replaceData');
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
@@ -177,16 +173,14 @@ function loadFUEPhases(projekt_kurzbz)
         data,
         {
             successCallback: function (data, textStatus, jqXHR) {
-                if (!data.error) {
-                    if(data.retval != null)
-                    {
-                        $(FH_PHASES_TABLE).tabulator('replaceData', data.retval);
-                    }
-                    else
-                    {
-                        // FHC_DialogLib.alertInfo("FH-Projekt hat keine Phasen");
-                        $(FH_PHASES_TABLE).tabulator('replaceData');
-                    }
+                if(FHC_AjaxClient.hasData(data))
+                {
+                    $(FH_PHASES_TABLE).tabulator('replaceData', data.retval);
+                }
+                else
+                {
+                    // FHC_DialogLib.alertInfo("FH-Projekt hat keine Phasen");
+                    $(FH_PHASES_TABLE).tabulator('replaceData');
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
@@ -234,12 +228,12 @@ $("#btn-sync-projects").click(function () {
         data,
         {
             successCallback: function (data, textStatus, jqXHR) {
-                if (data.error && data.retval != null) {
+                if (FHC_AjaxClient.isError(data)) {
                     // Print error message
-                    FHC_DialogLib.alertWarning(data.retval);
+                    FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
 
-                if (!data.error && data.retval) {
+                if (FHC_AjaxClient.hasData(data)) {
 
                     // Update sync status
                     $(SAP_PROJECT_TABLE).tabulator(
@@ -305,12 +299,12 @@ $("#btn-sync-phases").click(function () {
         data,
         {
             successCallback: function (data, textStatus, jqXHR) {
-                if (data.error && data.retval != null) {
+                if (FHC_AjaxClient.isError(data)) {
                     // Print error message
-                    FHC_DialogLib.alertWarning(data.retval);
+                    FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
 
-                if (!data.error && data.retval) {
+                if (FHC_AjaxClient.hasData(data)) {
 
                     // Update sync status
                     $(SAP_PHASES_TABLE).tabulator(
@@ -365,12 +359,12 @@ $("#btn-create-project").click(function () {
         data,
         {
             successCallback: function (data, textStatus, jqXHR) {
-                if (data.error && data.retval != null) {
+                if (FHC_AjaxClient.isError(data)) {
                     // Print error message
-                    FHC_DialogLib.alertWarning(data.retval);
+                    FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
 
-                if (!data.error && data.retval != null) {
+                if (FHC_AjaxClient.hasData(data)) {
 
                     // Add new FUE project row
                     $(FH_PROJECT_TABLE).tabulator(
@@ -438,12 +432,12 @@ $("#btn-create-phase").click(function () {
             data,
             {
                 successCallback: function (data, textStatus, jqXHR) {
-                    if (data.error && data.retval != null) {
+                    if (FHC_AjaxClient.isError(data)) {
                         // Print error message
-                        FHC_DialogLib.alertWarning(data.retval);
+                        FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                     }
 
-                    if (!data.error && data.retval != null) {
+                    if (FHC_AjaxClient.hasData(data)) {
 
                         for (var j = 0; j < data.retval.length; j++)
                         {
