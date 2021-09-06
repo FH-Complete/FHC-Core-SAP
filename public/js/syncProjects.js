@@ -7,9 +7,6 @@ const FH_PROJECT_TABLE = '[tableuniqueid = FUEProjects] #tableWidgetTabulator';
 const SAP_PHASES_TABLE = '[tableuniqueid = SAPPhases] #tableWidgetTabulator';
 const FH_PHASES_TABLE = '[tableuniqueid = FUEPhases] #tableWidgetTabulator';
 
-const PROJECT_MSG = '#projects-msg';
-const PHASES_MSG = '#projectphases-msg';
-
 const SAP_PROJECT_STATUSBEZEICHNUNG = {
     "": "Alle",
     "1": "Planning",
@@ -199,36 +196,6 @@ function loadFUEPhases(projekt_kurzbz)
     );
 
 }
-
-// Set GUI for synchronized projects. (Unable sync button,...)
-function _setGUI_SyncedProjects()
-{
-	_setGUI_disabledButtons();
-
-	$(PROJECT_MSG).text('VERKNÜPFT');
-	$(PROJECT_MSG).removeClass().addClass('text-success');
-}
-
-function _setGUI_disabledButtons(){
-	$("#panel-projects button").attr("disabled", true);
-	$("#select-organisationseinheit").attr("disabled", 'disabled');
-}
-
-// Reset GUI
-function _resetGUI()
-{
-    $("#panel-projects button").attr("disabled", false);
-    $("#select-organisationseinheit")
-	    .removeAttr("disabled")
-	    .val('null')
-	    .change();
-	$("#sap-project-status").text('-');
-	$("#sap-project-deleted").text('-');
-
-    $(PROJECT_MSG).text('');
-	$(PHASES_MSG).text('');
-}
-
 
 $(function() {
 // Init tooltip
@@ -508,10 +475,6 @@ $("#btn-create-phase").click(function () {
             }
         );
     });
-
-$("#select-organisationseinheit").change(function(){
-	organisationseinheit_selected = $(this).val();
-});
 
 });
 
