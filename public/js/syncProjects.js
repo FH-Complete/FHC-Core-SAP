@@ -47,30 +47,6 @@ function func_selectableCheck(row)
 }
 
 /**
- * Empty project title input field and phases when deselecting SAP project.
- * NOTE: used rowClick callback instead of rowDeselect callback, because rowDeselect would be triggered also when
- * using 'deselectRow' programmatically and this would cause unwanted behaviour.
-  */
-function func_rowClick_onSAPProject(e, row)
-{
-	var is_synced = row.getData().isSynced;
-
-	if (!row.isSelected())
-	{
-		$("#input-sap-project").val('');
-		$(SAP_PHASES_TABLE).tabulator('replaceData');
-
-		if (is_synced == 'true' ||  $("#input-fue-project").attr('data-fue-project-syncStatus') == 'true')
-		{
-			$("#input-fue-project").val('');
-			$(FH_PHASES_TABLE).tabulator('replaceData');
-
-			_resetGUI();
-		}
-	}
-}
-
-/**
  * Return nice readable sap projekt/phasenstatus instead of numeric value
  * @returns {{"": string, "1": string, "2": string, "3": string, "4": string, "5": string, "6": string}}
  */
@@ -148,6 +124,16 @@ function rowSelected_onSAPProject(row)
         // Empty FH phases table
         $(FH_PHASES_TABLE).tabulator('replaceData');
     }
+}
+
+/**
+ * Empty Phasen tables and Project titles on Project Deselection.
+ */
+function rowDeselected_onSAPProject(row){
+    $("#span-sap-project").text('-');
+    $("#span-fh-project").text('-');
+    $(SAP_PHASES_TABLE).tabulator('replaceData');
+    $(FH_PHASES_TABLE).tabulator('replaceData');
 }
 
 // Load SAP phases of a given SAP project.

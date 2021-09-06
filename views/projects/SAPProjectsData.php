@@ -67,6 +67,9 @@ $tableWidgetArray = array(
 		rowSelected: function(row){
 			rowSelected_onSAPProject(row);
 		},
+		rowDeselected:function(row) {
+			rowDeselected_onSAPProject(row);
+		 },
 	    rowUpdated: function(row){
             resortTable(row);
         },
