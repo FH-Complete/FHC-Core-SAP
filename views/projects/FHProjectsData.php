@@ -42,9 +42,6 @@ $tableWidgetArray = array(
             func_rowClick_onFHProject(e, row);
         },
 		tableWidgetHeader: false,
-		rowSelected: function(row){
-			rowSelected_onFUEProject(row);
-		},
 	    rowUpdated: function(row){
             resortTable(row);
         },
