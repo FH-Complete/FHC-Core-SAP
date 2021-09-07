@@ -361,13 +361,19 @@ $("#btn-create-project").click(function () {
         return;
     }
 
+    if (sap_project_data[0].isSynced == 'true'){
+        FHC_DialogLib.alertInfo('Projekt ist bereits synchronisiert.');
+        return;
+    }
+
     // Set SAP project
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
+    var oe_kurzbz = sap_project_data[0].oe_kurzbz;
 
     // Prepare data object for ajax call
     var data = {
         'projects_timesheet_id': projects_timesheet_id,
-	    'oe_kurzbz' : organisationseinheit_selected
+	    'oe_kurzbz' : oe_kurzbz
     };
 
     FHC_AjaxClient.ajaxCallPost(
@@ -382,28 +388,33 @@ $("#btn-create-project").click(function () {
 
                 if (FHC_AjaxClient.hasData(data)) {
 
+                    data = FHC_AjaxClient.getData(data);
+
                     // Add new FUE project row
                     $(FH_PROJECT_TABLE).tabulator(
                         'addRow',
                         JSON.stringify({
-                            projekt_id: data.retval.projekt_id, titel: data.retval.titel + " (" + data.retval.projekt_kurzbz + ")", isSynced: 'true'})
+                            projekt_id: data.projekt_id,
+                            projekt_kurzbz: data.projekt_kurzbz,
+                            titel: data.titel,
+                            isSynced: 'true'
+                        })
                     );
 
                     // Update SAP project sync status
                     $(SAP_PROJECT_TABLE).tabulator(
                         'updateData',
-                        JSON.stringify([{projects_timesheet_id: projects_timesheet_id, isSynced: 'true'}])
+                        JSON.stringify([{
+                            projects_timesheet_id: projects_timesheet_id,
+                            projekt_kurzbz: data.projekt_kurzbz,
+                            titel: data.titel,
+                            isSynced: 'true'
+                        }])
                     );
 
-	                $("#input-fue-project").val(data.retval.titel + " (" + data.retval.projekt_kurzbz + ")");
+                    // Update FH Projecttitle
+                    $('#span-fh-project').text(data.titel != null ? data.titel : data.projekt_kurzbz);
 
-                    $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
-                    $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
-
-                    _setGUI_SyncedProjects();
-
-                    // Print success message
-                    // FHC_DialogLib.alertSuccess("Projekt wurde erstellt und verknüpft.");
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
