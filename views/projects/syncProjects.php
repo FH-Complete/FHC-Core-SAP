@@ -45,22 +45,20 @@ $this->load->view(
 		</div>
 		<div class="row">
 			<div class="col-xs-9">
-				<h4>SAP Projekt Überblick</small></h4>
+				<span>SAP Projekt Überblick</span>
+				<div class="btn-group pull-right">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-project"><i class="fa fa-plus" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-project"><i class="fa fa-link" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
+				</div>
 			</div>
 			<div class="col-xs-3">
-				<h4>FH Projekte</h4>
+				<span>FH Projekte</span>
 			</div>
 		</div>
 		<div class="row">
-			<div class="col-xs-8">
+			<div class="col-xs-9">
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPProjectsData.php'); ?>
-			</div>
-			<div class="col-xs-1 text-center">
-				<div class="btn-group btn-group-vertical btn-group" style="margin-top: 15%;">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><i class="fa fa-plus fa-2x" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
-				</div>
 			</div>
 			<div class="col-xs-3">
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/FHProjectsData.php'); ?>
@@ -68,25 +66,21 @@ $this->load->view(
 		</div>
 		<br>
 		<div class="row">
-			<div class="col-xs-12">
-				<div class="col-xs-9">
-					<h4>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></h4>
+			<div class="col-xs-9">
+				<span>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></span>
+				<div class="btn-group pull-right">
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><i class="fa fa-plus" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
 				</div>
-				<div class="col-xs-3">
-					<h4>FH Projektphasen<small> | Verknüpftes FH Projekt: <span id="span-fh-project">-</span></small></h4>
-				</div>
+			</div>
+			<div class="col-xs-3">
+				<span>FH Projektphasen<small> | Verknüpftes FH Projekt: <span id="span-fh-project">-</span></small></span>
 			</div>
 		</div>
 		<div class="row">
-			<div class="col-xs-8">
+			<div class="col-xs-9">
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPPhasesData.php'); ?>
-			</div>
-			<div class="col-xs-1 text-center">
-				<div class="btn-group btn-group-vertical btn-group" style="margin-top: 15%;">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen"><i class="fa fa-plus fa-2x" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen"><i class="fa fa-link fa-2x" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken fa-2x" aria-hidden="true"></i></button>
-				</div>
 			</div>
 			<div class="col-xs-3">
 				<?php $this->load->view('extensions/FHC-Core-SAP/projects/FHPhasesData.php'); ?>
