@@ -466,14 +466,16 @@ $("#btn-create-phase").click(function () {
 
                     if (FHC_AjaxClient.hasData(data)) {
 
-                        for (var j = 0; j < data.retval.length; j++)
+                        data = FHC_AjaxClient.getData(data);
+
+                        for (var j = 0; j < data.length; j++)
                         {
                             // Add new FUE phase row
                             $(FH_PHASES_TABLE).tabulator(
                                 'addRow',
                                 JSON.stringify({
-                                    projektphase_id: data.retval[j].projektphase_id,
-                                    bezeichnung: data.retval[j].bezeichnung,
+                                    projektphase_id: data[j].projektphase_id,
+                                    bezeichnung: data[j].bezeichnung,
                                     isSynced: 'true'})
                             );
 
@@ -481,13 +483,12 @@ $("#btn-create-phase").click(function () {
                             $(SAP_PHASES_TABLE).tabulator(
                                 'updateData',
                                 JSON.stringify([{
-                                    projects_timesheet_id: data.retval[j].projects_timesheet_id,
+                                    projects_timesheet_id: data[j].projects_timesheet_id,
+                                    projektphase_id: data[j].projektphase_id,
+                                    bezeichnung: data[j].bezeichnung,
                                     isSynced: 'true'}])
                             );
                         }
-
-                        // Print success message
-                        // FHC_DialogLib.alertSuccess("Phase wurde erstellt und verknüpft.");
                     }
                 },
                 errorCallback: function (jqXHR, textStatus, errorThrown) {

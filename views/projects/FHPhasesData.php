@@ -36,13 +36,7 @@ $tableWidgetArray = array(
 		selectablePersistence: false,
 		selectableCheck: function(row){
             return func_selectableCheck(row);
-        },
-        rowUpdated: function(row){
-            resortTable(row);
-        },
-        rowAdded:function(row){
-	        resortTable(row);
-	    }
+        }
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},

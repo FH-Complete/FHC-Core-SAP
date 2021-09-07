@@ -52,7 +52,7 @@ $tableWidgetArray = array(
             return func_selectableCheck(row);
         },
         rowUpdated: function(row){
-            resortTable(row);
+             func_rowUpdated(row);
         },
         rowAdded:function(row){
 	        resortTable(row);
