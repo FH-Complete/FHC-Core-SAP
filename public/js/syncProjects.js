@@ -59,6 +59,20 @@ function resortTable(row)
     ]);
 }
 
+// Performes after row was updated
+function func_rowUpdated(row){
+
+    var is_synced = (row.getData().isSynced);
+
+    row.getCells().forEach(function(cell){
+
+        if(is_synced == 'true')
+        {
+            $(cell.getElement()).addClass('bg-success');
+        }
+    });
+}
+
 // Display FUE projekt_kurzbz if project title is null
 function renderStarted_onFUEProject(table)
 {
@@ -196,7 +210,7 @@ $(function() {
 $('[data-toggle="tooltip"]').tooltip();
 
 // Synchronize SAP and FH project.
-$("#btn-sync-projects").click(function () {
+$("#btn-sync-project").click(function () {
 
     // Get selected rows data
     var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
@@ -216,6 +230,8 @@ $("#btn-sync-projects").click(function () {
 
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
     var projekt_id = fue_project_data[0].projekt_id;
+    var projekt_kurzbz = fue_project_data[0].projekt_kurzbz;
+    var titel = fue_project_data[0].titel;
 
     // Prepare data object for ajax call
     var data = {
@@ -233,12 +249,16 @@ $("#btn-sync-projects").click(function () {
                     FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
 
-                if (FHC_AjaxClient.hasData(data)) {
-
+                if (data.retval) {
                     // Update sync status
                     $(SAP_PROJECT_TABLE).tabulator(
                         'updateData',
-                        JSON.stringify([{projects_timesheet_id: projects_timesheet_id, isSynced: 'true'}])
+                        JSON.stringify([{
+                            projects_timesheet_id: projects_timesheet_id,
+                            projekt_kurzbz: projekt_kurzbz,
+                            titel: titel,
+                            isSynced: 'true'
+                        }])
                     );
 
                     $(FH_PROJECT_TABLE).tabulator(
@@ -246,13 +266,9 @@ $("#btn-sync-projects").click(function () {
                         JSON.stringify([{projekt_id: projekt_id, isSynced: 'true'}])
                     );
 
-                    $("#input-sap-project").attr('data-sap-project-syncStatus', 'true');
-                    $("#input-fue-project").attr('data-fue-project-syncStatus', 'true');
-
-                    _setGUI_SyncedProjects();
-
-                    // Print success message
-                    // FHC_DialogLib.alertSuccess("Projekte wurden verknüpft.");
+                    // Update FH Projecttitle and -phasen
+                    $('#span-fh-project').text(titel != null ? titel : projekt_kurzbz);
+                    loadFUEPhases(projekt_kurzbz);
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {

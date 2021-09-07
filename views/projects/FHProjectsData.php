@@ -40,7 +40,7 @@ $tableWidgetArray = array(
         ],
 		tableWidgetHeader: false,
 	    rowUpdated: function(row){
-            resortTable(row);
+            func_rowUpdated(row);
         },
         rowAdded:function(row){
 	        resortTable(row);
@@ -51,7 +51,6 @@ $tableWidgetArray = array(
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
-		projekt_id: {visible: false},
 		projekt_id: {visible: false},
 		projekt_kurzbz: {headerFilter:"input", tooltip: true},
 		titel: {headerFilter:"input", tooltip: true}
