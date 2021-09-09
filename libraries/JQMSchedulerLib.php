@@ -93,11 +93,9 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\')
 								AND tbl_benutzer.aktiv
-						)
-						OR
-						EXISTS (
+						) OR EXISTS (
 							SELECT
 								1
 							FROM
@@ -105,7 +103,7 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 						)
 					)
 			      GROUP BY ps.person_id
@@ -151,9 +149,9 @@ class JQMSchedulerLib
 			SELECT p.person_id
 			  FROM public.tbl_person p
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE p.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		');
@@ -173,12 +171,12 @@ class JQMSchedulerLib
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE (
-					NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-					OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				    	OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				)
+			 	pss.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			 	OR pss.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			 	OR pss.datum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY ps.person_id
@@ -197,9 +195,12 @@ class JQMSchedulerLib
 			SELECT k.person_id
 			  FROM public.tbl_kontakt k
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE (
+				k.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+				OR k.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY k.person_id
@@ -218,9 +219,9 @@ class JQMSchedulerLib
 			SELECT a.person_id
 			  FROM public.tbl_adresse a
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE a.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY a.person_id
