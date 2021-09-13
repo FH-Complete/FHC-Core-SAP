@@ -817,6 +817,7 @@ class SyncPaymentsLib
 	{
 		$dbModel = new DB_Model();
 
+		// Only fetch Incoming/Outgoing Credit Memos until it is clear how to handle other payments
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
 				buchungsnr, studiengang_kz, studiensemester_kurzbz, betrag, buchungsdatum,
@@ -829,9 +830,10 @@ class SyncPaymentsLib
 				AND buchungsnr_verweis IS NULL
 				AND person_id = ?
 				AND buchungsdatum >= ?
+				AND buchungstyp_kurzbz = ?
 			ORDER BY
 				studiengang_kz
-		', array($person_id, self::BUCHUNGSDATUM_SYNC_START));
+		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)));
 
 		return $dbPaymentData;
 	}
