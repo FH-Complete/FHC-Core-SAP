@@ -3,21 +3,4 @@
     background-color: white;
 }
 
-#input-sap-project, #input-fue-project
-{
-    background-color: white;
-    font-weight: bold;
-    text-align: center;
-    font-size: initial;
-    border: solid 2px grey;
-}
 
-#btn-sync-projects, #btn-sync-phases, #btn-create-project, #btn-create-phase
-{
-    width: 180px;
-}
-
-#select-organisationseinheit
-{
-    width: 190px;
-}
