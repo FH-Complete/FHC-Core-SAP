@@ -301,13 +301,15 @@ $("#btn-sync-phases").click(function () {
     var project_id = sap_phases_data[0].project_id;
     var projekt_id = fue_phases_data[0].projekt_id;
     var projektphase_id = fue_phases_data[0].projektphase_id;
+    var bezeichnung = fue_phases_data[0].bezeichnung;
 
     // Prepare data object for ajax call
     var data = {
         'projects_timesheet_id': projects_timesheet_id,
         'project_id': project_id,
         'projekt_id': projekt_id,
-        'projektphase_id': projektphase_id
+        'projektphase_id': projektphase_id,
+        'bezeichnung': bezeichnung
     };
 
     FHC_AjaxClient.ajaxCallPost(
@@ -320,20 +322,26 @@ $("#btn-sync-phases").click(function () {
                     FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
 
-                if (FHC_AjaxClient.hasData(data)) {
+                if (data.retval) {
 
                     // Update sync status
                     $(SAP_PHASES_TABLE).tabulator(
                         'updateData',
-                        JSON.stringify([{projects_timesheet_id: projects_timesheet_id, isSynced: 'true'}])
+                        JSON.stringify([{
+                            projects_timesheet_id: projects_timesheet_id,
+                            projektphase_id: projektphase_id,
+                            bezeichnung: bezeichnung,
+                            isSynced: 'true'
+                        }])
                     );
                     $(FH_PHASES_TABLE).tabulator(
                         'updateData',
-                        JSON.stringify([{projektphase_id: projektphase_id, isSynced: 'true'}])
+                        JSON.stringify([{
+                            projektphase_id: projektphase_id,
+                            bezeichnung: bezeichnung,
+                            isSynced: 'true'
+                        }])
                     );
-
-                    // Print success message
-                    // FHC_DialogLib.alertSuccess("Phasen wurden verknüpft.");
                 }
             },
             errorCallback: function (jqXHR, textStatus, errorThrown) {
