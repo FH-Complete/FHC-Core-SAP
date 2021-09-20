@@ -66,7 +66,10 @@ $tableWidgetArray = array(
 		},
 		rowDeselected:function(row) {
 			rowDeselected_onSAPProject(row);
-		 },
+		},
+        rowFormatter: function(row){
+			func_rowFormatter(row);
+		},
 	    rowUpdated: function(row){
             func_rowUpdated(row);
         },

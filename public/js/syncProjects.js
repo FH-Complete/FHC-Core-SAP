@@ -58,6 +58,18 @@ function resortTable(row)
         {column: 'isSynced', dir: 'desc'}
     ]);
 }
+// Formats the rows
+function func_rowFormatter(row){
+    var is_synced = (row.getData().isSynced);
+
+    row.getCells().forEach(function(cell){
+
+        if(is_synced == 'true')
+        {
+            cell.getElement().classList.add('bg-success');
+        }
+    });
+}
 
 // Performes after row was updated
 function func_rowUpdated(row){
