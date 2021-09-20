@@ -343,7 +343,7 @@ class SyncPaymentsLib
 							'studiengang_kz' => $singlePayment->studiengang_kz,
 							'studiensemester_kurzbz' => $singlePayment->studiensemester_kurzbz,
 							'buchungsnr_verweis' => $singlePayment->buchungsnr,
-							'betrag' => $singlePayment->betrag*(-1),
+							'betrag' => str_replace(',', '.', $singlePayment->betrag*(-1)),
 							'buchungsdatum' => date('Y-m-d'),
 							'buchungstext' => $singlePayment->buchungstext,
 							'buchungstyp_kurzbz' => $singlePayment->buchungstyp_kurzbz
