@@ -18,6 +18,7 @@ class SyncProjects extends Auth_Controller
 				'loadSAPPhases' => 'basis/projekt:r',
 				'syncProjects' => 'basis/projekt:rw',
 				'syncProjectphases' => 'basis/projekt:rw',
+				'desyncProjectphases' => 'basis/projekt:rw',
 				'createFUEProject' => 'basis/projekt:rw',
 				'createFUEPhase' => 'basis/projekt:rw',
 				'getSAPProjectOE' => 'basis/projekt:r'
@@ -245,6 +246,29 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonError('Phase konnte nicht verknüpft werden.');
 		}
+	}
+	
+	public function desyncProjectphases()
+	{
+		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+		
+		// Check, if projects of the given phases are already synced
+		$result = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProjectphase($projects_timesheet_id);
+		
+		if (!$result)
+			$this->terminateWithJsonError('SAP Projektphase ist nicht verknüpft');
+		
+		$result = $this->ProjectsTimesheetsProjectModel->loadWhere(array('projects_timesheet_id' => $projects_timesheet_id));
+		
+		if (!$retval = getData($result)[0])
+			$this->terminateWithJsonError('Verknüpfung konnte nicht gefunden werden.');
+		
+		$result = $this->ProjectsTimesheetsProjectModel->delete($retval->projects_timesheets_project_id);
+		
+		if(isSuccess($result))
+			$this->outputJsonSuccess($retval);
+		else
+			$this->terminateWithJsonError('Verknüpfung konnte nicht gelöscht werden.');
 	}
 
 	// Create new FH project like the given SAP project. Synchronize them too.

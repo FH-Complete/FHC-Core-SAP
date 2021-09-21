@@ -71,7 +71,7 @@ $this->load->view(
 				<div class="btn-group pull-right">
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-phase"><i class="fa fa-plus" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-phases"><i class="fa fa-link" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen" id="btn-desync-phases"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
 				</div>
 			</div>
 			<div class="col-xs-3">

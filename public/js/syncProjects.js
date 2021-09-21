@@ -82,6 +82,10 @@ function func_rowUpdated(row){
         {
             $(cell.getElement()).addClass('bg-success');
         }
+        else
+        {
+            $(cell.getElement()).removeClass('bg-success');
+        }
     });
 }
 
@@ -516,6 +520,65 @@ $("#btn-create-phase").click(function () {
                 }
             }
         );
+    });
+
+// Desynchronize phases
+$('#btn-desync-phases').click(function() {
+
+        var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
+
+        if (sap_phases_data.length === 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Phase aus.');
+            return;
+        }
+
+        if (sap_phases_data[0].isSynced === 'false') {
+            FHC_DialogLib.alertInfo('Die ausgewählte SAP Phase ist nicht verknüpft.');
+            return;
+        }
+
+        var data = {
+            'projects_timesheet_id': sap_phases_data[0].projects_timesheet_id
+        };
+
+        FHC_AjaxClient.ajaxCallPost(
+            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjectphases",
+            data,
+            {
+                successCallback: function (data, textStatus, jqXHR) {
+
+                    if (FHC_AjaxClient.isError(data))
+                        FHC_DialogLib.alertWarning(data.retval);
+
+                    if (FHC_AjaxClient.hasData(data))
+                    {
+                        data = FHC_AjaxClient.getData(data);
+
+                        $(SAP_PHASES_TABLE).tabulator(
+                            'updateData',
+                            JSON.stringify([{
+                                projects_timesheet_id: data.projects_timesheet_id,
+                                projektphase_id: '',
+                                bezeichnung: '',
+                                isSynced: 'false'
+                            }])
+                        );
+
+                        $(FH_PHASES_TABLE).tabulator(
+                            'updateData',
+                            JSON.stringify([{
+                                projektphase_id: data.projektphase_id,
+                                isSynced: 'false'
+                            }])
+                        );
+                    }
+                },
+                errorCallback: function (jqXHR, textStatus, errorThrown) {
+                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+                }
+            }
+        );
+
     });
 
 });
