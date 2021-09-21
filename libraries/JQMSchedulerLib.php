@@ -397,21 +397,12 @@ class JQMSchedulerLib
 			SELECT ko.person_id
 			  FROM public.tbl_konto ko
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE ko.betrag < 0
+			 WHERE ko.betrag > 0
 			   AND ko.buchungstyp_kurzbz = \'ZuschussIO\'
 			   AND ko.buchungsnr NOT IN (
 				SELECT kos.buchungsnr_verweis
 				  FROM public.tbl_konto kos
-				 WHERE kos.buchungstyp_kurzbz = \'ZuschussIO\'
-				   AND kos.buchungsnr_verweis = ko.buchungsnr
-			)
-			   AND (
-			        ko.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			        OR ko.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			)
-			   AND (
-			        s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			        OR s.last_update IS NULL
+				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
 			)
 		      GROUP BY ko.person_id
 		');
