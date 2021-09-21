@@ -356,7 +356,7 @@ class SyncProjects extends Auth_Controller
 
 			    if ($isSynced_SAPPhase)
 			    {
-				    $this->outputJsonSuccess(null); // return null if already synced
+				    $this->terminateWithJsonError('Phase bereits verknüpft'); // if already synced
 			    }
 
 			    // Get SAP phase
