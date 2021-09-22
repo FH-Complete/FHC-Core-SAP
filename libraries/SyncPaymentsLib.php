@@ -616,14 +616,19 @@ class SyncPaymentsLib
 					}
 
 					// Prepare Sales Positions
-					$service_id = $this->_getServiceID($singlePayment->buchungstyp_kurzbz, $singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
+					$serviceIdResult = $this->_getServiceID($singlePayment->buchungstyp_kurzbz, $singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
 
-					if ($service_id === false)
+					// If no data have been found
+					if (isError($serviceIdResult) || !hasData($serviceIdResult))
 					{
-						$nonBlockingErrorsArray[] = 'Could not get Payment Service for '.$singlePayment->buchungstyp_kurzbz.', '.$singlePayment->studiengang_kz.', '.$singlePayment->studiensemester_kurzbz;
+						$nonBlockingErrorsArray[] = 'Could not get Payment Service for '.
+							$singlePayment->buchungstyp_kurzbz.', '.$singlePayment->studiengang_kz.', '.$singlePayment->studiensemester_kurzbz;
 						$data = array();
 						continue;
 					}
+
+					$service_id = getData($serviceIdResult)[0]->service_id;
+
 					$buchungsnr_arr[] = $singlePayment->buchungsnr;
 
 					$position = array(
@@ -688,7 +693,6 @@ class SyncPaymentsLib
 	 */
 	private function _CreateSalesOrder($data, $buchungsnr_arr, $release)
 	{
-
 		$nonBlockingErrorsArray = array();
 
 		// Create the Entry
@@ -706,10 +710,10 @@ class SyncPaymentsLib
 				if ($release)
 				{
 					// If FH then Release SO that Invoice is created
-					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID);
+					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID->_);
 					if (isError($releaseResult))
 					{
-						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($releaseResult));
+						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, array(getError($releaseResult)));
 					}
 				}
 
@@ -1069,3 +1073,4 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
+
