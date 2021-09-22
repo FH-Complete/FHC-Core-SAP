@@ -300,7 +300,8 @@ class SyncUsersLib
 					$insert = $this->_ci->SAPStudentsModel->insert(
 						array(
 							'person_id' => $userData->person_id,
-							'sap_user_id' => $manageCustomer->Customer->InternalID
+							'sap_user_id' => $manageCustomer->Customer->InternalID,
+							'last_update' => 'NOW()'
 						)
 					);
 
@@ -989,6 +990,7 @@ class SyncUsersLib
 			);
 
 			$userAllData->iban = null;
+			$userAllData->swift = null;
 
 			if (isError($bankResult)) return $bankResult;
 			if (hasData($bankResult)) // if a bank account was found
