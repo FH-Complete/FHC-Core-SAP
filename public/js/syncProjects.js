@@ -187,14 +187,23 @@ $("#btn-sync-project").click(function () {
     var fue_project_data = $(FH_PROJECT_TABLE).tabulator('getSelectedData');
 
     // Checks
-
-	if (sap_project_data.length == 0 || fue_project_data.length == 0) {
-		FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP- und ein FH-Projekt aus.');
+	if (sap_project_data.length == 0) {
+		FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
 		return;
 	}
 
-    if (sap_project_data[0].isSynced == 'true' || fue_project_data[0].isSynced == 'true') {
-        FHC_DialogLib.alertInfo('Mindestens ein Projekt ist bereits synchronisiert. Bitte wählen Sie ein anderes aus.');
+    if (sap_project_data[0].isSynced == 'true') {
+        FHC_DialogLib.alertInfo('Projekt kann nicht verknüpft werden, da es bereits synchronisiert ist.');
+        return;
+    }
+
+    if (fue_project_data.length == 0) {
+        FHC_DialogLib.alertInfo('Bitte wählen Sie zum Verknüpfen noch ein FH-Projekt aus.');
+        return;
+    }
+
+    if (fue_project_data[0].isSynced == 'true') {
+        FHC_DialogLib.alertInfo('FH-Projekt ist bereits mit anderem Projekt synchronisiert.');
         return;
     }
 
@@ -330,17 +339,12 @@ $("#btn-create-project").click(function () {
 
     // Checks
     if (sap_project_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Projekt aus.');
-        return;
-    }
-
-    if (fue_project_data.length != 0) {
-        FHC_DialogLib.alertWarning('Es darf kein FH-Projekt gewählt sein.');
+        FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
         return;
     }
 
     if (sap_project_data[0].isSynced == 'true'){
-        FHC_DialogLib.alertInfo('Projekt ist bereits synchronisiert.');
+        FHC_DialogLib.alertInfo('Projekt kann nicht neu erstellt werden, da es bereits synchronisiert ist.');
         return;
     }
 
@@ -411,7 +415,7 @@ $("#btn-create-phase").click(function () {
 
         // Checks
         if (sap_phase_data.length == 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine SAP Phase aus.');
+            FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine Phase aus.');
             return;
         }
 
@@ -483,12 +487,12 @@ $('#btn-desync-projects').click(function() {
 
         // Checks
         if (sap_project_data.length == 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Projekt aus.');
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
             return;
         }
 
         if (sap_project_data[0].isSynced == 'false') {
-            FHC_DialogLib.alertInfo('Das ausgewählte SAP Projekt ist nicht verknüpft.');
+            FHC_DialogLib.alertInfo('Das Projekt kann nicht entknüpft werden, da es nicht synchronisiert ist.');
             return;
         }
 
@@ -579,13 +583,20 @@ $('#btn-desync-phases').click(function() {
 
         var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
 
+        // Checks
         if (sap_phases_data.length === 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Phase aus.');
+            FHC_DialogLib.alertInfo('Bitte wählen Sie eine Phase aus.');
+            return;
+        }
+
+        if (sap_phases_data.length > 1)
+        {
+            FHC_DialogLib.alertInfo('Bitte entknüpfen Sie nur einzelne Phasen.');
             return;
         }
 
         if (sap_phases_data[0].isSynced === 'false') {
-            FHC_DialogLib.alertInfo('Die ausgewählte SAP Phase ist nicht verknüpft.');
+            FHC_DialogLib.alertInfo('Die Phase kann nicht entknüpft werden, da sie nicht synchronisiert ist.');
             return;
         }
 
