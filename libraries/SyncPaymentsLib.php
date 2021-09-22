@@ -713,7 +713,7 @@ class SyncPaymentsLib
 					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID);
 					if (isError($releaseResult))
 					{
-						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($releaseResult));
+						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, array(getError($releaseResult)));
 					}
 				}
 
@@ -1073,3 +1073,4 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
+
