@@ -710,7 +710,7 @@ class SyncPaymentsLib
 				if ($release)
 				{
 					// If FH then Release SO that Invoice is created
-					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID);
+					$releaseResult = $this->_releaseSO($manageSalesOrder->SalesOrder->ID->_);
 					if (isError($releaseResult))
 					{
 						$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, array(getError($releaseResult)));
