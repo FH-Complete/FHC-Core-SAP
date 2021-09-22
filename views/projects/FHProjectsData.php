@@ -44,9 +44,6 @@ $tableWidgetArray = array(
         },
         rowAdded:function(row){
 	        resortTable(row);
-	    },
-	    renderStarted: function(){
-	        renderStarted_onFUEProject(this);
 	    }
 	}',
 	'datasetRepFieldsDefs' => '{
