@@ -66,16 +66,7 @@ $tableWidgetArray = array(
 		},
 		rowDeselected:function(row) {
 			rowDeselected_onSAPProject(row);
-		},
-        rowFormatter: function(row){
-			func_rowFormatter(row);
-		},
-	    rowUpdated: function(row){
-            func_rowUpdated(row);
-        },
-         rowAdded:function(row){
-	        resortTable(row);
-	    }
+		}
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},

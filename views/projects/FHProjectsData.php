@@ -39,9 +39,6 @@ $tableWidgetArray = array(
             {field:"isSynced", value:"false"} // set default isSynced filter to "false"
         ],
 		tableWidgetHeader: false,
-		rowFormatter: function(row){
-			func_rowFormatter(row);
-		},
 	    rowUpdated: function(row){
             func_rowUpdated(row);
         },

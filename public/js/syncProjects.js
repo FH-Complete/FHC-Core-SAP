@@ -37,12 +37,6 @@ var mut_formatStringDate = function(value, data, type, params, component) {
 // Tabulator table format functions
 // -----------------------------------------------------------------------------------------------------------------
 
-// Allow selection of projects / phases, that are NOT synchronized
-function func_selectableCheck(row)
-{
-    return row.getData().isSynced == 'false';
-}
-
 /**
  * Return nice readable sap projekt/phasenstatus instead of numeric value
  * @returns {{"": string, "1": string, "2": string, "3": string, "4": string, "5": string, "6": string}}
@@ -50,6 +44,7 @@ function func_selectableCheck(row)
 function getSAPProjectStatusbezeichnung() {
     return SAP_PROJECT_STATUSBEZEICHNUNG;
 }
+
 // Resort table on row update and add row
 function resortTable(row)
 {
@@ -57,47 +52,6 @@ function resortTable(row)
     table.setSort([
         {column: 'isSynced', dir: 'desc'}
     ]);
-}
-// Formats the rows
-function func_rowFormatter(row){
-    var is_synced = (row.getData().isSynced);
-
-    row.getCells().forEach(function(cell){
-
-        if(is_synced == 'true')
-        {
-            cell.getElement().classList.add('bg-success');
-        }
-    });
-}
-
-// Performes after row was updated
-function func_rowUpdated(row){
-
-    var is_synced = (row.getData().isSynced);
-
-    row.getCells().forEach(function(cell){
-
-        if(is_synced == 'true')
-        {
-            $(cell.getElement()).addClass('bg-success');
-        }
-        else
-        {
-            $(cell.getElement()).removeClass('bg-success');
-        }
-    });
-}
-
-// Display FUE projekt_kurzbz if project title is null
-function renderStarted_onFUEProject(table)
-{
-    table.getRows().forEach(function(row){
-        if (row.getData().titel == null || row.getData().titel == '')
-        {
-            row.getData().titel = row.getData().projekt_kurzbz;
-        }
-    });
 }
 
 // Get SAP phases and also, if the project is synchronized, the corresponding FH project and phases.
