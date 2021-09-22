@@ -522,6 +522,104 @@ $("#btn-create-phase").click(function () {
         );
     });
 
+// Desynchronize projects
+$('#btn-desync-projects').click(function() {
+        // Get selected rows data
+        var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
+
+        // Checks
+        if (sap_project_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein SAP Projekt aus.');
+            return;
+        }
+
+        if (sap_project_data[0].isSynced == 'false') {
+            FHC_DialogLib.alertInfo('Das ausgewählte SAP Projekt ist nicht verknüpft.');
+            return;
+        }
+
+    var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
+    var projekt_kurzbz = sap_project_data[0].projekt_kurzbz;
+    var projekt_id = sap_project_data[0].projekt_id;
+
+    /**
+     * First check if project has timerecordings.
+     * Ask for confirmation.
+     * If confirmed, desynchronize projects.
+     */
+    var confirmed = false;
+
+    FHC_AjaxClient.ajaxCallPost(
+            //Check if project has timerecordings.
+            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/checkProjectHasTimerecordings",
+            {projekt_kurzbz: projekt_kurzbz},
+            {
+                successCallback: function (data, textStatus, jqXHR) {
+                    if (FHC_AjaxClient.isError(data))
+                    {
+                        FHC_DialogLib.alertWarning(data.retval);
+                    }
+
+                    let projectHasTimerecordings = data.retval;
+
+                    // If project has timerecordings...
+                    if (projectHasTimerecordings == true)
+                    {
+                        // ...ask for confirmation.
+                        confirmed = confirm('Es sind bereits Zeiten auf das Projekt verbucht. Trotzdem entknüpfen?');
+                    }
+
+                    // If user confirmed or project has no timerecordings
+                    if (confirmed || projectHasTimerecordings == false)
+                    {
+                        //...start desynchronisation
+                        FHC_AjaxClient.ajaxCallPost(
+                            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjects",
+                            {projects_timesheet_id: projects_timesheet_id},
+                            {
+                                successCallback: function (data, textStatus, jqXHR) {
+
+                                    if (FHC_AjaxClient.isError(data))
+                                    {
+                                        FHC_DialogLib.alertWarning(data.retval);
+                                    }
+
+                                    if (data.retval)
+                                    {
+                                        // Update tables
+                                        $(SAP_PROJECT_TABLE).tabulator(
+                                            'updateData',
+                                            JSON.stringify([{
+                                                projects_timesheet_id: projects_timesheet_id,
+                                                projekt_kurzbz: '',
+                                                titel: '',
+                                                isSynced: 'false'
+                                            }])
+                                        );
+
+                                        $(FH_PROJECT_TABLE).tabulator(
+                                            'updateData',
+                                            JSON.stringify([{
+                                                projekt_id: projekt_id,
+                                                isSynced: 'false'
+                                            }])
+                                        );
+                                    }
+                                },
+                                errorCallback: function (jqXHR, textStatus, errorThrown) {
+                                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+                                }
+                            }
+                        );
+                    }
+                },
+                errorCallback: function (jqXHR, textStatus, errorThrown) {
+                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+                }
+            }
+    );
+});
+
 // Desynchronize phases
 $('#btn-desync-phases').click(function() {
 

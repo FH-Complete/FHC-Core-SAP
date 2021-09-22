@@ -17,17 +17,20 @@ class SyncProjects extends Auth_Controller
 				'loadFUEPhases' => 'basis/projekt:r',
 				'loadSAPPhases' => 'basis/projekt:r',
 				'syncProjects' => 'basis/projekt:rw',
+				'desyncProjects' => 'basis/projekt:rw',
 				'syncProjectphases' => 'basis/projekt:rw',
 				'desyncProjectphases' => 'basis/projekt:rw',
 				'createFUEProject' => 'basis/projekt:rw',
 				'createFUEPhase' => 'basis/projekt:rw',
-				'getSAPProjectOE' => 'basis/projekt:r'
+				'getSAPProjectOE' => 'basis/projekt:r',
+				'checkProjectHasTimerecordings' => 'basis/projekt:rw'
 			)
 		);
 
 		// Load models
 		$this->load->model('project/Projekt_model', 'ProjektModel');
 		$this->load->model('project/Projektphase_model', 'ProjektphaseModel');
+		$this->load->model('ressource/Zeitaufzeichnung_model', 'ZeitaufzeichnungModel');
 		$this->load->model('extensions/FHC-Core-SAP/SAPProjectsTimesheets_model', 'SAPProjectsTimesheetsModel');
 		$this->load->model('extensions/FHC-Core-SAP/ProjectsTimesheetsProject_model', 'ProjectsTimesheetsProjectModel');
 
@@ -196,6 +199,40 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonError('Projekt konnte nicht verknüpft werden.');
 		}
+	}
+	
+	public function desyncProjects()
+	{
+		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+	
+		// Check, if project is already synced
+		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($projects_timesheet_id);
+		
+		if (!$isSynced_SAPProject)
+		{
+			$this->terminateWithJsonError('Das ausgewählte SAP Projekt ist nicht verknüpft.');
+		}
+		
+		$result = $this->ProjectsTimesheetsProjectModel->loadWhere(array(
+			'projects_timesheet_id' => $projects_timesheet_id
+		));
+		
+		if (!hasData($result))
+		{
+			$this->terminateWithJsonError('Verknüpfung konnte nicht gefunden werden.');
+		}
+		
+		$result = $this->ProjectsTimesheetsProjectModel->delete($result->retval[0]->projects_timesheets_project_id);
+
+		if (isSuccess($result))
+		{
+			$this->outputJsonSuccess(true);
+		}
+		else
+		{
+			$this->terminateWithJsonError('Verknüpfung konnte nicht gelöscht werden.');
+		}
+		
 	}
 
 	// Synchronize SAP and FH projectphases.
@@ -453,6 +490,27 @@ class SyncProjects extends Auth_Controller
 			    return $this->outputJsonError('Fehler beim Erstellen der FH-Projektphasen');
 		    }
 	    }
+	}
+	
+	/**
+	 * Check if project already has time recordings.
+	 */
+	public function checkProjectHasTimerecordings()
+	{
+		$projekt_kurzbz = $this->input->post('projekt_kurzbz');
+		
+		// Check if project has timerecordings
+		$this->ZeitaufzeichnungModel->addSelect('1');
+		$this->ZeitaufzeichnungModel->addLimit(1);
+		$result = $this->ZeitaufzeichnungModel->loadWhere(array('projekt_kurzbz' => $projekt_kurzbz));
+	
+		if (isError($result))
+		{
+			$this->terminateWithJsonError('Prüfung auf Zeitbuchungen war fehlerhaft.');
+		}
+		
+		// Return true, if project has timerecordings. Otherwise false.
+		$this->outputJsonSuccess(hasData($result));
 	}
 
 	// -----------------------------------------------------------------------------------------------------------------
