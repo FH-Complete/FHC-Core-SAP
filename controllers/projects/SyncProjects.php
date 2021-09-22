@@ -335,6 +335,14 @@ class SyncProjects extends Auth_Controller
 		{
 			return $this->outputJsonError('SAP Projekt konnte nicht gefunden werden.');
 		}
+		
+		// Check, if FUE project already exists
+		$result = $this->ProjektModel->load($retval->project_id);
+
+		if (hasData($result))
+		{
+			$this->terminateWithJsonError('FH Projekt mit gleicher Projektkurzbezeichnung bereits vorhanden.');
+		}
 
 		// Create FUE project
 		$result = $this->ProjektModel->insert(
