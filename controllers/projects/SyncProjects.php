@@ -23,6 +23,7 @@ class SyncProjects extends Auth_Controller
 				'createFUEProject' => 'basis/projekt:rw',
 				'createFUEPhase' => 'basis/projekt:rw',
 				'getSAPProjectOE' => 'basis/projekt:r',
+				'checkPhaseHasTimerecordings' => 'basis/projekt:rw',
 				'checkProjectHasTimerecordings' => 'basis/projekt:rw'
 			)
 		);
@@ -490,6 +491,27 @@ class SyncProjects extends Auth_Controller
 			    return $this->outputJsonError('Fehler beim Erstellen der FH-Projektphasen');
 		    }
 	    }
+	}
+	
+	/**
+	 * Check if phase already has time recordings.
+	 */
+	public function checkPhaseHasTimerecordings()
+	{
+		$projektphase_id = $this->input->post('projektphase_id');
+		
+		// Check if project has timerecordings
+		$this->ZeitaufzeichnungModel->addSelect('1');
+		$this->ZeitaufzeichnungModel->addLimit(1);
+		$result = $this->ZeitaufzeichnungModel->loadWhere(array('projektphase_id' => $projektphase_id));
+		
+		if (isError($result))
+		{
+			$this->terminateWithJsonError('Prüfung auf Zeitbuchungen war fehlerhaft.');
+		}
+		
+		// Return true, if phase has timerecordings. Otherwise false.
+		$this->outputJsonSuccess(hasData($result));
 	}
 	
 	/**
