@@ -31,8 +31,7 @@ $tableWidgetArray = array(
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
 		tableWidgetHeader: false,
-		selectable: true,     
-        selectableRangeMode: "click",
+		selectable: 1,
 		selectablePersistence: false,
 	    rowUpdated: function(row){
             func_rowUpdated(row);
