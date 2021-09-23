@@ -231,6 +231,7 @@ $("#btn-sync-project").click(function () {
                         'updateData',
                         JSON.stringify([{
                             projects_timesheet_id: projects_timesheet_id,
+                            projekt_id: projekt_id,
                             projekt_kurzbz: projekt_kurzbz,
                             titel: titel,
                             isSynced: 'true'
@@ -378,6 +379,7 @@ $("#btn-create-project").click(function () {
                         'updateData',
                         JSON.stringify([{
                             projects_timesheet_id: projects_timesheet_id,
+                            projekt_id: data.projekt_id,
                             projekt_kurzbz: data.projekt_kurzbz,
                             titel: data.titel,
                             isSynced: 'true'
