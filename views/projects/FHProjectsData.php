@@ -35,9 +35,9 @@ $tableWidgetArray = array(
 		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
-		initialHeaderFilter:[
-            {field:"isSynced", value:"false"} // set default isSynced filter to "false"
-        ],
+		initialSort:[
+		    {column:"isSynced", dir:"asc"} // start with false
+	    ],
 		tableWidgetHeader: false,
 	    rowUpdated: function(row){
 	        row.deselect();

@@ -60,6 +60,9 @@ $tableWidgetArray = array(
 		initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
         ],
+        initialSort:[
+		    {column:"isSynced", dir:"asc"} // start with false
+	    ],
 		tableWidgetHeader: false,
 		rowSelected: function(row){
 			rowSelected_onSAPProject(row);
