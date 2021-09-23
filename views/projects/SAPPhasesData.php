@@ -11,11 +11,11 @@ $qry = '
     "project_id",
     "start_date",
     "end_date",
+    "time_recording",
     "project_task_id",
     "name",
     "projektphase_id",
-    "bezeichnung",
-    "time_recording"
+    "bezeichnung"
 	) LIMIT 0;
 ';
 
@@ -32,11 +32,11 @@ $tableWidgetArray = array(
 		'SAP ProjektID',
 		'Start',
 		'Ende',
+		'ZA-pflichtig',
 		'SAP Phase-ID',
 		'SAP Phase',
 		'FH Phase-ID',
-		'FH Phase',
-		'ZA-pflichtig'
+		'FH Phase'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
@@ -63,11 +63,11 @@ $tableWidgetArray = array(
 		project_id: {visible:false},
 		start_date: {visible: true, mutator: mut_formatStringDate},
 		end_date: {visible: true, mutator: mut_formatStringDate},
+		time_recording: {visible: true},
 		project_task_id: {visible: true, tooltip: true},
 		name: {visible: true, tooltip: true},
 		projektphase_id: {visible: true, tooltip: true},
-		bezeichnung: {visible: true, tooltip: true},
-		time_recording: {visible: true}
+		bezeichnung: {visible: true, tooltip: true}
 	}'
 );
 

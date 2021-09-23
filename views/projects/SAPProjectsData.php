@@ -19,8 +19,8 @@ $qry = '
 	FROM    	sync.tbl_sap_projects_timesheets
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projects_timesheet_id)
 	LEFT JOIN 	fue.tbl_projekt USING (projekt_id)
-	LEFT JOIN sync.tbl_sap_organisationsstruktur sap_oe ON (responsible_unit = sap_oe.oe_kurzbz_sap)
-	LEFT JOIN public.tbl_organisationseinheit oe ON (oe.oe_kurzbz = sap_oe.oe_kurzbz)
+	LEFT JOIN   sync.tbl_sap_organisationsstruktur sap_oe ON (responsible_unit = sap_oe.oe_kurzbz_sap)
+	LEFT JOIN   public.tbl_organisationseinheit oe ON (oe.oe_kurzbz = sap_oe.oe_kurzbz)
 	-- Filter out phases
 	WHERE 		project_task_id IS NULL
 	-- Filter out deleted projects
