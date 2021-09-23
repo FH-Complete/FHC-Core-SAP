@@ -45,7 +45,7 @@ $this->load->view(
 		</div>
 		<div class="row">
 			<div class="col-xs-9">
-				<span>SAP Projekt Überblick</span>
+				<span>Projekt Überblick</span>
 				<div class="btn-group pull-right">
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-project"><i class="fa fa-plus" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-project"><i class="fa fa-link" aria-hidden="true"></i></button>
@@ -67,7 +67,7 @@ $this->load->view(
 		<br>
 		<div class="row">
 			<div class="col-xs-9">
-				<span>SAP Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></span>
+				<span>Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></span>
 				<div class="btn-group pull-right">
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-phase"><i class="fa fa-plus" aria-hidden="true"></i></button>
 					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-phases"><i class="fa fa-link" aria-hidden="true"></i></button>
