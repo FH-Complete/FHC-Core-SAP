@@ -34,7 +34,7 @@ $tableWidgetArray = array(
 		selectable: 1,
 		selectablePersistence: false,
 	    rowUpdated: function(row){
-            func_rowUpdated(row);
+	        row.deselect();
         }
 	}',
 	'datasetRepFieldsDefs' => '{

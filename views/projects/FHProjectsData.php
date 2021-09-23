@@ -40,7 +40,7 @@ $tableWidgetArray = array(
         ],
 		tableWidgetHeader: false,
 	    rowUpdated: function(row){
-            func_rowUpdated(row);
+	        row.deselect();
         },
         rowAdded:function(row){
 	        resortTable(row);
