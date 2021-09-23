@@ -212,15 +212,12 @@ $("#btn-sync-project").click(function () {
     var projekt_kurzbz = fue_project_data[0].projekt_kurzbz;
     var titel = fue_project_data[0].titel;
 
-    // Prepare data object for ajax call
-    var data = {
-        'projects_timesheet_id': projects_timesheet_id,
-        'projekt_id': projekt_id
-    };
-
     FHC_AjaxClient.ajaxCallPost(
         FHC_JS_DATA_STORAGE_OBJECT.called_path + "/syncProjects",
-        data,
+        {
+            projects_timesheet_id: projects_timesheet_id,
+            projekt_id: projekt_id
+        },
         {
             successCallback: function (data, textStatus, jqXHR) {
                 if (FHC_AjaxClient.isError(data)) {
@@ -282,18 +279,15 @@ $("#btn-sync-phases").click(function () {
     var projektphase_id = fue_phases_data[0].projektphase_id;
     var bezeichnung = fue_phases_data[0].bezeichnung;
 
-    // Prepare data object for ajax call
-    var data = {
-        'projects_timesheet_id': projects_timesheet_id,
-        'project_id': project_id,
-        'projekt_id': projekt_id,
-        'projektphase_id': projektphase_id,
-        'bezeichnung': bezeichnung
-    };
-
     FHC_AjaxClient.ajaxCallPost(
         FHC_JS_DATA_STORAGE_OBJECT.called_path + "/syncProjectphases",
-        data,
+        {
+            projects_timesheet_id: projects_timesheet_id,
+            project_id: project_id,
+            projekt_id: projekt_id,
+            projektphase_id: projektphase_id,
+            bezeichnung: bezeichnung
+        },
         {
             successCallback: function (data, textStatus, jqXHR) {
                 if (FHC_AjaxClient.isError(data)) {
@@ -335,7 +329,6 @@ $("#btn-create-project").click(function () {
 
     // Get selected rows data
     var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
-    var fue_project_data = $(FH_PROJECT_TABLE).tabulator('getSelectedData');
 
     // Checks
     if (sap_project_data.length == 0) {
@@ -348,19 +341,16 @@ $("#btn-create-project").click(function () {
         return;
     }
 
-    // Set SAP project
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
     var oe_kurzbz = sap_project_data[0].oe_kurzbz;
 
-    // Prepare data object for ajax call
-    var data = {
-        'projects_timesheet_id': projects_timesheet_id,
-	    'oe_kurzbz' : oe_kurzbz
-    };
-
+    // Set SAP project
     FHC_AjaxClient.ajaxCallPost(
         FHC_JS_DATA_STORAGE_OBJECT.called_path + "/createFUEProject",
-        data,
+        {
+            projects_timesheet_id: projects_timesheet_id,
+            oe_kurzbz : oe_kurzbz
+        },
         {
             successCallback: function (data, textStatus, jqXHR) {
                 if (FHC_AjaxClient.isError(data)) {
@@ -431,14 +421,11 @@ $("#btn-create-phase").click(function () {
             projects_timesheet_id_arr.push(sap_phase_data[i].projects_timesheet_id);
         }
 
-        // Prepare data object for ajax call
-        var data = {
-            'projects_timesheet_id': projects_timesheet_id_arr
-        };
-
         FHC_AjaxClient.ajaxCallPost(
             FHC_JS_DATA_STORAGE_OBJECT.called_path + "/createFUEPhase",
-            data,
+            {
+                projects_timesheet_id: projects_timesheet_id_arr
+            },
             {
                 successCallback: function (data, textStatus, jqXHR) {
                     if (FHC_AjaxClient.isError(data)) {
