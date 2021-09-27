@@ -486,6 +486,7 @@ $('#btn-desync-projects').click(function() {
         }
 
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
+    var project_id = sap_project_data[0].project_id;
     var projekt_kurzbz = sap_project_data[0].projekt_kurzbz;
     var projekt_id = sap_project_data[0].projekt_id;
 
@@ -522,7 +523,10 @@ $('#btn-desync-projects').click(function() {
                         //...start desynchronisation
                         FHC_AjaxClient.ajaxCallPost(
                             FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjects",
-                            {projects_timesheet_id: projects_timesheet_id},
+                            {
+                                projects_timesheet_id: projects_timesheet_id,
+                                project_id: project_id
+                            },
                             {
                                 successCallback: function (data, textStatus, jqXHR) {
 
@@ -533,7 +537,7 @@ $('#btn-desync-projects').click(function() {
 
                                     if (data.retval)
                                     {
-                                        // Update tables
+                                        // Update project tables
                                         $(SAP_PROJECT_TABLE).tabulator(
                                             'updateData',
                                             JSON.stringify([{
@@ -551,6 +555,29 @@ $('#btn-desync-projects').click(function() {
                                                 isSynced: 'false'
                                             }])
                                         );
+
+                                        /**
+                                         *  Update phases tables
+                                         *  NOTE: If request was successful, all eventually present and synced phases
+                                         *  of project have been desynced, too
+                                        */
+                                        let sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getData');
+                                        let update_sap_phases_data = [];
+                                        sap_phases_data.forEach((sap_phase, index) => {
+                                            update_sap_phases_data.push({
+                                                projects_timesheet_id: sap_phase.projects_timesheet_id,
+                                                projektphase_id: '',
+                                                bezeichnung: '',
+                                                isSynced: 'false'
+                                            })
+                                        });
+
+                                        $(SAP_PHASES_TABLE).tabulator(
+                                            'updateData',
+                                            JSON.stringify(update_sap_phases_data)
+                                        );
+
+                                        $(FH_PHASES_TABLE).tabulator('clearData');
                                     }
                                 },
                                 errorCallback: function (jqXHR, textStatus, errorThrown) {

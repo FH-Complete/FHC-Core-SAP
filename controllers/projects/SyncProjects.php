@@ -205,6 +205,7 @@ class SyncProjects extends Auth_Controller
 	public function desyncProjects()
 	{
 		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
+		$project_id = $this->input->post('project_id');
 	
 		// Check, if project is already synced
 		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($projects_timesheet_id);
@@ -214,6 +215,27 @@ class SyncProjects extends Auth_Controller
 			$this->terminateWithJsonError('Das ausgewählte SAP Projekt ist nicht verknüpft.');
 		}
 		
+		// Get phases of the given project
+		$result = $this->SAPProjectsTimesheetsModel->getAllPhasesFromProject($project_id);
+		
+		// If phases are present
+		if (hasData($result))
+		{
+			$phases_projects_timesheet_id_arr = array_column(getData($result), 'projects_timesheet_id');
+			
+			// Desync phases
+			$result = $this->ProjectsTimesheetsProjectModel
+				->desyncByProjectsTimesheetIds($phases_projects_timesheet_id_arr);
+			
+			if (isError($result))
+			{
+				$this->terminateWithJsonError(
+					'Projektentknüpfung abgebrochen, da synchronisierte Phasen zu diesem Projekt nicht entknüpft werden konnten.'
+				);
+			}
+		}
+		
+		// Then desync projects
 		$result = $this->ProjectsTimesheetsProjectModel->loadWhere(array(
 			'projects_timesheet_id' => $projects_timesheet_id
 		));
@@ -233,7 +255,6 @@ class SyncProjects extends Auth_Controller
 		{
 			$this->terminateWithJsonError('Verknüpfung konnte nicht gelöscht werden.');
 		}
-		
 	}
 
 	// Synchronize SAP and FH projectphases.
