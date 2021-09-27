@@ -186,4 +186,19 @@ class ProjectsTimesheetsProject_model extends DB_Model
 
 		return hasData($result);
 	}
+	
+	/**
+	 * Desync all projects/phases by given project_timesheet_id array.
+	 * @param $phases_projects_timesheet_id_arr
+	 * @return mixed
+	 */
+	public function desyncByProjectsTimesheetIds($projects_timesheet_id_arr)
+	{
+		$qry = '
+			DELETE FROM sync.tbl_projects_timesheets_project
+			WHERE projects_timesheet_id IN ('. implode(', ', $projects_timesheet_id_arr). ')
+		';
+		
+		return $this->execQuery($qry);
+	}
 }
