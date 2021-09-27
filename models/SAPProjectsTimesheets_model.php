@@ -48,5 +48,18 @@ class SAPProjectsTimesheets_model extends DB_Model
 			'UPDATE sync.tbl_sap_projects_timesheets SET deleted = TRUE'
 		);
 	}
+	
+	
+	/**
+	 * Get all phases from SAP project.
+	 * @param $project_id
+	 * @return mixed
+	 */
+	public function getAllPhasesFromProject($project_id)
+	{
+		return $this->loadWhere(
+			'project_id = '. $this->db->escape($project_id). ' AND project_task_id IS NOT NULL'
+		);
+	}
 }
 
