@@ -1,13 +1,13 @@
 <?php
 
-require_once 'CoreAPIModel.php';
+require_once 'CustomAPIModel.php';
 
 /**
  * This implements all the calls for:
- * API set name SAPCoreAPI
- * Service name QuerySalesOrderIn
+ * API set name CustomAPI
+ * Service name SO_Release
  */
-class SORelease_model extends SOAPClientModel
+class SORelease_model extends CustomAPIModel
 {
 	/**
 	 * Set the properties to perform SOAP calls
@@ -17,7 +17,6 @@ class SORelease_model extends SOAPClientModel
 		parent::__construct();
 
 		$this->_serviceName = 'SO_Release'; // service name
-		$this->_apiSetName = 'CustomAPI'; // API set name
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -39,3 +38,4 @@ class SORelease_model extends SOAPClientModel
 		return $this->_call('SO_Release', $parameters);
 	}
 }
+
