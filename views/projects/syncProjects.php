@@ -40,20 +40,20 @@ $this->load->view(
 		<!-- title -->
 		<div class="row">
 			<div class="col-lg-12 page-header">
-				<h3>Projekt Synchronisation</h3>
+				<h3>Projekt Synchronisation<small> | SAP <> FH Projekte- und Phasensynchronisation</small></h3>
 			</div>
 		</div>
 		<div class="row">
 			<div class="col-xs-9">
-				<span>Projekt Überblick</span>
+				<span class="tabulator-title">Projekte Überblick</span>
 				<div class="btn-group pull-right">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-project"><i class="fa fa-plus" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-project"><i class="fa fa-link" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen" id="btn-desync-projects"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Projekt neu erstellen" id="btn-create-project"><i class="fa fa-plus" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Projekte verknüpfen" id="btn-sync-project"><i class="fa fa-link" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Projekte entknüpfen [Entknüpft auch Phasen zum Projekt]" id="btn-desync-projects"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
 				</div>
 			</div>
 			<div class="col-xs-3">
-				<span>FH Projekte</span>
+				<span><b>FH Projekte</b></span>
 			</div>
 		</div>
 		<div class="row">
@@ -67,15 +67,18 @@ $this->load->view(
 		<br>
 		<div class="row">
 			<div class="col-xs-9">
-				<span>Projektphasen Überblick<small> | Gewähltes SAP Projekt: <span id="span-sap-project">-</span></small></span>
+				<span class="tabulator-title">Projektphasen Überblick von Projekt: <span id="span-sap-project">[ Projekt auswählen ]</span></span>
 				<div class="btn-group pull-right">
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Neu erstellen" id="btn-create-phase"><i class="fa fa-plus" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Verknüpfen" id="btn-sync-phases"><i class="fa fa-link" aria-hidden="true"></i></button>
-					<button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="right" title="Entknüpfen" id="btn-desync-phases"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Phase(n) neu erstellen [Mehrfachselektion möglich]" id="btn-create-phase"><i class="fa fa-plus" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Phasen verknüpfen" id="btn-sync-phases"><i class="fa fa-link" aria-hidden="true"></i></button>
+					<button type="button" class="btn btn-default btn-lg" data-toggle="tooltip" data-placement="right" title="Phasen entknüpfen" id="btn-desync-phases"><i class="fa fa-chain-broken" aria-hidden="true"></i></button>
 				</div>
 			</div>
 			<div class="col-xs-3">
-				<span>FH Projektphasen<small> | Verknüpftes FH Projekt: <span id="span-fh-project">-</span></small></span>
+				<span data-toggle="tooltip" data-placement="right" title="Wenn das gewählte Projekt aus der Projekt Übersichtstabelle mit einem FH-Projekt verknüpft ist, werden hier die zugehörigen FH-Projektphasen automatisch angezeigt.">
+					<i class="fa fa-lg fa-info-circle" aria-hidden="true"></i>
+				</span>
+				<span><b>FH Projektphasen von: <span id="span-fh-project">-</span></b></span>
 			</div>
 		</div>
 		<div class="row">

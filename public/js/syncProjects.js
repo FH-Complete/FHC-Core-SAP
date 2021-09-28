@@ -122,7 +122,7 @@ function rowSelected_onSAPProject(row)
  * Empty Phasen tables and Project titles on Project Deselection.
  */
 function rowDeselected_onSAPProject(row){
-    $("#span-sap-project").text('-');
+    $("#span-sap-project").text('[ Projekt auswählen ]');
     $("#span-fh-project").text('-');
     $(SAP_PHASES_TABLE).tabulator('replaceData');
     $(FH_PHASES_TABLE).tabulator('replaceData');
