@@ -202,6 +202,7 @@ class SyncProjects extends Auth_Controller
 		}
 	}
 	
+	// Desynchronize SAP and FH projects.
 	public function desyncProjects()
 	{
 		$projects_timesheet_id = $this->input->post('projects_timesheet_id');
@@ -307,6 +308,7 @@ class SyncProjects extends Auth_Controller
 		}
 	}
 	
+	// Desnynchronize SAP and FH projectphases.
 	public function desyncProjectphases()
 	{
 		$projects_timesheet_id = $this->input->post('projects_timesheet_id');

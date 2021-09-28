@@ -24,8 +24,6 @@ const SAP_PHASES_STATUSBEZEICHNUNG = {
     '6': 'Completed'
 };
 
-var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
-
 // -----------------------------------------------------------------------------------------------------------------
 // Mutators - setter methods to manipulate table data when entering the tabulator
 // -----------------------------------------------------------------------------------------------------------------
