@@ -56,7 +56,7 @@ $tableWidgetArray = array(
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
 			formatter:"lookup",
-			formatterParams:getSAPProjectStatusbezeichnung
+			formatterParams:getSAPPhasesStatusbezeichnung
 		},
 		projects_timesheets_project: {visible: false},
 		projects_timesheet_id: {visible: false},

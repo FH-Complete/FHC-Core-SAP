@@ -17,6 +17,13 @@ const SAP_PROJECT_STATUSBEZEICHNUNG = {
     "6": "Completed"
 };
 
+const SAP_PHASES_STATUSBEZEICHNUNG = {
+    '2': 'Approved',
+    '3': 'Stopped',
+    '4': 'Closed',
+    '6': 'Completed'
+};
+
 var organisationseinheit_selected = ''; // organisational unit, is needed to create new FH project
 
 // -----------------------------------------------------------------------------------------------------------------
@@ -38,11 +45,17 @@ var mut_formatStringDate = function(value, data, type, params, component) {
 // -----------------------------------------------------------------------------------------------------------------
 
 /**
- * Return nice readable sap projekt/phasenstatus instead of numeric value
- * @returns {{"": string, "1": string, "2": string, "3": string, "4": string, "5": string, "6": string}}
+ * Returns nice readable sap projekt instead of numeric value
  */
 function getSAPProjectStatusbezeichnung() {
     return SAP_PROJECT_STATUSBEZEICHNUNG;
+}
+
+/**
+ * Returns nice readable sap phasenstatus instead of numeric value
+ */
+function getSAPPhasesStatusbezeichnung() {
+    return SAP_PHASES_STATUSBEZEICHNUNG;
 }
 
 // Resort table on row update and add row
