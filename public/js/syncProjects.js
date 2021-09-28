@@ -197,25 +197,10 @@ $("#btn-sync-project").click(function () {
     var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
     var fue_project_data = $(FH_PROJECT_TABLE).tabulator('getSelectedData');
 
-    // Checks
-	if (sap_project_data.length == 0) {
-		FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
-		return;
-	}
-
-    if (sap_project_data[0].isSynced == 'true') {
-        FHC_DialogLib.alertInfo('Projekt kann nicht verknüpft werden, da es bereits synchronisiert ist.');
-        return;
-    }
-
-    if (fue_project_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie zum Verknüpfen noch ein FH-Projekt aus.');
-        return;
-    }
-
-    if (fue_project_data[0].isSynced == 'true') {
-        FHC_DialogLib.alertInfo('FH-Projekt ist bereits mit anderem Projekt synchronisiert.');
-        return;
+    // Run checks
+	if (SyncProjects.runSyncProjectChecks(sap_project_data, fue_project_data) === false)
+	{
+	    return;
     }
 
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
@@ -273,26 +258,9 @@ $("#btn-sync-phases").click(function () {
     var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
     var fue_phases_data = $(FH_PHASES_TABLE).tabulator('getSelectedData');
 
-    // Checks
-    if (sap_phases_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie die mindestens eine Phase aus.');
-        return;
-    }
-
-    if (sap_phases_data[0].isSynced == 'true')
+    // Run checks
+    if (SyncProjects.runSynPhasesChecks(sap_phases_data, fue_phases_data) === false)
     {
-        FHC_DialogLib.alertInfo('Phase kann nicht verknüpft werden, da sie bereits synchronisiert ist.');
-        return;
-    }
-
-    if (fue_phases_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie die FH Projektphase aus, die synchronisiert werden soll.');
-        return;
-    }
-
-    if (sap_phases_data.length > 1 || fue_phases_data.length > 1)
-    {
-        FHC_DialogLib.alertInfo('Bitte verknüpfen Sie nur einzelne Phasen direkt miteinander.');
         return;
     }
 
@@ -353,16 +321,11 @@ $("#btn-create-project").click(function () {
     // Get selected rows data
     var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
 
-    // Checks
-    if (sap_project_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
-        return;
-    }
-
-    if (sap_project_data[0].isSynced == 'true'){
-        FHC_DialogLib.alertInfo('Projekt kann nicht neu erstellt werden, da es bereits synchronisiert ist.');
-        return;
-    }
+    // Run checks
+   if (SyncProjects.runCreateProjectChecks(sap_project_data) === false)
+   {
+       return;
+   }
 
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
     var oe_kurzbz = sap_project_data[0].oe_kurzbz;
@@ -422,97 +385,86 @@ $("#btn-create-project").click(function () {
 
 // Create new FH phase(s) like the given SAP phase(s). Synchronize them too.
 $("#btn-create-phase").click(function () {
-
         // Get selected rows data
-        var sap_phase_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
-        var fue_phase_data = $(FH_PHASES_TABLE).tabulator('getSelectedData');
+    var sap_phase_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
+    var fue_phase_data = $(FH_PHASES_TABLE).tabulator('getSelectedData');
 
-        // Checks
-        if (sap_phase_data.length == 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine Phase aus.');
-            return;
-        }
+    // Run checks
+    if (SyncProjects.runCreatePhaseChecks(sap_phase_data, fue_phase_data) === false)
+    {
+        return;
+    }
 
-        if (fue_phase_data.length != 0) {
-            FHC_DialogLib.alertWarning('Es darf keine FH-Phase gewählt sein.');
-            return;
-        }
-
-        // Set array of SAP phases
-        projects_timesheet_id_arr = [];
-        for (var i = 0; i < sap_phase_data.length; i++)
+    // Set array of SAP phases
+    projects_timesheet_id_arr = [];
+    for (var i = 0; i < sap_phase_data.length; i++)
+    {
+        // Return if one of the phases is already synced
+        if (sap_phase_data[i].isSynced === 'true')
         {
-            // Return if one of the phases is already synced
-            if (sap_phase_data[i].isSynced === 'true')
-            {
-                FHC_DialogLib.alertInfo('Projektphase(n) nicht erstellt. Mindestens eine Phase ist bereits synchronisiert.');
-                return;
-            }
-            
-            projects_timesheet_id_arr.push(sap_phase_data[i].projects_timesheet_id);
+            FHC_DialogLib.alertInfo('Projektphase(n) nicht erstellt. Mindestens eine Phase ist bereits synchronisiert.');
+            return;
         }
 
-        FHC_AjaxClient.ajaxCallPost(
-            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/createFUEPhase",
-            {
-                projects_timesheet_id: projects_timesheet_id_arr
-            },
-            {
-                successCallback: function (data, textStatus, jqXHR) {
-                    if (FHC_AjaxClient.isError(data)) {
-                        // Print error message
-                        FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
-                    }
+        projects_timesheet_id_arr.push(sap_phase_data[i].projects_timesheet_id);
+    }
 
-                    if (FHC_AjaxClient.hasData(data)) {
-
-                        data = FHC_AjaxClient.getData(data);
-
-                        for (var j = 0; j < data.length; j++)
-                        {
-                            // Add new FUE phase row
-                            $(FH_PHASES_TABLE).tabulator(
-                                'addRow',
-                                JSON.stringify({
-                                    projektphase_id: data[j].projektphase_id,
-                                    bezeichnung: data[j].bezeichnung,
-                                    isSynced: 'true'})
-                            );
-
-                            // Updated sap phase sync status
-                            $(SAP_PHASES_TABLE).tabulator(
-                                'updateData',
-                                JSON.stringify([{
-                                    projects_timesheet_id: data[j].projects_timesheet_id,
-                                    projektphase_id: data[j].projektphase_id,
-                                    bezeichnung: data[j].bezeichnung,
-                                    isSynced: 'true'}])
-                            );
-                        }
-                    }
-                },
-                errorCallback: function (jqXHR, textStatus, errorThrown) {
-                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+    FHC_AjaxClient.ajaxCallPost(
+        FHC_JS_DATA_STORAGE_OBJECT.called_path + "/createFUEPhase",
+        {
+            projects_timesheet_id: projects_timesheet_id_arr
+        },
+        {
+            successCallback: function (data, textStatus, jqXHR) {
+                if (FHC_AjaxClient.isError(data)) {
+                    // Print error message
+                    FHC_DialogLib.alertWarning(FHC_AjaxClient.getError(data));
                 }
+
+                if (FHC_AjaxClient.hasData(data)) {
+
+                    data = FHC_AjaxClient.getData(data);
+
+                    for (var j = 0; j < data.length; j++)
+                    {
+                        // Add new FUE phase row
+                        $(FH_PHASES_TABLE).tabulator(
+                            'addRow',
+                            JSON.stringify({
+                                projektphase_id: data[j].projektphase_id,
+                                bezeichnung: data[j].bezeichnung,
+                                isSynced: 'true'})
+                        );
+
+                        // Updated sap phase sync status
+                        $(SAP_PHASES_TABLE).tabulator(
+                            'updateData',
+                            JSON.stringify([{
+                                projects_timesheet_id: data[j].projects_timesheet_id,
+                                projektphase_id: data[j].projektphase_id,
+                                bezeichnung: data[j].bezeichnung,
+                                isSynced: 'true'}])
+                        );
+                    }
+                }
+            },
+            errorCallback: function (jqXHR, textStatus, errorThrown) {
+                FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
             }
-        );
-    });
+        }
+    );
+});
 
 // Desynchronize projects
 $('#btn-desync-projects').click(function() {
-        // Get selected rows data
-        var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
+    // Get selected rows data
+    var sap_project_data = $(SAP_PROJECT_TABLE).tabulator('getSelectedData');
 
-        // Checks
-        if (sap_project_data.length == 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
-            return;
-        }
-
-        if (sap_project_data[0].isSynced == 'false') {
-            FHC_DialogLib.alertInfo('Das Projekt kann nicht entknüpft werden, da es nicht synchronisiert ist.');
-            return;
-        }
+    // Run checks
+    if (SyncProjects.runDesyncProjectChecks(sap_project_data) === false)
+    {
+        return;
+    }
 
     var projects_timesheet_id = sap_project_data[0].projects_timesheet_id;
     var project_id = sap_project_data[0].project_id;
@@ -626,104 +578,200 @@ $('#btn-desync-projects').click(function() {
 // Desynchronize phases
 $('#btn-desync-phases').click(function() {
 
-        var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
+    var sap_phases_data = $(SAP_PHASES_TABLE).tabulator('getSelectedData');
 
-        // Checks
+    // Run checks
+    if (SyncProjects.runDesyncPhasesChecks(sap_phases_data) === false)
+    {
+        return;
+    }
+
+    /**
+     * First check if phase has timerecordings.
+     * Ask for confirmation.
+     * If confirmed, desynchronize phases.
+     */
+    var confirmed = false;
+
+    FHC_AjaxClient.ajaxCallPost(
+        //Check if phase has timerecordings.
+        FHC_JS_DATA_STORAGE_OBJECT.called_path + "/checkPhaseHasTimerecordings",
+        {projektphase_id: sap_phases_data[0].projektphase_id},
+        {
+            successCallback: function (data, textStatus, jqXHR) {
+                if (FHC_AjaxClient.isError(data))
+                {
+                    FHC_DialogLib.alertWarning(data.retval);
+                }
+
+                let phaseHasTimerecordings = data.retval;
+
+                // If phase has timerecordings...
+                if (phaseHasTimerecordings == true)
+                {
+                    // ...ask for confirmation.
+                    confirmed = confirm('Es sind bereits Zeiten auf das Projekt verbucht. Trotzdem entknüpfen?');
+                }
+
+                // If user confirmed or phase has no timerecordings
+                if (confirmed || phaseHasTimerecordings == false)
+                {
+                    //...start desynchronisation
+                    FHC_AjaxClient.ajaxCallPost(
+                        FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjectphases",
+                        {projects_timesheet_id: sap_phases_data[0].projects_timesheet_id},
+                        {
+                            successCallback: function (data, textStatus, jqXHR) {
+
+                                if (FHC_AjaxClient.isError(data))
+                                    FHC_DialogLib.alertWarning(data.retval);
+
+                                if (FHC_AjaxClient.hasData(data))
+                                {
+                                    data = FHC_AjaxClient.getData(data);
+
+                                    $(SAP_PHASES_TABLE).tabulator(
+                                        'updateData',
+                                        JSON.stringify([{
+                                            projects_timesheet_id: data.projects_timesheet_id,
+                                            projektphase_id: '',
+                                            bezeichnung: '',
+                                            isSynced: 'false'
+                                        }])
+                                    );
+
+                                    $(FH_PHASES_TABLE).tabulator(
+                                        'updateData',
+                                        JSON.stringify([{
+                                            projektphase_id: data.projektphase_id,
+                                            isSynced: 'false'
+                                        }])
+                                    );
+                                }
+                            },
+                            errorCallback: function (jqXHR, textStatus, errorThrown) {
+                                FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+                            }
+                        }
+                    );
+                }
+            },
+            errorCallback: function (jqXHR, textStatus, errorThrown) {
+                FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
+            }
+        }
+    );
+});
+
+});
+
+var SyncProjects = {
+    runSyncProjectChecks: function(sap_project_data, fh_project_data){
+        if (sap_project_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
+            return false;
+        }
+
+        if (sap_project_data[0].isSynced == 'true') {
+            FHC_DialogLib.alertInfo('Projekt kann nicht verknüpft werden, da es bereits synchronisiert ist.');
+            return false;
+        }
+
+        if (fh_project_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie zum Verknüpfen noch ein FH-Projekt aus.');
+            return false;
+        }
+
+        if (fh_project_data[0].isSynced == 'true') {
+            FHC_DialogLib.alertInfo('FH-Projekt ist bereits mit anderem Projekt synchronisiert.');
+            return false;
+        }
+
+        return true;
+    },
+    runSynPhasesChecks: function(sap_phases_data, fh_phases_data){
+        if (sap_phases_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie die mindestens eine Phase aus.');
+            return false;
+        }
+
+        if (sap_phases_data[0].isSynced == 'true')
+        {
+            FHC_DialogLib.alertInfo('Phase kann nicht verknüpft werden, da sie bereits synchronisiert ist.');
+            return false;
+        }
+
+        if (fh_phases_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie die FH Projektphase aus, mit der synchronisiert werden soll.');
+            return false;
+        }
+
+        if (sap_phases_data.length > 1 || fh_phases_data.length > 1)
+        {
+            FHC_DialogLib.alertInfo('Bitte verknüpfen Sie nur einzelne Phasen direkt miteinander.');
+            return false;
+        }
+
+        return true;
+    },
+    runCreateProjectChecks: function (sap_project_data) {
+        if (sap_project_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
+            return false;
+        }
+
+        if (sap_project_data[0].isSynced == 'true'){
+            FHC_DialogLib.alertInfo('Projekt kann nicht neu erstellt werden, da es bereits synchronisiert ist.');
+            return false;
+        }
+
+        return true;
+    },
+    runCreatePhaseChecks: function (sap_phase_data, fh_phase_data){
+        if (sap_phase_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine Phase aus.');
+            return false;
+        }
+
+        if (fh_phase_data.length != 0) {
+            FHC_DialogLib.alertWarning('Es darf keine FH-Phase gewählt sein.');
+            return false;
+        }
+
+        return true;
+    },
+    runDesyncProjectChecks: function(sap_project_data){
+        if (sap_project_data.length == 0) {
+            FHC_DialogLib.alertInfo('Bitte wählen Sie ein Projekt aus.');
+            return false;
+        }
+
+        if (sap_project_data[0].isSynced == 'false') {
+            FHC_DialogLib.alertInfo('Das Projekt kann nicht entknüpft werden, da es nicht synchronisiert ist.');
+            return false;
+        }
+
+        return true;
+    },
+    runDesyncPhasesChecks: function(sap_phases_data){
         if (sap_phases_data.length === 0) {
             FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine Phase aus.');
-            return;
+            return false;
         }
 
         if (sap_phases_data.length > 1)
         {
             FHC_DialogLib.alertInfo('Bitte entknüpfen Sie nur einzelne Phasen.');
-            return;
+            return false;
         }
 
         if (sap_phases_data[0].isSynced === 'false') {
             FHC_DialogLib.alertInfo('Die Phase kann nicht entknüpft werden, da sie nicht synchronisiert ist.');
-            return;
+            return false;
         }
 
-        /**
-         * First check if phase has timerecordings.
-         * Ask for confirmation.
-         * If confirmed, desynchronize phases.
-         */
-        var confirmed = false;
-
-        FHC_AjaxClient.ajaxCallPost(
-            //Check if phase has timerecordings.
-            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/checkPhaseHasTimerecordings",
-            {projektphase_id: sap_phases_data[0].projektphase_id},
-            {
-                successCallback: function (data, textStatus, jqXHR) {
-                    if (FHC_AjaxClient.isError(data))
-                    {
-                        FHC_DialogLib.alertWarning(data.retval);
-                    }
-
-                    let phaseHasTimerecordings = data.retval;
-
-                    // If phase has timerecordings...
-                    if (phaseHasTimerecordings == true)
-                    {
-                        // ...ask for confirmation.
-                        confirmed = confirm('Es sind bereits Zeiten auf das Projekt verbucht. Trotzdem entknüpfen?');
-                    }
-
-                    // If user confirmed or phase has no timerecordings
-                    if (confirmed || phaseHasTimerecordings == false)
-                    {
-                        //...start desynchronisation
-                        FHC_AjaxClient.ajaxCallPost(
-                            FHC_JS_DATA_STORAGE_OBJECT.called_path + "/desyncProjectphases",
-                            {projects_timesheet_id: sap_phases_data[0].projects_timesheet_id},
-                            {
-                                successCallback: function (data, textStatus, jqXHR) {
-
-                                    if (FHC_AjaxClient.isError(data))
-                                        FHC_DialogLib.alertWarning(data.retval);
-
-                                    if (FHC_AjaxClient.hasData(data))
-                                    {
-                                        data = FHC_AjaxClient.getData(data);
-
-                                        $(SAP_PHASES_TABLE).tabulator(
-                                            'updateData',
-                                            JSON.stringify([{
-                                                projects_timesheet_id: data.projects_timesheet_id,
-                                                projektphase_id: '',
-                                                bezeichnung: '',
-                                                isSynced: 'false'
-                                            }])
-                                        );
-
-                                        $(FH_PHASES_TABLE).tabulator(
-                                            'updateData',
-                                            JSON.stringify([{
-                                                projektphase_id: data.projektphase_id,
-                                                isSynced: 'false'
-                                            }])
-                                        );
-                                    }
-                                },
-                                errorCallback: function (jqXHR, textStatus, errorThrown) {
-                                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
-                                }
-                            }
-                        );
-                    }
-                },
-                errorCallback: function (jqXHR, textStatus, errorThrown) {
-                    FHC_DialogLib.alertError("Systemfehler<br>Bitte kontaktieren Sie Ihren Administrator.");
-                }
-            }
-        );
-    });
-
-});
-
-
+        return true;
+    }
+}
 
 
