@@ -416,73 +416,83 @@ class SyncProjects extends Auth_Controller
 
 	    if (!isEmptyArray($projects_timesheet_id_arr))
 	    {
+	    	// Loop through given projectphases
 		    foreach ($projects_timesheet_id_arr as $projects_timesheet_id)
 		    {
-			    // Check, if given phase is already synced
-			    $isSynced_SAPPhase = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProjectphase($projects_timesheet_id);
+			    // Check, if SAP projectphase is already synced with FH projectphase
+			    $isSynced_SAPPhase = $this->ProjectsTimesheetsProjectModel
+				    ->isSynced_SAPProjectphase($projects_timesheet_id);
 
 			    if ($isSynced_SAPPhase)
 			    {
-				    $this->terminateWithJsonError('Phase bereits verknüpft'); // if already synced
+				    $this->terminateWithJsonError(
+				    	'Phase kann nicht neu erstellt werden, da sie bereits synchronisiert ist.'
+				    );
 			    }
 
-			    // Get SAP phase
+			    // Get SAP projectphase
 			    $result = $this->SAPProjectsTimesheetsModel->load($projects_timesheet_id);
-
-			    if (!$retval = getData($result)[0])
+			    
+			    if (!hasData($result))
 			    {
-				    return $this->outputJsonError('Fehler beim Ermitteln der SAP Phase.');
+				    $this->outputJsonError('Fehler beim Ermitteln der SAP Phase.');
 			    }
+			    
+			    $sapPhase = getData($result)[0];
 
-			    $project_id = $retval->project_id;
-			    $project_task_id = $retval->project_task_id;
-			    $project_name = $retval->name;
-			    $start_date = $retval->start_date;
-			    $end_date = $retval->end_date;
+			    // Get SAP project
+			    $result = $this->SAPProjectsTimesheetsModel->getProject( $sapPhase->project_id);
 
-
-			    // Get the corresponding SAP project
-			    $result = $this->SAPProjectsTimesheetsModel->getProject($project_id);
-
-			    if (!$retval = getData($result)[0])
+			    if (!hasData($result))
 			    {
-				    return $this->outputJsonError('Fehler beim Ermitteln des entsprechenden SAP Projekts.');
+				    $this->outputJsonError('Fehler beim Ermitteln des entsprechenden SAP Projekts.');
 			    }
+			    
+			    $sapProject = getData($result)[0];
 
-			    $sap_project_projects_timesheet_id = $retval->projects_timesheet_id;
-
-			    // Get synced FUE project
+			    // Get synced FH project
 			    $this->ProjektModel->addSelect('projekt_kurzbz, projekt_id');
 			    $this->ProjektModel->addJoin('sync.tbl_projects_timesheets_project', 'projekt_id');
-			    $this->ProjektModel->addJoin('sync.tbl_sap_projects_timesheets', 'projects_timesheet_id');
 
 			    $result = $this->ProjektModel->loadWhere(array(
-				    'projects_timesheet_id' => $sap_project_projects_timesheet_id
+				    'projects_timesheet_id' => $sapProject->projects_timesheet_id
 			    ));
 
-			    if (!$retval = getData($result)[0])
+			    // Check, if SAP and FH projects are synced yet
+			    if (!hasData($result))
 			    {
-				    return $this->outputJsonError('Bitte synchronisieren Sie erst die Projekte.');
+				    $this->terminateWithJsonError('Bitte synchronisieren Sie erst die Projekte.');
 			    }
+			    
+			    $fhProjekt = getData($result)[0];
+			
+			    // Check if FH Projectphase already exists
+			    // Note: If FH projectphase had been created, then desynced, it exists and should not be created again.
+			    $result = $this->ProjektphaseModel->loadWhere(array(
+			    	'projekt_kurzbz' => $fhProjekt->projekt_kurzbz,
+				    'bezeichnung' => mb_substr($sapPhase->name, 0, 32)
+			    ));
 
-			    $projekt_kurzbz = $retval->projekt_kurzbz;
-			    $projekt_id = $retval->projekt_id;
+			    if (hasData($result))
+			    {
+				    $this->terminateWithJsonError('FH Phase mit gleicher Bezeichnung bereits vorhanden.');
+			    }
 
 			    // Create FUE phase to corresponding FUE project
 			    // -----------------------------------------------------------------------------------------------------
 			    $result = $this->ProjektphaseModel->insert(array(
-					    'projekt_kurzbz' => $projekt_kurzbz,
-					    'bezeichnung' => mb_substr($project_name, 0, 32),
-					    'beschreibung' => $project_name,
-					    'start' => $start_date,
-					    'ende' => $end_date,
+					    'projekt_kurzbz' => $fhProjekt->projekt_kurzbz,
+					    'bezeichnung' => mb_substr($sapPhase->name, 0, 32),
+					    'beschreibung' => $sapPhase->name,
+					    'start' => $sapPhase->start_date,
+					    'ende' => $sapPhase->end_date,
 					    'typ' => 'Projektphase'
 				    )
 			    );
 
 			    if (isError($result))
 			    {
-				    return $this->outputJsonError('FH-Phase konnte nicht angelegt werden.');
+				    $this->terminateWithJsonError('FH-Projektphase '. $sapPhase->name. ' konnte nicht neu angelegt werden.');
 			    }
 
 			    // Get projektphase_id of created FUE phase
@@ -492,7 +502,7 @@ class SyncProjects extends Auth_Controller
 			    // -----------------------------------------------------------------------------------------------------
 			    $result = $this->ProjectsTimesheetsProjectModel->syncProjectphases(
 				    $projects_timesheet_id,
-				    $projekt_id,
+				    $fhProjekt->projekt_id,
 				    $projektphase_id
 			    );
 
@@ -501,23 +511,23 @@ class SyncProjects extends Auth_Controller
 				    $json []= (array(
 					    'projects_timesheet_id' => $projects_timesheet_id,
 					    'projektphase_id' => $projektphase_id,
-					    'bezeichnung' => $project_name
+					    'bezeichnung' => $sapPhase->name
 				    ));
 			    }
 			    else
 			    {
-				    return $this->outputJsonError('Phase konnte nicht verknüpft werden.');
+				    $this->terminateWithJsonError('FH-Projektphase '. $sapPhase->name. ' konnte nicht verknüpft werden.');
 			    }
 	    	}
 
 		    // Output json to ajax
 		    if (isset($json) && !isEmptyArray($json))
 		    {
-			    return $this->outputJsonSuccess($json);
+			    $this->outputJsonSuccess($json);
 		    }
 		    else
 		    {
-			    return $this->outputJsonError('Fehler beim Erstellen der FH-Projektphasen');
+			    $this->outputJsonError('Fehler beim Erstellen der FH-Projektphasen');
 		    }
 	    }
 	}
