@@ -276,8 +276,19 @@ $("#btn-sync-phases").click(function () {
     var fue_phases_data = $(FH_PHASES_TABLE).tabulator('getSelectedData');
 
     // Checks
-    if (sap_phases_data.length == 0 || fue_phases_data.length == 0) {
-        FHC_DialogLib.alertInfo('Bitte wählen Sie die zweite Phase aus.');
+    if (sap_phases_data.length == 0) {
+        FHC_DialogLib.alertInfo('Bitte wählen Sie die mindestens eine Phase aus.');
+        return;
+    }
+
+    if (sap_phases_data[0].isSynced == 'true')
+    {
+        FHC_DialogLib.alertInfo('Phase kann nicht verknüpft werden, da sie bereits synchronisiert ist.');
+        return;
+    }
+
+    if (fue_phases_data.length == 0) {
+        FHC_DialogLib.alertInfo('Bitte wählen Sie die FH Projektphase aus, die synchronisiert werden soll.');
         return;
     }
 
@@ -433,6 +444,13 @@ $("#btn-create-phase").click(function () {
         projects_timesheet_id_arr = [];
         for (var i = 0; i < sap_phase_data.length; i++)
         {
+            // Return if one of the phases is already synced
+            if (sap_phase_data[i].isSynced === 'true')
+            {
+                FHC_DialogLib.alertInfo('Projektphase(n) nicht erstellt. Mindestens eine Phase ist bereits synchronisiert.');
+                return;
+            }
+            
             projects_timesheet_id_arr.push(sap_phase_data[i].projects_timesheet_id);
         }
 
@@ -614,7 +632,7 @@ $('#btn-desync-phases').click(function() {
 
         // Checks
         if (sap_phases_data.length === 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie eine Phase aus.');
+            FHC_DialogLib.alertInfo('Bitte wählen Sie mindestens eine Phase aus.');
             return;
         }
 
