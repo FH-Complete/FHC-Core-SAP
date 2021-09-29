@@ -79,7 +79,8 @@ class SyncPaymentsLib
 	 */
 	public function isSalesOrderPaid($salesOrderId, $studentId)
 	{
-		$id_arr = '';
+		$id_arr = array();
+
 		// Take results from cache if available
 		if (isset($this->_getInvoiceIDFromSalesOrderCache[$salesOrderId]))
 		{
@@ -99,31 +100,34 @@ class SyncPaymentsLib
 					$this->_getInvoiceIDFromSalesOrderCache[$salesOrderId] = $id_arr;
 				}
 				else
-					$this->_getInvoiceIDFromSalesOrderCache[$salesOrderId] = '';
+					$this->_getInvoiceIDFromSalesOrderCache[$salesOrderId] = array();
 			}
 			else
 			{
-				return error("Failed to get Invoices for SalesOrder".print_r($invoiceResult,true));
+				$this->_ci->LogLibSAP->logErrorDB("Failed to get Invoices for SalesOrder: ".getError($invoiceResult));
+				return error("Failed to get Invoices for SalesOrder: ".getError($invoiceResult));
 			}
 		}
 
-		if(is_array($id_arr))
+		if (!isEmptyArray($id_arr))
 		{
 			// If there are Invoices, check if there are open amounts for this invoices
 			foreach ($id_arr as $invoiceId)
 			{
-				// if there are open Amounts, its not cleared
+				// If there are open Amounts, its not cleared
 				$isInvoiceClearedResult = $this->_isInvoiceCleared($studentId, $invoiceId);
+
 				if (isSuccess($isInvoiceClearedResult))
 				{
-					if (!$isInvoiceClearedResult->retval)
+					if (!hasData($isInvoiceClearedResult))
 					{
-						echo "Offene Posten für Rechnung $invoiceId gefunden -> Nicht bezahlt";
+						$this->_ci->LogLibSAP->logWarningDB('Offene Posten für Rechnung '.$invoiceId.' gefunden -> Nicht bezahlt');
 						return success(false);
 					}
 				}
 				else
 				{
+					$this->_ci->LogLibSAP->logErrorDB("Invoice Clearance check failed: ".getError($isInvoiceClearedResult));
 					return error('Invoice Clearance check failed');
 				}
 			}
@@ -134,8 +138,8 @@ class SyncPaymentsLib
 		}
 		else
 		{
-			// If no Invoice is available its not paid;
-			echo "Keine Rechnung gefunden -> nicht bezahlt";
+			// If no Invoice is available it's not paid
+			$this->_ci->LogLibSAP->logWarningDB('Keine Rechnung gefunden -> nicht bezahlt: '.$salesOrderId.' - '.$studentId);
 			return success(false);
 		}
 
@@ -407,46 +411,50 @@ class SyncPaymentsLib
 
 		if (isSuccess($openPaymentsResult))
 		{
-			$openPayments = getData($openPaymentsResult);
-
-			if(is_array($openPayments))
+			if (hasData($openPaymentsResult))
 			{
+				$openPayments = getData($openPaymentsResult);
+
 				foreach ($openPayments as $row)
 				{
-					echo "\nCheck SO: $row->sap_sales_order_id ";
 					$isPaidResult = $this->isSalesOrderPaid($row->sap_sales_order_id, $row->sap_user_id);
-					if (isSuccess($isPaidResult) && getData($isPaidResult) === true)
+					if (isSuccess($isPaidResult))
 					{
-						echo " -> Paid ";
-						// paid
-						$this->_ci->KontoModel->setPaid($row->buchungsnr);
-					}
-					else
-					{
-						if(isError($isPaidResult))
+						if (hasData($isPaidResult))
 						{
-							echo "Error: ".print_r($isPaidResult, true);
+							if (getData($isPaidResult) === true)
+							{
+								// paid
+								$kontoResult = $this->_ci->KontoModel->setPaid($row->buchungsnr);
+								if (isError($kontoResult)) return $kontoResult;
+							}
+							// otherwise it is not paid
 						}
-						else
-						{
-							echo " -> not Paid";
-							// not paid yet
-						}
-					}
+						// otherwise no invoices, not paid or no sales order
 
-					// set last check timestamp
-					$this->_ci->SAPSalesOrderModel->update(
-						array($row->buchungsnr),
-						array(
-							'lastcheck' => 'NOW()',
-						)
-					);
+						// In any case set last check timestamp
+						$lastCheckResult = $this->_ci->SAPSalesOrderModel->update(
+							array($row->buchungsnr),
+							array(
+								'lastcheck' => 'NOW()',
+							)
+						);
+
+						if (isError($lastCheckResult)) return $lastCheckResult;
+					}
+					else // returns the error
+						return $isPaidResult;
+
 				}
 			}
-			// else nothing to check
+			else
+			{
+				return success("No Open Payments");
+			}
 		}
 		else
 		{
+			$this->_ci->LogLibSAP->logErrorDB("setPaid: cannot get Open Payments");
 			return error("Cannot get Open Payments");
 		}
 	}
@@ -501,7 +509,7 @@ class SyncPaymentsLib
 								$release = true;
 
 							// Create Sales Order for previous Degree Programm
-							$this->_CreateSalesOrder($data, $buchungsnr_arr, $release);
+							$this->_createSalesOrder($data, $buchungsnr_arr, $release);
 						}
 						$last_stg = $singlePayment->studiengang_kz;
 						$buchungsnr_arr = array();
@@ -533,13 +541,15 @@ class SyncPaymentsLib
 								$task_id = getData($TaskResult)[0]->project_id;
 							else
 							{
-								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.$singlePayment->studiengang_kz.' and studysemester '.$singlePayment->studiensemester_kurzbz;
+								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.
+									$singlePayment->studiengang_kz.' and studysemester '.
+									$singlePayment->studiensemester_kurzbz;
 								continue 2;
 							}
 
 							// Speziallehrgänge die in der FH sind statt in der GMBH!
 							if ($singlePayment->studiengang_kz < 0
-							 || in_array($singlePayment->studiengang_kz, $this->_ci->config->item('project_gmbh_custom_id_list'))
+								|| in_array($singlePayment->studiengang_kz, $this->_ci->config->item('project_gmbh_custom_id_list'))
 							)
 							{
 								// Lehrgaenge
@@ -570,6 +580,7 @@ class SyncPaymentsLib
 							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
 							$personalressource = $this->_ci->config->item('payments_personal_ressource')['fh'];
 						}
+
 						$data = array(
 							'BasicMessageHeader' => array(
 								'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
@@ -604,7 +615,7 @@ class SyncPaymentsLib
 						);
 					}
 
-					if($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
+					if ($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 					{
 						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
 						// andere Zahlungsbedingungen
@@ -676,7 +687,7 @@ class SyncPaymentsLib
 				else
 					$release = true;
 
-				$result = $this->_CreateSalesOrder($data, $buchungsnr_arr, $release);
+				$result = $this->_createSalesOrder($data, $buchungsnr_arr, $release);
 				if (hasData($result))
 					$nonBlockingErrorsArray = array_merge($nonBlockingErrorsArray, getData($result));
 			}
@@ -691,7 +702,7 @@ class SyncPaymentsLib
 	/**
 	 * Create a SalesOrder and writes the Sync Table entry
 	 */
-	private function _CreateSalesOrder($data, $buchungsnr_arr, $release)
+	private function _createSalesOrder($data, $buchungsnr_arr, $release)
 	{
 		$nonBlockingErrorsArray = array();
 
@@ -699,7 +710,7 @@ class SyncPaymentsLib
 		$manageSalesOrderResult = $this->_ci->ManageSalesOrderInModel->MaintainBundle($data);
 
 		// If no error occurred...
-		if (!isError($manageSalesOrderResult))
+		if (!isError($manageSalesOrderResult) && hasData($manageSalesOrderResult))
 		{
 			$manageSalesOrder = getData($manageSalesOrderResult);
 
@@ -728,7 +739,10 @@ class SyncPaymentsLib
 					);
 					// If database error occurred then return it
 					if (isError($insert))
-						$nonBlockingErrorsArray[] = 'Could not write SyncTable entry Buchungsnr: '.$buchungsnr.' SalesOrderID: '.$manageSalesOrder->SalesOrder->ID->_;
+						$nonBlockingErrorsArray[] = 'Could not write SyncTable entry Buchungsnr: '.
+							$buchungsnr.
+							' SalesOrderID: '.
+							$manageSalesOrder->SalesOrder->ID->_;
 				}
 			}
 			else // ...otherwise store a non blocking error
@@ -975,7 +989,7 @@ class SyncPaymentsLib
 	{
 		// If we already checked this combination - return the cached results
 		if (isset($this->_isInvoiceClearedCache[$studentId])
-		 && isset($this->_isInvoiceClearedCache[$studentId][$invoiceId]))
+			&& isset($this->_isInvoiceClearedCache[$studentId][$invoiceId]))
 		{
 			return success($this->_isInvoiceClearedCache[$studentId][$invoiceId]);
 		}
@@ -1041,7 +1055,7 @@ class SyncPaymentsLib
 		 	if (hasData($result))
 			{
 				if (isset($result->retval->SalesOrder)
-				 && isset($result->retval->SalesOrder->BusinessTransactionDocumentReference))
+					&& isset($result->retval->SalesOrder->BusinessTransactionDocumentReference))
 				{
 					if (is_array($result->retval->SalesOrder->BusinessTransactionDocumentReference))
 					{
@@ -1049,7 +1063,7 @@ class SyncPaymentsLib
 						{
 							// Check if it is an Invoice (can also be an reference to a project)
 							if (isset($invoice->BusinessTransactionDocumentReference->TypeCode)
-							 && $invoice->BusinessTransactionDocumentReference->TypeCode->_ == 28)
+								&& $invoice->BusinessTransactionDocumentReference->TypeCode->_ == 28)
 							{
 								$id_arr[] = $invoice->BusinessTransactionDocumentReference->ID->_;
 							}
@@ -1059,7 +1073,7 @@ class SyncPaymentsLib
 					{
 						// Check if it is an Invoice (can also be an reference to a project)
 						if (isset($result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->TypeCode)
-						 && $result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->TypeCode->_ == 28)
+							&& $result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->TypeCode->_ == 28)
 						{
 							$id_arr[] = $result->retval->SalesOrder->BusinessTransactionDocumentReference->BusinessTransactionDocumentReference->ID->_;
 						}
