@@ -255,9 +255,8 @@ class SyncProjects extends Auth_Controller
 
 		$sap_project_projects_timesheet_id = $retval->projects_timesheet_id;
 		$isSynced_SAPProject = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProject($sap_project_projects_timesheet_id);
-		$isSynced_FUEProject = $this->ProjectsTimesheetsProjectModel->isSynced_FUEProject($projekt_id);
 
-		if (!$isSynced_SAPProject || !$isSynced_FUEProject)
+		if (!$isSynced_SAPProject)
 		{
 			return $this->outputJsonError('Bitte synchronisieren Sie erst die Projekte');
 		}
