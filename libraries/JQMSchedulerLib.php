@@ -13,6 +13,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
+	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	// Maximum amount of users to be placed in a single job
@@ -93,11 +94,9 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\')
 								AND tbl_benutzer.aktiv
-						)
-						OR
-						EXISTS (
+						) OR EXISTS (
 							SELECT
 								1
 							FROM
@@ -105,7 +104,7 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 						)
 					)
 			      GROUP BY ps.person_id
@@ -141,6 +140,7 @@ class JQMSchedulerLib
 		$contacts = array();
 		$addresses = array();
 		$prestudents = array();
+		$bankData = array();
 
 		$dbModel = new DB_Model();
 
@@ -151,9 +151,9 @@ class JQMSchedulerLib
 			SELECT p.person_id
 			  FROM public.tbl_person p
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE p.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		');
@@ -173,12 +173,12 @@ class JQMSchedulerLib
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE (
-					NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-					OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				    	OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				)
+			 	pss.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			 	OR pss.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			 	OR pss.datum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY ps.person_id
@@ -197,9 +197,12 @@ class JQMSchedulerLib
 			SELECT k.person_id
 			  FROM public.tbl_kontakt k
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE (
+				k.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+				OR k.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY k.person_id
@@ -218,9 +221,12 @@ class JQMSchedulerLib
 			SELECT a.person_id
 			  FROM public.tbl_adresse a
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+			 WHERE (
+				a.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+				OR a.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
 			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
+				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
 				OR s.last_update IS NULL
 			)
 		      GROUP BY a.person_id
@@ -232,8 +238,32 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
+		// Bank data
+
+		// Get users that have bank data updated
+		$bankDataResult = $dbModel->execReadOnlyQuery('
+			SELECT bv.person_id
+			  FROM public.tbl_bankverbindung bv
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE (
+				bv.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+				OR bv.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+			)
+			   AND (
+				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
+				OR s.last_update IS NULL
+			)
+		      GROUP BY bv.person_id
+		');
+
+		// If error occurred while retrieving updated bank data from database then return the error
+		if (isError($bankDataResult)) return $bankDataResult;
+
+		// If there are updated bank data
+		if (hasData($bankDataResult)) $bankData = getData($bankDataResult);
+
 		// Return a success that contains all the arrays merged together
-		return success(uniquePersonIdArray(array_merge($persons, $contacts, $addresses, $prestudents)));
+		return success(uniquePersonIdArray(array_merge($persons, $contacts, $addresses, $prestudents, $bankData)));
 	}
 
 	/**
@@ -352,4 +382,39 @@ class JQMSchedulerLib
 
 		return success($jobInput);
 	}
+
+	/**
+	 * Looks for new credit memo
+	 */
+	public function creditMemo()
+	{
+		$creditMemo = array();
+
+		$dbModel = new DB_Model();
+
+		// Get users that have updated credit memo
+		$creditMemoResult = $dbModel->execReadOnlyQuery('
+			SELECT ko.person_id
+			  FROM public.tbl_konto ko
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE ko.betrag > 0
+			   AND ko.buchungstyp_kurzbz = \'ZuschussIO\'
+			   AND ko.buchungsnr NOT IN (
+				SELECT kos.buchungsnr_verweis
+				  FROM public.tbl_konto kos
+				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
+			)
+		      GROUP BY ko.person_id
+		');
+
+		// If error occurred while retrieving updated credit memo from database then return the error
+		if (isError($creditMemoResult)) return $creditMemoResult;
+
+		// If there are updated credit memo
+		if (hasData($creditMemoResult)) $creditMemo = getData($creditMemoResult);
+                                                     
+		// Return a success that contains all the credit memo
+		return success($creditMemo);
+	}
 }
+
