@@ -47,11 +47,11 @@ $tableWidgetArray = array(
 		'Ende',
 		'oe_kurzbz',
 		'Projekt-OE',
-		'SAP Projekt-ID',
-		'SAP Projekt',
+		'SAP Projekt-Nr',
+		'SAP Projektname',
 		'projekt_ID',
-		'FH Projekt-ID',
-		'FH Projekt',
+		'FH Projekt-Kurzbz',
+		'FH Projekttitel',
 		'Deleted'
 	),
 	'datasetRepOptions' => '{
@@ -85,10 +85,10 @@ $tableWidgetArray = array(
 			formatterParams: getSAPProjectStatusbezeichnung
 		},
 		projects_timesheet_id: {visible: false},
-		oe_kurzbz: {visible: false},
-		oe_bezeichnung: {headerFilter: "input", tooltip: true},
 		start_date: {headerFilter: "input", mutator: mut_formatStringDate},
 		end_date: {headerFilter: "input", mutator: mut_formatStringDate},
+		oe_kurzbz: {visible: false},
+		oe_bezeichnung: {headerFilter: "input", tooltip: true},
 		project_id: {headerFilter: "input", tooltip: true},
 		name: {headerFilter: "input", tooltip: true},
 		projekt_id: {visible: false},

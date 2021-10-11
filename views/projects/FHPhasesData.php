@@ -20,9 +20,9 @@ $tableWidgetArray = array(
 		'Synced',
 		'SyncID',
 		'FH ProjektTimesheetID',
-		'FH Projekt',
+		'FH Projekt-Nr',
 		'FH Phase-ID',
-		'FH Phase'
+		'FH Phasenbz'
 	),
 	'datasetRepOptions' => '{
 		index: "projektphase_id",

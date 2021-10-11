@@ -30,14 +30,14 @@ $tableWidgetArray = array(
 		'Status',
 		'SyncID',
 		'SAP ProjektTimesheetID',
-		'SAP ProjektID',
+		'SAP Projekt-Nr',
 		'Start',
 		'Ende',
 		'ZA-pflichtig',
-		'SAP Phase-ID',
-		'SAP Phase',
+		'SAP Phase-Nr',
+		'SAP Phasenname',
 		'FH Phase-ID',
-		'FH Phase',
+		'FH Phasenbz',
 		'Deleted'
 	),
 	'datasetRepOptions' => '{
