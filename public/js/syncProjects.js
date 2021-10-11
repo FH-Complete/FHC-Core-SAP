@@ -404,7 +404,7 @@ $("#btn-create-phase").click(function () {
         // Return if one of the phases is already synced
         if (sap_phase_data[i].isSynced === 'true')
         {
-            FHC_DialogLib.alertInfo('Projektphase(n) nicht erstellt. Mindestens eine Phase ist bereits synchronisiert.');
+            FHC_DialogLib.alertInfo('Projektphase(n) nicht erstellt.<br>Grund: Mindestens eine Phase ist bereits synchronisiert.');
             return;
         }
 
@@ -675,17 +675,17 @@ var SyncProjects = {
         }
 
         if (sap_project_data[0].isSynced == 'true') {
-            FHC_DialogLib.alertInfo('Projekt kann nicht verknüpft werden, da es bereits synchronisiert ist.');
+            FHC_DialogLib.alertInfo('Projekt kann nicht synchronisiert werden.<br>Grund: Projekt ist bereits synchronisiert.');
             return false;
         }
 
         if (fh_project_data.length == 0) {
-            FHC_DialogLib.alertInfo('Bitte wählen Sie zum Verknüpfen noch ein FH-Projekt aus.');
+            FHC_DialogLib.alertInfo('Bitte wählen Sie zum Synchronisieren noch ein FH-Projekt aus.');
             return false;
         }
 
         if (fh_project_data[0].isSynced == 'true') {
-            FHC_DialogLib.alertInfo('FH-Projekt ist bereits mit anderem Projekt synchronisiert.');
+            FHC_DialogLib.alertInfo('FH-Projekt ist bereits synchronisiert.');
             return false;
         }
 
@@ -699,7 +699,7 @@ var SyncProjects = {
 
         if (sap_phases_data[0].isSynced == 'true')
         {
-            FHC_DialogLib.alertInfo('Phase kann nicht verknüpft werden, da sie bereits synchronisiert ist.');
+            FHC_DialogLib.alertInfo('Phase kann nicht synchronisiert werden.<br>Grund: Phase ist bereits synchronisiert.');
             return false;
         }
 
@@ -710,7 +710,7 @@ var SyncProjects = {
 
         if (sap_phases_data.length > 1 || fh_phases_data.length > 1)
         {
-            FHC_DialogLib.alertInfo('Bitte verknüpfen Sie nur einzelne Phasen direkt miteinander.');
+            FHC_DialogLib.alertInfo('Bitte synchronisieren Sie nur einzelne Phasen direkt miteinander.');
             return false;
         }
 
@@ -723,7 +723,7 @@ var SyncProjects = {
         }
 
         if (sap_project_data[0].isSynced == 'true'){
-            FHC_DialogLib.alertInfo('Projekt kann nicht neu erstellt werden, da es bereits synchronisiert ist.');
+            FHC_DialogLib.alertInfo('Projekt kann nicht neu erstellt werden.<br>Grund: Projekt ist bereits synchronisiert.');
             return false;
         }
 
@@ -749,7 +749,7 @@ var SyncProjects = {
         }
 
         if (sap_project_data[0].isSynced == 'false') {
-            FHC_DialogLib.alertInfo('Das Projekt kann nicht entknüpft werden, da es nicht synchronisiert ist.');
+            FHC_DialogLib.alertInfo('Das Projekt kann nicht entknüpft werden.<br>Grund: Projekt ist nicht synchronisiert.');
             return false;
         }
 
@@ -768,7 +768,7 @@ var SyncProjects = {
         }
 
         if (sap_phases_data[0].isSynced === 'false') {
-            FHC_DialogLib.alertInfo('Die Phase kann nicht entknüpft werden, da sie nicht synchronisiert ist.');
+            FHC_DialogLib.alertInfo('Die Phase kann nicht entknüpft werden.<br>Grund: Phase ist nicht synchronisiert.');
             return false;
         }
 

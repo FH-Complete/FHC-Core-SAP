@@ -178,7 +178,7 @@ class SyncProjects extends Auth_Controller
 		}
 		else
 		{
-			return $this->outputJsonError('Projekt konnte nicht verknüpft werden.');
+			return $this->outputJsonError('Projekt konnte nicht synchronisiert werden.');
 		}
 	}
 	
@@ -193,7 +193,7 @@ class SyncProjects extends Auth_Controller
 		
 		if (!$isSynced_SAPProject)
 		{
-			$this->terminateWithJsonError('Das ausgewählte SAP Projekt ist nicht verknüpft.');
+			$this->terminateWithJsonError('Das ausgewählte SAP Projekt ist nicht synchronisiert.');
 		}
 		
 		// Get phases of the given project
@@ -283,7 +283,7 @@ class SyncProjects extends Auth_Controller
 		}
 		else
 		{
-			return $this->outputJsonError('Phase konnte nicht verknüpft werden.');
+			return $this->outputJsonError('Phase konnte nicht synchronisiert werden.');
 		}
 	}
 	
@@ -296,7 +296,7 @@ class SyncProjects extends Auth_Controller
 		$result = $this->ProjectsTimesheetsProjectModel->isSynced_SAPProjectphase($projects_timesheet_id);
 		
 		if (!$result)
-			$this->terminateWithJsonError('SAP Projektphase ist nicht verknüpft');
+			$this->terminateWithJsonError('SAP Projektphase ist nicht synchronisiert');
 		
 		$result = $this->ProjectsTimesheetsProjectModel->loadWhere(array('projects_timesheet_id' => $projects_timesheet_id));
 		
@@ -319,7 +319,8 @@ class SyncProjects extends Auth_Controller
 
 		if (isEmptyString($oe_kurzbz))
 		{
-			return $this->outputJsonError('Bitte wählen Sie eine Organisationseinheit');
+			$this->outputJsonError('FH Projekt anlegen fehlgeschlagen.<br>
+				Grund: Im SAP Projekt ist keine Organisationseinheit hinterlegt.');
 		}
 
 		// Check, if given project is already synced
@@ -343,7 +344,8 @@ class SyncProjects extends Auth_Controller
 
 		if (hasData($result))
 		{
-			$this->terminateWithJsonError('FH Projekt mit gleicher Projektkurzbezeichnung bereits vorhanden.');
+			$this->terminateWithJsonError('FH Projekt mit gleicher Projektkurzbezeichnung bereits vorhanden.<br>
+				Es kann in der FH-Projekttabelle gewählt und erneut synchronisiert werden.');
 		}
 
 		// Create FUE project
@@ -386,7 +388,7 @@ class SyncProjects extends Auth_Controller
 		}
 		else
 		{
-			return $this->outputJsonError('Projekte konnten nicht verknüpft werden.');
+			return $this->outputJsonError('Projekte konnten nicht synchronisiert werden.');
 		}
 	}
 
@@ -407,7 +409,7 @@ class SyncProjects extends Auth_Controller
 			    if ($isSynced_SAPPhase)
 			    {
 				    $this->terminateWithJsonError(
-				    	'Phase kann nicht neu erstellt werden, da sie bereits synchronisiert ist.'
+				    	'Phase kann nicht neu erstellt werden.<br>Grund: Phase ist bereits synchronisiert.'
 				    );
 			    }
 
@@ -456,7 +458,8 @@ class SyncProjects extends Auth_Controller
 
 			    if (hasData($result))
 			    {
-				    $this->terminateWithJsonError('FH Phase mit gleicher Bezeichnung bereits vorhanden.');
+				    $this->terminateWithJsonError('FH Phase mit gleicher Bezeichnung in diesem Projekt bereits vorhanden.<br>
+				    	Sie kann in der FH Phasentabelle gewählt und erneut synchronisiert werden.');
 			    }
 
 			    // Create FUE phase to corresponding FUE project
@@ -497,7 +500,7 @@ class SyncProjects extends Auth_Controller
 			    }
 			    else
 			    {
-				    $this->terminateWithJsonError('FH-Projektphase '. $sapPhase->name. ' konnte nicht verknüpft werden.');
+				    $this->terminateWithJsonError('FH-Projektphase '. $sapPhase->name. ' konnte nicht synchronisiert werden.');
 			    }
 	    	}
 
