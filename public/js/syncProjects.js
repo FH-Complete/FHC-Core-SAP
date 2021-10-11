@@ -433,6 +433,7 @@ $("#btn-create-phase").click(function () {
                         $(FH_PHASES_TABLE).tabulator(
                             'addRow',
                             JSON.stringify({
+                                projekt_id: data[j].projekt_id,
                                 projektphase_id: data[j].projektphase_id,
                                 bezeichnung: data[j].bezeichnung,
                                 isSynced: 'true'})

@@ -494,6 +494,7 @@ class SyncProjects extends Auth_Controller
 			    {
 				    $json []= (array(
 					    'projects_timesheet_id' => $projects_timesheet_id,
+					    'projekt_id' => $fhProjekt->projekt_id,
 					    'projektphase_id' => $projektphase_id,
 					    'bezeichnung' => $sapPhase->name
 				    ));
