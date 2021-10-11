@@ -3,7 +3,7 @@
 // NOTE: This is a pseudo query to be able to start with an empty table.
 // Table will be filled with data by user interaction (ajax call).
 $qry = '
-	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)) AS tmp (
+	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)) AS tmp (
 	"isSynced",
 	"status",
     "projects_timesheets_project",
@@ -15,7 +15,8 @@ $qry = '
     "project_task_id",
     "name",
     "projektphase_id",
-    "bezeichnung"
+    "bezeichnung",
+    "deleted"
 	) LIMIT 0;
 ';
 
@@ -36,7 +37,8 @@ $tableWidgetArray = array(
 		'SAP Phase-ID',
 		'SAP Phase',
 		'FH Phase-ID',
-		'FH Phase'
+		'FH Phase',
+		'Deleted'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
@@ -67,7 +69,8 @@ $tableWidgetArray = array(
 		project_task_id: {visible: true, tooltip: true},
 		name: {visible: true, tooltip: true},
 		projektphase_id: {visible: true, tooltip: true},
-		bezeichnung: {visible: true, tooltip: true}
+		bezeichnung: {visible: true, tooltip: true},
+		deleted: {visible: false}
 	}'
 );
 

@@ -14,14 +14,16 @@ const SAP_PROJECT_STATUSBEZEICHNUNG = {
     "3": "Released",
     "4": "Stopped",
     "5": "Closed",
-    "6": "Completed"
+    "6": "Completed",
+    '99': 'Deleted [still synced]'
 };
 
 const SAP_PHASES_STATUSBEZEICHNUNG = {
     '2': 'Approved',
     '3': 'Stopped',
     '4': 'Closed',
-    '6': 'Completed'
+    '6': 'Completed',
+    '99': 'Deleted [still synced]'
 };
 
 // -----------------------------------------------------------------------------------------------------------------

@@ -5,7 +5,10 @@ $qry = '
 				WHEN projects_timesheets_project_id IS NOT NULL THEN \'true\'
 				ELSE \'false\'
 				END AS "isSynced",
-				status,
+				CASE
+					WHEN deleted = true THEN 99
+					ELSE status
+		        END AS "status",
 				projects_timesheet_id,
 				start_date::date,
 				end_date::date,
@@ -15,7 +18,8 @@ $qry = '
 				name,
 				projekt_id,
 				projekt_kurzbz,
-				titel
+				titel,
+				deleted
 	FROM    	sync.tbl_sap_projects_timesheets
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projects_timesheet_id)
 	LEFT JOIN 	fue.tbl_projekt USING (projekt_id)
@@ -23,8 +27,8 @@ $qry = '
 	LEFT JOIN   public.tbl_organisationseinheit oe ON (oe.oe_kurzbz = sap_oe.oe_kurzbz)
 	-- Filter out phases
 	WHERE 		project_task_id IS NULL
-	-- Filter out deleted projects
-	AND         deleted = FALSE
+	-- Filter out deleted projects or leave them, if they are still synched (synched ones should stay to be able to desynch them)
+	AND         ((deleted = FALSE) OR (deleted = TRUE AND projects_timesheets_project_id IS NOT NULL))
 	-- Filter out Intercompany (ICP) and Objektverwendung (OV) projects
 	AND         (project_id NOT LIKE \'ICP%\' AND project_id NOT LIKE \'OV%\')
 	ORDER BY 	projects_timesheets_project_id, project_id
@@ -47,7 +51,8 @@ $tableWidgetArray = array(
 		'SAP Projekt',
 		'projekt_ID',
 		'FH Projekt-ID',
-		'FH Projekt'
+		'FH Projekt',
+		'Deleted'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
@@ -88,7 +93,8 @@ $tableWidgetArray = array(
 		name: {headerFilter: "input", tooltip: true},
 		projekt_id: {visible: false},
 		projekt_kurzbz: {headerFilter: "input", tooltip: true},
-		titel: {headerFilter: "input", tooltip: true}
+		titel: {headerFilter: "input", tooltip: true},
+		deleted: {visible: false}
 	}'
 );
 
