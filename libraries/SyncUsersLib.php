@@ -584,6 +584,13 @@ class SyncUsersLib
 					continue;
 				}
 			}
+			else
+			{
+				$this->_ci->LogLibSAP->logWarningDB(
+					'The following user does not exists on SAP: person_id: '.$userData->person_id.
+					' - sap_user_id: '.getData($sapIdResult)[0]->sap_user_id
+				);
+			}
 		}
 
 		return success('Users data updated successfully');
