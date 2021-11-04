@@ -7,12 +7,10 @@ $qry = '
 				END AS "isSynced",
 				projekt_id,
 				projekt_kurzbz,
-				CONCAT(titel, \' (\' ,projekt_kurzbz ,\')\') as titel
+				titel
 	FROM 		fue.tbl_projekt
 	LEFT JOIN 	sync.tbl_projects_timesheets_project synctbl USING (projekt_id)
 	WHERE 		synctbl.projektphase_id IS NULL
-	-- filter active projects only
-	AND 		( ende IS NULL OR ende >= ( NOW() - INTERVAL \'1 YEAR\' ) )
 	ORDER BY 	projects_timesheets_project_id, projekt_kurzbz
 ';
 
@@ -24,38 +22,33 @@ $tableWidgetArray = array(
 	'columnsAliases' => array(
 		'Synced',
 		'ProjektTimesheet-ID',
-		'Projekt-Kurzbz',
-		'Projekt'
+		'FH Projekt-Kurzbz',
+		'FH Projekttitel'
 	),
 	'datasetRepOptions' => '{
 		index: "projekt_id",
+		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
-		rowClick: function(e, row){
-            func_rowClick_onFHProject(e, row);
-        },
+		initialSort:[
+		    {column:"isSynced", dir:"asc"} // start with false
+	    ],
 		tableWidgetHeader: false,
-		rowSelected: function(row){
-			rowSelected_onFUEProject(row);
-		},
 	    rowUpdated: function(row){
-            resortTable(row);
+	        row.deselect();
         },
         rowAdded:function(row){
 	        resortTable(row);
-	    },
-	    renderStarted: function(){
-	        renderStarted_onFUEProject(this);
 	    }
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 100},
+		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
 		projekt_id: {visible: false},
-		projekt_kurzbz: {visible: false},
-		titel: {headerFilter:"input"}
+		projekt_kurzbz: {headerFilter:"input", tooltip: true},
+		titel: {headerFilter:"input", tooltip: true}
 	}'
 );
 
