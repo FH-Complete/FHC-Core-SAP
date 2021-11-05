@@ -1061,7 +1061,8 @@ class SyncProjectsLib
 					// Get the project data from sync.tbl_sap_projects_timesheets
 					$projectResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
 						array(
-							'project_object_id' => $linkedProject->project_object_id
+							'project_object_id' => $linkedProject->project_object_id,
+							'project_task_object_id' => null // do not get the tasks
 						)
 					);
 
