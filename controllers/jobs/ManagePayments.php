@@ -82,7 +82,7 @@ class ManagePayments extends JQW_Controller
 		$this->logInfo('Start data synchronization with SAP ByD: Gutschrift');
 
 		// Gets the latest jobs
-		$lastJobs = $this->getLastJobs(SyncPaymentsLib::SAP_PAYMENT_GUTSCHRIFT);
+		$lastJobs = $this->getOldestJob(SyncPaymentsLib::SAP_PAYMENT_GUTSCHRIFT);
 		if (isError($lastJobs))
 		{
 			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncPaymentsLib::SAP_PAYMENT_GUTSCHRIFT);
@@ -155,11 +155,10 @@ class ManagePayments extends JQW_Controller
 	 */
 	public function create()
 	{
-		$jobType = 'SAPPaymentCreate';
 		$this->logInfo('Start data synchronization with SAP ByD: Payments');
 
 		// Gets the latest jobs
-		$lastJobs = $this->getLastJobs($jobType);
+		$lastJobs = $this->getOldestJob(SyncPaymentsLib::SAP_PAYMENT_CREATE);
 		if (isError($lastJobs))
 		{
 			$this->logError('An error occurred while creating payments in SAP', getError($lastJobs));
@@ -200,7 +199,7 @@ class ManagePayments extends JQW_Controller
 					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
 				);
 
-				if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
+				if (hasData($lastJobs)) $this->updateJobsQueue(SyncPaymentsLib::SAP_PAYMENT_CREATE, getData($lastJobs));
 			}
 		}
 
