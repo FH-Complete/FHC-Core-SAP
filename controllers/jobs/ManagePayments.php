@@ -3,7 +3,7 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * Job Queue Worker to create or update users in SAP Business by Design
+ * Job Queue Worker to create or update payments in SAP Business by Design
  */
 class ManagePayments extends JQW_Controller
 {
@@ -24,9 +24,12 @@ class ManagePayments extends JQW_Controller
 	//------------------------------------------------------------------------------------------------------------------
 	// Public methods
 
-	public function get($id)
+	/**
+	 *
+	 * */
+	public function getPaymentById($id)
 	{
-		echo print_r($this->syncpaymentslib->getPaymentById($id), true);
+		var_dump($this->syncpaymentslib->getPaymentById($id));
 	}
 
 	/**
@@ -34,21 +37,28 @@ class ManagePayments extends JQW_Controller
 	 */
 	public function checkIfPaid($salesOrderId, $studentId)
 	{
-		$result = $this->syncpaymentslib->isSalesOrderPaid($salesOrderId,$studentId);
+		$result = $this->syncpaymentslib->isSalesOrderPaid($salesOrderId, $studentId);
 
-		if(isSuccess($result) && hasData($result))
+		if (isSuccess($result))
 		{
-			if(getData($result) === true)
+			if (hasData($result))
 			{
-				echo "SalesOrder is paid";
+				if (getData($result) === true)
+				{
+					var_dump("SalesOrder is paid");
+				}
+				else
+				{
+					var_dump("SalesOrder is NOT paid");
+				}
 			}
 			else
 			{
-				echo "SalesOrder is NOT paid";
+				var_dump("Sales order not found on SAP");
 			}
 		}
 		else
-			echo print_r($result, true);
+			var_dump(getError($result));
 	}
 
 	/**
@@ -57,7 +67,11 @@ class ManagePayments extends JQW_Controller
 	 */
 	public function setPaid()
 	{
+		$this->logInfo('Start data synchronization with SAP ByD: setPaid');
+
 		$this->syncpaymentslib->setPaid();
+
+		$this->logInfo('End data synchronization with SAP ByD: setPaid');
 	}
 
 	/**
