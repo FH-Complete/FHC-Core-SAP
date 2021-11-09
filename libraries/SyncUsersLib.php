@@ -989,6 +989,7 @@ class SyncUsersLib
 			);
 
 			$userAllData->iban = null;
+			$userAllData->swift = null;
 
 			if (isError($bankResult)) return $bankResult;
 			if (hasData($bankResult)) // if a bank account was found

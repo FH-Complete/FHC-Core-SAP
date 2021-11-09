@@ -228,12 +228,12 @@ class ManageProjects extends JOB_Controller
 	/**
 	 *
 	 */
-	public function importProjectsDates()
+	public function updateFUEProjects()
 	{
 		$this->logInfo('Start projects dates synchronization with SAP ByD');
 
 		// Import SAP projects ids
-		$importResult = $this->syncprojectslib->importProjectsDates();
+		$importResult = $this->syncprojectslib->updateFUEProjects();
 
 		// If an error occurred then log it
 		if (isError($importResult))

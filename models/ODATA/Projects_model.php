@@ -216,7 +216,7 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function createTask($parentObjectID, $name, $responsibleCostCentreID, $duration)
+	public function createTask($parentObjectID, $name, $responsibleCostCentreID, $duration, $timeRecording)
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectCollection(\''.$parentObjectID.'\')/ProjectTask',
@@ -230,7 +230,7 @@ class Projects_model extends ODATAClientModel
 				'MASollStunden1unitCode_KUT' => 'HUR',
 				'LehreGrobplanung1content_KUT' => '20.00000000000000',
 				'LehreGrobplanung1unitCode_KUT' => 'HUR',
-				'TimeConfirmationProfileCode' => '2'
+				'TimeConfirmationProfileCode' => $timeRecording
 			)
 		);
 	}
@@ -309,14 +309,14 @@ class Projects_model extends ODATAClientModel
 	/**
 	 * 
 	 */
-	public function setTimeRecordingOff($projectObjectId)
+	public function setTimeRecording($projectObjectId, $timeRecording)
 	{
 		return $this->_call(
 			self::URI_PREFIX.'ProjectTaskCollection(\''.$projectObjectId.'\')',
 			ODATAClientLib::HTTP_MERGE_METHOD,
 			array(
 				'ObjectID' => $projectObjectId,
-				'TimeConfirmationProfileCode' => '1'
+				'TimeConfirmationProfileCode' => $timeRecording
 			)
 		);
 	}
