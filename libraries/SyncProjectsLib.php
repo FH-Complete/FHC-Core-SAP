@@ -79,8 +79,9 @@ class SyncProjectsLib
 	const DE_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI DE';
 
 	// SAP time recording values
-	const TIME_RECORDING_ON = '2';
-	const TIME_RECORDING_OFF = '1';
+	const TIME_RECORDING_NOT_ALLOWED = '1';
+	const TIME_RECORDING_NO_APPROVAL = '2';
+	const TIME_RECORDING_APPROVAL = '3';
 
 	private $_ci; // Code igniter instance
 
@@ -474,8 +475,9 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
 					{
-						// If true it means the time recording is enabled on SAP and vice versa
-						$timeRecording = $projectTask->TimeConfirmationProfileCode == self::TIME_RECORDING_ON;
+						// Any other value means that the time recording is allowed on FHC
+						// If true it means the time recording is enabled
+						$timeRecording = $projectTask->TimeConfirmationProfileCode != self::TIME_RECORDING_NOT_ALLOWED;
 
 						// If the current task is the project itself then update:
 						// - name
@@ -483,21 +485,23 @@ class SyncProjectsLib
 						// and skip to the next one
 						if ($project->ProjectID == $projectTask->ID)
 						{
-
 							// Updates only the name and time recording
 							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 								$projects_timesheet_id,
 								array(
 									'name' => $projectTask->Name,
-									'time_recording' => $timeRecording
+									'time_recording' => $timeRecording,
+									// to enforce that this is a project and _not_ a task
+									'project_task_object_id' => null
 								)
 							);
 
 							// If error occurred during update return database error
 							if (isError($updateResult)) return $updateResult;
 
-							continue;
+							continue; // to the next task
 						}
+						// otherwise this is a task
 
 						// Check if the task is already present with the SAP project object id and SAP task object id
 						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
@@ -2138,7 +2142,7 @@ class SyncProjectsLib
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
 			// Set the time recording off for this project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_OFF);
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_NOT_ALLOWED);
 
 			// If an error occurred while setting the project time recording
 			if (isError($setTimeRecordingOffResult))
@@ -2245,7 +2249,7 @@ class SyncProjectsLib
 							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 							$costCenter->oe_kurzbz_sap,
 							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
-							self::TIME_RECORDING_ON
+							self::TIME_RECORDING_NO_APPROVAL
 						);
 
 						// If an error occurred while creating the project task on ByD return the error
@@ -2546,7 +2550,7 @@ class SyncProjectsLib
 								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 								$costCenter->oe_kurzbz_sap,
 								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
-								self::TIME_RECORDING_ON
+								self::TIME_RECORDING_NO_APPROVAL
 							);
 
 							// If an error occurred while creating the project task on ByD return the error
