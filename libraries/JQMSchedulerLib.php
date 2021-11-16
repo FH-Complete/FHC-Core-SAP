@@ -19,9 +19,6 @@ class JQMSchedulerLib
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
 
-	// Update time interval
-	const UPDATE_TIME_INTERVAL = '24 hours';
-
 	/**
 	 * Object initialization
 	 */
@@ -148,14 +145,10 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_person table
 		$personResult = $dbModel->execReadOnlyQuery('
-			SELECT p.person_id
+			SELECT DISTINCT p.person_id
 			  FROM public.tbl_person p
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE p.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			   AND (
-				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR s.last_update IS NULL
-			)
+			 WHERE p.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -168,20 +161,13 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_prestudent = tbl_prestudentstatus table
 		$prestudentsResult = $dbModel->execReadOnlyQuery('
-			SELECT ps.person_id
+			SELECT DISTINCT ps.person_id
 			  FROM public.tbl_prestudent ps
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE (
-			 	pss.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			 	OR pss.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			 	OR pss.datum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			)
-			   AND (
-				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR s.last_update IS NULL
-			)
-		      GROUP BY ps.person_id
+			 WHERE pss.insertamum > s.last_update
+			    OR pss.updateamum > s.last_update
+			    OR pss.datum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -194,18 +180,11 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_kontakt table
 		$contactsResult = $dbModel->execReadOnlyQuery('
-			SELECT k.person_id
+			SELECT DISTINCT k.person_id
 			  FROM public.tbl_kontakt k
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE (
-				k.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR k.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			)
-			   AND (
-				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR s.last_update IS NULL
-			)
-		      GROUP BY k.person_id
+			 WHERE k.insertamum > s.last_update
+			    OR k.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -218,18 +197,11 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_adresse table
 		$addressesResult = $dbModel->execReadOnlyQuery('
-			SELECT a.person_id
+			SELECT DISTINCT a.person_id
 			  FROM public.tbl_adresse a
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE (
-				a.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR a.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			)
-			   AND (
-				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR s.last_update IS NULL
-			)
-		      GROUP BY a.person_id
+			 WHERE a.insertamum > s.last_update
+			    OR a.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -242,18 +214,11 @@ class JQMSchedulerLib
 
 		// Get users that have bank data updated
 		$bankDataResult = $dbModel->execReadOnlyQuery('
-			SELECT bv.person_id
+			SELECT DISTINCT bv.person_id
 			  FROM public.tbl_bankverbindung bv
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE (
-				bv.insertamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR bv.updateamum::DATE = (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-			)
-			   AND (
-				s.last_update::DATE <= (CURRENT_DATE - INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\')::DATE
-				OR s.last_update IS NULL
-			)
-		      GROUP BY bv.person_id
+			 WHERE bv.insertamum > s.last_update
+			    OR bv.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated bank data from database then return the error
