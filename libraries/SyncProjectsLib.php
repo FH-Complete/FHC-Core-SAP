@@ -781,8 +781,12 @@ class SyncProjectsLib
 								// Function covered by this user in this project
 								$userFunction = self::EMPLOYEE_VAUE; // by default it is a worker
 
-								// If it is the leader of this project
-								if ($partecipant->EmployeeID == $sapLeaderId) $userFunction = self::LEADER_VAUE;
+								// If it is the leader of this project or the substitute
+								if ($partecipant->EmployeeID == $sapLeaderId
+									|| $partecipant->ProjectResponsibleEmployeeSubstituteIndicator === true)
+								{
+									$userFunction = self::LEADER_VAUE;
+								}
 
 								// Get or create the ressource
 								$ressourceResult = $this->_getOrCreateRessource($partecipant->EmployeeID);
