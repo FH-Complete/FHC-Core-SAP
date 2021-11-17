@@ -3,9 +3,9 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * Job to create or update projects in SAP Business by Design
+ * Jobs and queue workers to synchronize projects between FHC and SAP Business by Design
  */
-class ManageProjects extends JOB_Controller
+class ManageProjects extends JQW_Controller
 {
 	/**
 	 * Controller initialization
@@ -270,4 +270,53 @@ class ManageProjects extends JOB_Controller
 
 		$this->logInfo('End project '.$projectName.' dates update on SAP ByD');
 	}
+
+	/**
+	 * Activate purchase orders in SAPByD
+	 */
+	public function activatePurchaseOrders()
+	{
+		$this->logInfo('Start purchase orders activation on SAP ByD');
+
+		// Gets the SAP_PO_ACTIV_NUMBER oldest jobs
+		$oldestJobs = $this->getOldestJobs(SyncProjectsLib::SAP_PURCHASE_ORDERS_ACTIVATION, SyncProjectsLib::SAP_PO_ACTIV_NUMBER);
+		if (isError($oldestJobs))
+		{
+			$this->logError(getCode($oldestJobs).': '.getError($oldestJobs), SyncProjectsLib::SAP_PURCHASE_ORDERS_ACTIVATION);
+		}
+		else
+		{
+			// Get SAP_PO_ACTIV_NUMBER jobs from the queue
+			$syncResult = $this->syncprojectslib->activatePurchaseOrders(
+				mergePurchaseOrdersIdArray( // and merge the purchase order ids in one single array
+					getData($oldestJobs)
+				)
+			);
+
+			// If an error occurred then log it
+			if (isError($syncResult))
+			{
+				$this->logError(getCode($syncResult).': '.getError($syncResult));
+			}
+			else
+			{
+				$this->logInfo(getData($syncResult));
+			}
+
+			// Update jobs properties values
+			$this->updateJobs(
+				getData($oldestJobs), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+				array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+			);
+			
+			if (hasData($oldestJobs)) $this->updateJobsQueue(
+				SyncProjectsLib::SAP_PURCHASE_ORDERS_ACTIVATION,
+				getData($oldestJobs)
+			);
+		}
+
+		$this->logInfo('End purchase orders activation on SAP ByD');
+	}
 }
+
