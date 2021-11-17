@@ -86,7 +86,7 @@ class JQMScheduler extends JQW_Controller
 			if (hasData($jobInputResult))
 			{
 				// Split array in arrays every LENGTH
-				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::UPDATE_LENGTH);
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
 
 				// Loops on arrays
 				foreach ($jobInputArrays as $jobInputArray)
@@ -174,17 +174,24 @@ class JQMScheduler extends JQW_Controller
 			// If a job input were generated
 			if (hasData($jobInputResult))
 			{
-				// Add the new job to the jobs queue
-				$addNewJobResult = $this->addNewJobsToQueue(
-					JQMSchedulerLib::JOB_TYPE_SAP_NEW_PAYMENTS, // job type
-					$this->generateJobs( // gnerate the structure of the new job
-						JobsQueueLib::STATUS_NEW,
-						getData($jobInputResult)
-					)
-				);
+				// Split array in arrays every LENGTH
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
 
-				// If error occurred return it
-				if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+				// Loops on arrays
+				foreach ($jobInputArrays as $jobInputArray)
+				{
+					// Add the new job to the jobs queue
+					$addNewJobResult = $this->addNewJobsToQueue(
+						JQMSchedulerLib::JOB_TYPE_SAP_NEW_PAYMENTS, // job type
+						$this->generateJobs( // generate the structure of the new job
+							JobsQueueLib::STATUS_NEW,
+							json_encode($jobInputArray)
+						)
+					);
+
+					// If error occurred return it
+					if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+				}
 			}
 			else // otherwise log info
 			{
@@ -216,22 +223,26 @@ class JQMScheduler extends JQW_Controller
 			if (hasData($jobInputResult))
 			{
 				// Split array in arrays every LENGTH
-				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::UPDATE_LENGTH);
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
 
 				// Loops on arrays
 				foreach ($jobInputArrays as $jobInputArray)
 				{
-					// Add the new job to the jobs queue
-					$addNewJobResult = $this->addNewJobsToQueue(
-						JQMSchedulerLib::JOB_TYPE_SAP_CREDIT_MEMO, // job type
-						$this->generateJobs( // generate the structure of the new job
-							JobsQueueLib::STATUS_NEW,
-							json_encode($jobInputArray)
-						)
-					);
+					// Loops on arrays
+					foreach ($jobInputArrays as $jobInputArray)
+					{
+						// Add the new job to the jobs queue
+						$addNewJobResult = $this->addNewJobsToQueue(
+							JQMSchedulerLib::JOB_TYPE_SAP_CREDIT_MEMO, // job type
+							$this->generateJobs( // generate the structure of the new job
+								JobsQueueLib::STATUS_NEW,
+								json_encode($jobInputArray)
+							)
+						);
 
-					// If error occurred return it
-					if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+						// If error occurred return it
+						if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+					}
 				}
 			}
 			else // otherwise log info

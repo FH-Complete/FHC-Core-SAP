@@ -8,7 +8,7 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 class SyncPaymentsLib
 {
 	// Jobs types used by this lib
-	const SAP_PAYMENTS_CREATE = 'SAPPaymentCreate';
+	const SAP_PAYMENT_CREATE = 'SAPPaymentCreate';
 	const SAP_PAYMENT_GUTSCHRIFT = 'SAPPaymentGutschrift';
 
 	// Prefix for SAP SOAP id calls

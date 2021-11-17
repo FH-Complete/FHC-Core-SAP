@@ -16,8 +16,8 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
-	// Maximum amount of users to be placed in a single job
-	const UPDATE_LENGTH = 200;
+	// Maximum amount of elements to be placed in a single job
+	const MAX_JOB_ELEMENTS = 200;
 
 	/**
 	 * Object initialization
@@ -270,82 +270,71 @@ class JQMSchedulerLib
 	 */
 	public function newPayments()
 	{
-		$jobInput = null;
-
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
 
 		$dbModel = new DB_Model();
 
 		// Gets new permanent employees created in the last 42 hours
 		$newPaymentsResult = $dbModel->execReadOnlyQuery('
-		SELECT
-			distinct person_id
-		FROM
-			public.tbl_konto bk
-		WHERE
-			betrag < 0
-			AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
-			AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
-			AND
-			(
-				EXISTS(SELECT
-				1
-				FROM
-					public.tbl_prestudent
-					JOIN public.tbl_student USING(prestudent_id)
-					JOIN public.tbl_benutzer ON(uid=student_uid)
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-					AND tbl_benutzer.aktiv
-				)
-				OR
-				EXISTS(SELECT
+			SELECT
+				distinct person_id
+			FROM
+				public.tbl_konto bk
+			WHERE
+				betrag < 0
+				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
+				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+				AND
+				(
+					EXISTS(SELECT
 					1
-				FROM
-					public.tbl_prestudent
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND tbl_prestudent.studiengang_kz=10002
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-					AND EXISTS(SELECT
-							1
-						FROM
-							public.tbl_prestudent
-						WHERE
-							tbl_prestudent.person_id = bk.person_id
-							AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
-							AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+					FROM
+						public.tbl_prestudent
+						JOIN public.tbl_student USING(prestudent_id)
+						JOIN public.tbl_benutzer ON(uid=student_uid)
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+						AND tbl_benutzer.aktiv
+					)
+					OR
+					EXISTS(SELECT
+						1
+					FROM
+						public.tbl_prestudent
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND tbl_prestudent.studiengang_kz=10002
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+						AND EXISTS(SELECT
+								1
+							FROM
+								public.tbl_prestudent
+							WHERE
+								tbl_prestudent.person_id = bk.person_id
+								AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+						)
+					)
+					OR
+					EXISTS(SELECT
+					1
+					FROM
+						public.tbl_prestudent
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND studiengang_kz = bk.studiengang_kz
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
 					)
 				)
-				OR
-				EXISTS(SELECT
-				1
-				FROM
-					public.tbl_prestudent
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND studiengang_kz = bk.studiengang_kz
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
-				)
-			)
-
-			AND buchungsnr_verweis is null
-			AND buchungsdatum <= now()
-			AND buchungsdatum >= ?
+	
+				AND buchungsnr_verweis is null
+				AND buchungsdatum <= now()
+				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
 
-		// If error occurred while retrieving new users from database then return the error
-		if (isError($newPaymentsResult)) return $newPaymentsResult;
-
-		// If new users are present
-		if (hasData($newPaymentsResult))
-		{
-			$jobInput = json_encode(getData($newPaymentsResult));
-		}
-
-		return success($jobInput);
+		return $newPaymentsResult;
 	}
 
 	/**
@@ -353,8 +342,6 @@ class JQMSchedulerLib
 	 */
 	public function creditMemo()
 	{
-		$creditMemo = array();
-
 		$dbModel = new DB_Model();
 
 		// Get users that have updated credit memo
@@ -372,14 +359,7 @@ class JQMSchedulerLib
 		      GROUP BY ko.person_id
 		');
 
-		// If error occurred while retrieving updated credit memo from database then return the error
-		if (isError($creditMemoResult)) return $creditMemoResult;
-
-		// If there are updated credit memo
-		if (hasData($creditMemoResult)) $creditMemo = getData($creditMemoResult);
-                                                     
-		// Return a success that contains all the credit memo
-		return success($creditMemo);
+		return $creditMemoResult;
 	}
 }
 
