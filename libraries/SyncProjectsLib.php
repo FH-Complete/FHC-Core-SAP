@@ -2317,7 +2317,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -2444,7 +2444,7 @@ class SyncProjectsLib
 						  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-						 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+						 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 						   AND b.aktiv = TRUE
 						   AND m.fixangestellt = TRUE
 						   AND m.personalnummer > 0
@@ -2575,7 +2575,7 @@ class SyncProjectsLib
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
 			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_NOT_ALLOWED);
 
 			// If an error occurred while setting the project time recording
 			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
@@ -2614,7 +2614,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -2744,7 +2744,7 @@ class SyncProjectsLib
 							  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 							  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 							  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-							 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+							 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 							   AND b.aktiv = TRUE
 							   AND m.fixangestellt = TRUE
 							   AND m.personalnummer > 0
