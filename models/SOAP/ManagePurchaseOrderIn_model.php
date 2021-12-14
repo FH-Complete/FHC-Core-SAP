@@ -29,5 +29,13 @@ class ManagePurchaseOrderIn_model extends CoreAPIModel
 	{
 		return $this->_call('ManagePurchaseOrderInMaintainBundle', $parameters);
 	}
+
+	/**
+	 * SOAP function:
+	 */
+	public function purchaseOrderCheckBundle($parameters)
+	{
+		return $this->_call('ManagePurchaseOrderInCheckMaintainBundle', $parameters);
+	}
 }
 

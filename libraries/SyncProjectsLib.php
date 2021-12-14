@@ -7,6 +7,13 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class SyncProjectsLib
 {
+	// Job queue worker types
+	const SAP_PURCHASE_ORDERS_ACTIVATION = 'SAPPurchaseOrdersSync';
+
+	const SAP_PURCHASE_ORDER_ID = 'purchase_order_id'; // Name of the job input property
+
+	const SAP_PO_ACTIV_NUMBER = 100; // Number of purchase orders to be activated
+
 	// Config entry name to enable/disable log warnings
 	const PROJECT_WARNINGS_ENABLED = 'project_warnings_enabled';
 
@@ -781,8 +788,12 @@ class SyncProjectsLib
 								// Function covered by this user in this project
 								$userFunction = self::EMPLOYEE_VAUE; // by default it is a worker
 
-								// If it is the leader of this project
-								if ($partecipant->EmployeeID == $sapLeaderId) $userFunction = self::LEADER_VAUE;
+								// If it is the leader of this project or the substitute
+								if ($partecipant->EmployeeID == $sapLeaderId
+									|| $partecipant->ProjectResponsibleEmployeeSubstituteIndicator === true)
+								{
+									$userFunction = self::LEADER_VAUE;
+								}
 
 								// Get or create the ressource
 								$ressourceResult = $this->_getOrCreateRessource($partecipant->EmployeeID);
@@ -1293,6 +1304,84 @@ class SyncProjectsLib
 
 		// If everything was fine
 		return success('Project dates have been successfully updated');
+	}
+
+	/**
+	 * Activate purchase orders in SAPByD
+	 */
+	public function activatePurchaseOrders($purchaseOrdersIdArray)
+	{
+		// Request header
+		$request = array(
+			'BasicMessageHeader' => array(
+				'UUID' => generateUUID()
+			),
+			'PurchaseOrderMaintainBundle' => array()
+		);
+
+		// For each purchase order stored in the queue
+		foreach ($purchaseOrdersIdArray as $purchaseOrderId)
+		{
+			// Build the request body
+			$requestBody = array(
+				'actionCode' => '02',
+				'ItemListCompleteTransmissionIndicator' => false,
+				'PurchaseOrderID' => $purchaseOrderId,
+				'BusinessTransactionDocumentTypeCode' => '001',
+				'OrderPurchaseOrderActionIndicator' => true
+			);
+
+			// Check if the purchase order is activatable
+			$purchaseOrderCheckBundleResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderCheckBundle(
+				array(
+					'BasicMessageHeader' => array(
+						'UUID' => generateUUID()
+					),
+					'PurchaseOrderMaintainBundle' => $requestBody
+				)
+			);
+
+			// If a fatal error occurred then return it
+			if (isError($purchaseOrderCheckBundleResult)) return $purchaseOrderCheckBundleResult;
+
+			// If the response is not empty
+			if (hasData($purchaseOrderCheckBundleResult))
+			{
+				$purchaseOrderCheckBundle = getData($purchaseOrderCheckBundleResult);
+				
+				// If the purchase order check was fine
+				if ((isset($purchaseOrderCheckBundle->PurchaseOrder) && !isset($purchaseOrderCheckBundle->Log))
+					|| (isset($purchaseOrderCheckBundle->Log) && isEmptyArray((array)$purchaseOrderCheckBundle->Log)))
+				{
+					// Add this purchase order to those to be activated
+					$request['PurchaseOrderMaintainBundle'][] = $requestBody;
+				}
+				else // otherwise log a warning
+				{
+					if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Check failed for purchase order id: '.$purchaseOrderId);
+					}
+				}
+			}
+			else // otherwise log a warning
+			{
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Check failed for purchase order id: '.$purchaseOrderId);
+				}
+			}
+		}
+
+		// Perform the SOAP call
+		$purchaseOrderResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+			$request
+		);
+
+		// If error occurred then return the error
+		if (isError($purchaseOrderResult)) return $purchaseOrderResult;
+
+		return success('Purchase orders activation success');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -1901,7 +1990,7 @@ class SyncProjectsLib
 				$eeid = getData($sapEeidResult)[0]->sap_eeid;
 
 				// Place the purchase order
-				$purchaseOrder = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+				$purchaseOrderResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
 					array(
 						'BasicMessageHeader' => array(
 							'UUID' => generateUUID()
@@ -2036,7 +2125,49 @@ class SyncProjectsLib
 				);
 
 				// If error occurred then return the error
-				if (isError($purchaseOrder)) return $purchaseOrder;
+				if (isError($purchaseOrderResult)) return $purchaseOrderResult;
+
+				// If the response is not empty...
+				if (hasData($purchaseOrderResult))
+				{
+					// ...get the response data...
+					$purchaseOrder = getData($purchaseOrderResult);
+
+					// ...and check the response data structure...
+					if (isset($purchaseOrder->PurchaseOrder)
+						&& isset($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID)
+						&& isset($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_)
+						&& !isEmptyString($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_))
+					{
+						// ...if it is correct then get the purchase order id...
+						$purchaseOrderId = $purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_;
+
+						// ...create the object to be stored into the job queue...
+						$inputPurchaseOrder = new stdClass();
+						$inputPurchaseOrder->{self::SAP_PURCHASE_ORDER_ID} = $purchaseOrderId;
+
+						// ...and store it in the job queue!
+						$addNewJobResult = $this->_ci->jobsqueuelib->addNewJobsToQueue(
+							self::SAP_PURCHASE_ORDERS_ACTIVATION, // job type
+							JobsQueueLib::generateJobs( // generate the structure of the new job
+								JobsQueueLib::STATUS_NEW,
+								json_encode($inputPurchaseOrder) // enconde in JSON
+							)
+						);
+
+						// If error occurred return it
+						if (isError($addNewJobResult)) return $addNewJobResult;
+					}
+					else // otherwise log a warning
+					{
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB(
+								'Wrong response structure purchaseOrderMaintainBundle for project: '.$projectId
+							);
+						}
+					}
+				}
 			}
 		}
 
@@ -3136,3 +3267,4 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
+
