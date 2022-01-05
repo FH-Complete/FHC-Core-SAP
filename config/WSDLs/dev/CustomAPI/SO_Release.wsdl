@@ -697,10 +697,10 @@
   </wsdl:binding>
   <wsdl:service name="service">
     <wsdl:port name="binding_SOAP12" binding="tns:binding_SOAP12">
-      <wsoap12:address location="https://my354373.sapbydesign.com/sap/bc/srt/scs/sap/yy230hghny_so_release?sap-vhost=my354373.sapbydesign.com"/>
+      <wsoap12:address location="https://my360060.sapbydesign.com/sap/bc/srt/scs/sap/yy230hghny_so_release?sap-vhost=my360060.sapbydesign.com"/>
     </wsdl:port>
     <wsdl:port name="binding" binding="tns:binding">
-      <soap:address location="https://my354373.sapbydesign.com/sap/bc/srt/scs/sap/yy230hghny_so_release?sap-vhost=my354373.sapbydesign.com"/>
+      <soap:address location="https://my360060.sapbydesign.com/sap/bc/srt/scs/sap/yy230hghny_so_release?sap-vhost=my360060.sapbydesign.com"/>
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
