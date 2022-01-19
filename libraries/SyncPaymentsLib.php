@@ -496,6 +496,8 @@ class SyncPaymentsLib
 
 			if (!isError($result_openpayments) && hasData($result_openpayments))
 			{
+				$wunschtermin = null;
+
 				$paymentData = getData($result_openpayments);
 				foreach ($paymentData as $singlePayment)
 				{
@@ -511,24 +513,26 @@ class SyncPaymentsLib
 							// Create Sales Order for previous Degree Programm
 							$this->_createSalesOrder($data, $buchungsnr_arr, $release);
 						}
+
 						$last_stg = $singlePayment->studiengang_kz;
 						$buchungsnr_arr = array();
-
-
 						$task_id = '';
 						$name = $singlePayment->studiengang_kurzbz;
 						$externeReferenz = $singlePayment->studiengang_kurzbz;
 
-						if ($singlePayment->studiensemester_start < date('Y-m-d'))
+						if ($wunschtermin == null)
 						{
-							// If it is an entry for a old semester set the date to tommorow
-							$date = new DateTime();
-							$date->modify('+1 day');
-							$wunschtermin = $date->format('Y-m-d').'T00:00:00Z';
-						}
-						else
-						{
-							$wunschtermin = $singlePayment->studiensemester_start.'T00:00:00Z';
+							if ($singlePayment->studiensemester_start < date('Y-m-d'))
+							{
+								// If it is an entry for a old semester set the date to tommorow
+								$date = new DateTime();
+								$date->modify('+1 day');
+								$wunschtermin = $date->format('Y-m-d').'T00:00:00Z';
+							}
+							else
+							{
+								$wunschtermin = $singlePayment->studiensemester_start.'T00:00:00Z';
+							}
 						}
 
 						if ($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
@@ -887,7 +891,7 @@ class SyncPaymentsLib
 				AND buchungsdatum <= now()
 				AND tbl_studiensemester.start <= ?
 			ORDER BY
-				studiengang_kz
+				studiengang_kz, studiensemester_start
 		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
 
 		return $dbPaymentData;
