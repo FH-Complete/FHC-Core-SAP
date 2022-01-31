@@ -27,6 +27,11 @@ class QueryEmployeeIn_model extends CoreAPIModel
 	 */
 	public function findByIdentification($parameters)
 	{
+		return $this->_call('FindByIdentification', $parameters);
+	}
+
+	public function findBasicDataByIdentification($parameters)
+	{
 		return $this->_call('FindBasicDataByIdentification', $parameters);
 	}
 }

@@ -172,3 +172,57 @@ function uniquePersonIdArray($personIdArray)
 	return $uniquePersonIdArray; // return the new array with unique elements
 }
 
+/**
+ * Removes duplicated elements from the the given array
+ * Array elements: {mitarbeiter_uid => string}
+ */
+function uniqudMitarbeiterUidArray($mitarbeiterUidArray)
+{
+	$uniqueMitarbeiterUidArray = array(); // returned array
+
+	// For each element of the given array
+	foreach ($mitarbeiterUidArray as $muid)
+	{
+		$found = false; // found flag
+
+		// For each element of the array that will be returned
+		foreach ($uniqueMitarbeiterUidArray as $umuid)
+		{
+			// If the same element is found in the array that will be returned
+			if ($muid->uid == $umuid->uid)
+			{
+				$found = true; // set the flag as true
+				break; // stop looping
+			}
+		}
+
+		// If the element was not found in the array that will be returned then store it in this array
+		if (!$found) $uniqueMitarbeiterUidArray[] = $muid;
+	}
+
+	return $uniqueMitarbeiterUidArray; // return the new array with unique elements
+}
+
+// alle Informationen aus dem IBAN rausholen um die SAP richtig zu übermitteln
+function checkIBAN($iban)
+{
+	if (isEmptyString($iban))
+		return false;
+
+	$iban = strtolower(str_replace(' ','',$iban));
+	$ibanCountry = substr($iban, 0, 2);
+
+	$ibanArr = array(
+		'at' => array('accnumber' => 11, 'bankcode' => 5, 'length' => 20),
+		'de' => array('accnumber' => 10, 'bankcode' => 8, 'length' => 22)
+	);
+
+	if (strlen($iban) !== $ibanArr[$ibanCountry]['length'])
+		return false;
+
+	$accNumber = substr($iban, 4 + $ibanArr[$ibanCountry]['bankcode'], $ibanArr[$ibanCountry]['accnumber']);
+	$bankNumber = substr($iban, 4, $ibanArr[$ibanCountry]['bankcode']);
+
+	return array('country' => strtoupper($ibanCountry), 'iban' => strtoupper($iban), 'accNumber' => $accNumber, 'bankNumber' => $bankNumber);
+}
+
