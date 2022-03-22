@@ -301,7 +301,7 @@ class SyncServicesLib
 		if (isError($servicesAllData)) return $servicesAllData;
 		if (!hasData($servicesAllData)) return error('No data available for the given users');
 
-		$dbModel = new DB_Model();
+		$dbModel = new DB_Model(); // outside the loop!
 
 		// Loops through users data
 		foreach (getData($servicesAllData) as $serviceData)
@@ -330,7 +330,7 @@ class SyncServicesLib
 
 			// Gets the SAP service id for the current user
 			$sapIdResult = $dbModel->execReadOnlyQuery('
-				SELECT s.sap_service_id
+				SELECT DISTINCT s.sap_service_id
 				  FROM sync.tbl_sap_services s
 	 			 WHERE s.person_id = ?
 			', array($serviceData->person_id));
@@ -406,60 +406,6 @@ class SyncServicesLib
 
 						if (isError($valuationResult)) return $valuationResult; // if fatal error
 					}
-
-					// Price list & list price
-					// If root_organization_unit is not null then it is possible to add this service to a price list and to a list price
-					if ($serviceData->root_organization_unit != null)
-					{
-						// Price list
-						$priceListId = '';
-						// If the root organization unit is GMBH then add this service to the FHTW price list
-						// NOTE: for price list the logic is inverted!
-						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
-						{
-							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::FHTW_CONFIG_INDX];
-						}
-						else // otherwise to the GMBH price list
-						{
-							$priceListId = ($this->_ci->config->item(SyncPriceListsLib::PRICE_LISTS_ID_FORMATS))[self::GMBH_CONFIG_INDX];
-						}
-
-						// Finally add this service to a price list
-						$manageSalesPriceListInResult = $this->_ci->syncpricelistslib->addServiceToPriceList(
-							$priceListId,
-							$serviceId,
-							$stundensatz
-						);
-
-						if (isError($manageSalesPriceListInResult)) return $manageSalesPriceListInResult; // if fatal error
-
-						// List price
-						$companyId = '';
-						// If the root organization unit is GMBH then add this service to the GMBH list price
-						if ($serviceData->root_organization_unit == self::GMBH_OE_VALUE)
-						{
-							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::GMBH_CONFIG_INDX];
-						}
-						else // otherwise to the FHTW list price
-						{
-							$companyId = ($this->_ci->config->item(self::SERVICES_VALUATION_COMPANY_IDS))[self::FHTW_CONFIG_INDX];
-						}
-
-						// Add a new list price that links this service to a list price
-						$manageSalesListPriceInResult = $this->_ci->synclistpriceslib->manageProcurementPriceSpecificationIn(
-							$companyId,
-							$serviceId,
-							$stundensatz
-						);
-
-						if (isError($manageSalesListPriceInResult)) return $manageSalesListPriceInResult; // if fatal error
-					}
-					else
-					{
-						$this->_ci->LogLibSAP->logWarningDB(
-							'Was not possible to find the root organization unit for this service: '.$serviceId
-						);
-					}
 				}
 				else // ...otherwise store a non blocking error and continue with the next user
 				{
@@ -505,34 +451,34 @@ class SyncServicesLib
 
 	/**
 	 * Remove already created users from the given array
-	 * Wrapper method for _addOrRemoveUsers
+	 * Wrapper method for _removeUsers
 	 */
 	private function _removeCreatedUsers($users)
 	{
-		return $this->_addOrRemoveUsers($users, false);
+		return $this->_removeUsers($users, false);
 	}
 
 	/**
 	 * Remove still not created users from the given array
-	 * Wrapper method for _addOrRemoveUsers
+	 * Wrapper method for _removeUsers
 	 */
 	private function _removeNotCreatedUsers($users)
 	{
-		return $this->_addOrRemoveUsers($users, true);
+		return $this->_removeUsers($users, true);
 	}
 
 	/**
 	 * Used to remove created or not created users from the given array
-	 * initialFoundValue is a toggle
+	 * initialFoundValue is a toggle to specify if the created or the not created users have to be removed
 	 */
-	private function _addOrRemoveUsers($users, $initialFoundValue)
+	private function _removeUsers($users, $initialFoundValue)
 	{
 		$diffUsersArray = array(); // array that is foing to be returned
 
 		// Get synchronized users from database
 		$dbModel = new DB_Model();
 		$dbSyncdUsers = $dbModel->execReadOnlyQuery('
-			SELECT s.person_id
+			SELECT DISTINCT s.person_id
 			  FROM sync.tbl_sap_services s
 			 WHERE s.person_id IN ?
 		', array($users));
@@ -610,13 +556,35 @@ class SyncServicesLib
 		// Loops through services data
 		foreach (getData($dbServicesData) as $userPersonalData)
 		{
+			// By default use the user's surname + name + personal number
+			$description = $userPersonalData->surname.' '.$userPersonalData->name.' '.$userPersonalData->personalnumber;
+
+			// Checks that the service name/description it's not longer then the allowed length
+			if (strlen($description) > 40)
+			{
+				// If the surname it is already too much then
+				if (strlen($userPersonalData->surname) > 40)
+				{
+					// The surname is shortened to be able to be concatenated with the personal number
+					$description = substr(
+						$userPersonalData->surname,
+						0,
+						40 - strlen($userPersonalData->personalnumber) - 1
+					).' '.$userPersonalData->personalnumber;
+				}
+				elseif (strlen($userPersonalData->surname.' '.$userPersonalData->name) > 40) // else if surname + name is too long then
+				{
+					// The surname + name is shortened to be able to be concatenated with the personal number
+					$description = substr(
+						$userPersonalData->surname.' '.$userPersonalData->name,
+						0,
+						40 - strlen($userPersonalData->personalnumber) - 1
+					).' '.$userPersonalData->personalnumber;
+				}
+			}
+
 			// Description
-			$userPersonalData->description = sprintf(
-				'%s %s %s',
-				$userPersonalData->name,
-				$userPersonalData->surname,
-				$userPersonalData->personalnumber
-			);
+			$userPersonalData->description = $description;
 
 			// Set category and root_organization_unit properties for this user
 			// Get root organization unit for this user

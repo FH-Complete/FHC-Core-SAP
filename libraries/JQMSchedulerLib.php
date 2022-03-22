@@ -12,6 +12,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_USERS = 'SAPUsersCreate';
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
+	const JOB_TYPE_SAP_UPDATE_SERVICES = 'SAPServicesUpdate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
@@ -263,6 +264,34 @@ class JQMSchedulerLib
 		}
 
 		return success($jobInput);
+	}
+
+	/**
+	 * Gets all the active employees
+	 */
+	public function updateServices()
+	{
+		$jobInput = null;
+
+		$dbModel = new DB_Model();
+
+		// Gets all the employees
+		$updateUsersResult = $dbModel->execReadOnlyQuery('
+			SELECT vwm.person_id
+			  FROM campus.vw_mitarbeiter vwm
+			  JOIN public.tbl_benutzerfunktion bf USING (uid)
+			 WHERE vwm.aktiv = TRUE
+			   AND bf.funktion_kurzbz = \'oezuordnung\'
+			   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
+			   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
+		      ORDER BY vwm.person_id DESC
+		');
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($updateUsersResult)) return $updateUsersResult;
+
+		// Return a success that contains all the arrays merged together
+		return success(getData($updateUsersResult));
 	}
 
 	/**

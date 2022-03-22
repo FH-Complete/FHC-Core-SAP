@@ -30,16 +30,111 @@ class ManageServices extends JQW_Controller
 	 */
 	public function create()
 	{
-		$this->_manageServices(SyncServicesLib::SAP_SERVICES_CREATE, 'create');
+		$this->logInfo('Start data synchronization with SAP ByD: create');
+
+		// Gets the latest jobs
+		$lastJobs = $this->getLastJobs(SyncServicesLib::SAP_SERVICES_CREATE);
+		if (isError($lastJobs))
+		{
+			$this->logError(getCode($lastJobs).': '.getError($lastJobs), SyncServicesLib::SAP_SERVICES_CREATE);
+		}
+		elseif (hasData($lastJobs)) // if there jobs to work
+		{
+			// Update jobs properties s
+			$this->updateJobs(
+				getData($lastJobs), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date('Y-m-d H:i:s')) // Job properties new values
+			);
+			$updateResult = $this->updateJobsQueue(SyncServicesLib::SAP_SERVICES_CREATE, getData($lastJobs));
+
+			// If an error occurred then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // works the jobs
+			{
+				// Create/update users on SAP side
+				$syncResult = $this->syncserviceslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
+
+				// Log result
+				if (isError($syncResult))
+				{
+					$this->logError(getCode($syncResult).': '.getError($syncResult));
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($lastJobs), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				);
+				$this->updateJobsQueue(SyncServicesLib::SAP_SERVICES_CREATE, getData($lastJobs));
+			}
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: create');
 	}
 
 	/**
 	 * This method is called to synchronize updated services data with SAP Business by Design
-	 * Wrapper method for _manageServices
 	 */
 	public function update()
 	{
-		$this->_manageServices(SyncServicesLib::SAP_SERVICES_UPDATE, 'update');
+		$this->logInfo('Start data synchronization with SAP ByD: update');
+
+		// Gets the oldest job
+		$oldestJob = $this->getOldestJob(SyncServicesLib::SAP_SERVICES_UPDATE);
+		if (isError($oldestJob))
+		{
+			$this->logError(getCode($oldestJob).': '.getError($oldestJob), SyncServicesLib::SAP_SERVICES_UPDATE);
+		}
+		elseif (hasData($oldestJob)) // if there jobs to work
+		{
+			// Update jobs properties
+			$this->updateJobs(
+				getData($oldestJob), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date('Y-m-d H:i:s')) // Job properties new values
+			);
+			$updateResult = $this->updateJobsQueue(SyncServicesLib::SAP_SERVICES_UPDATE, getData($oldestJob));
+
+			// If an error occurred then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // works the jobs
+			{
+				// Create/update users on SAP side
+				$syncResult = $this->syncserviceslib->update(mergeUsersPersonIdArray(getData($oldestJob)));
+
+				// Log result
+				if (isError($syncResult))
+				{
+					$this->logError(getCode($syncResult).': '.getError($syncResult));
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($oldestJob), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				);
+				$this->updateJobsQueue(SyncServicesLib::SAP_SERVICES_UPDATE, getData($oldestJob));
+			}
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: update');
 	}
 
 	/**
@@ -58,72 +153,6 @@ class ManageServices extends JQW_Controller
 	public function getServiceById($id)
 	{
 		var_dump($this->syncserviceslib->getServiceById(urldecode($id)));
-	}
-
-	//------------------------------------------------------------------------------------------------------------------
-	// Private methods
-
-	/**
-	 * Performs data synchronization with SAP, depending on the first parameter can create or update services
-	 */
-	private function _manageServices($jobType, $operation)
-	{
-		$this->logInfo('Start data synchronization with SAP ByD: '.$operation);
-
-		// Gets the latest jobs
-		$lastJobs = $this->getLastJobs($jobType);
-		if (isError($lastJobs))
-		{
-			$this->logError(getCode($lastJobs).': '.getError($lastJobs), $jobType);
-		}
-		elseif (hasData($lastJobs)) // if there jobs to work
-		{
-			// Update jobs properties s
-			$this->updateJobs(
-				getData($lastJobs), // Jobs to be updated
-				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
-				array(date('Y-m-d H:i:s')) // Job properties new values
-			);
-			$updateResult = $this->updateJobsQueue($jobType, getData($lastJobs));
-
-			// If an error occurred then log it
-			if (isError($updateResult))
-			{
-				$this->logError(getError($updateResult));
-			}
-			else // works the jobs
-			{
-				// Create/update users on SAP side
-				if ($jobType == SyncServicesLib::SAP_SERVICES_CREATE)
-				{
-					$syncResult = $this->syncserviceslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
-				}
-				else
-				{
-					$syncResult = $this->syncserviceslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
-				}
-
-				// Log result
-				if (isError($syncResult))
-				{
-					$this->logError(getCode($syncResult).': '.getError($syncResult));
-				}
-				else
-				{
-					$this->logInfo(getData($syncResult));
-				}
-
-				// Update jobs properties values
-				$this->updateJobs(
-					getData($lastJobs), // Jobs to be updated
-					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
-					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
-				);
-				$this->updateJobsQueue($jobType, getData($lastJobs));
-			}
-		}
-
-		$this->logInfo('End data synchronization with SAP ByD: '.$operation);
 	}
 }
 
