@@ -15,7 +15,8 @@ class SyncEmps extends Auth_Controller
 		parent::__construct(
 			array(
 				'index' => 'admin:rw',
-				'syncEmp' => 'admin:rw'
+				'syncEmp' => 'admin:rw',
+				'getCSVEmployees' => 'admin:rw'
 			)
 		);
 
@@ -43,5 +44,26 @@ class SyncEmps extends Auth_Controller
 
 		$this->outputJson($syncStatus);
 
+	}
+
+	public function getCSVEmployees()
+	{
+		$data = $this->_ci->syncemployeeslib->getCSVEmployees();
+		$filename = "employees.csv";
+		header('Content-type: text/csv; charset=utf-8');
+		header('Content-Disposition: attachment; filename='.$filename);
+		$file = fopen('php://output', 'w');
+
+		fputcsv($file, array('Mitarbeiter', 'Startdatum', 'Stunden', 'Verwaltungskategorie'));
+
+		foreach ($data as $additionalClause){
+			foreach ($additionalClause['workingAgreement'] as $workAgreement)
+			{
+				$line = [$additionalClause['emp'], date_format(date_create($workAgreement['startDate']), "m/d/Y"), $workAgreement['timeRate'], $workAgreement['category']];
+				fputcsv($file, $line);
+			}
+		}
+		fclose($file);
+		exit();
 	}
 }

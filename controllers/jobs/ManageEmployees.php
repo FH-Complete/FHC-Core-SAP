@@ -56,7 +56,6 @@ class ManageEmployees extends JQW_Controller
 
 		// Gets the latest jobs
 		$lastJobs = $this->getLastJobs(SyncEmployeesLib::SAP_EMPLOYEES_CREATE);
-		$syncResult = $this->syncemployeeslib->create(mergeUidArray(getData($lastJobs)));
 
 		if (isError($lastJobs))
 		{

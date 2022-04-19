@@ -155,7 +155,7 @@ class SyncEmployeesLib
 	/**
 	 * 
 	 */
-	public function create($emps)
+	public function create($emps, $job = true)
 	{
 		// If the given array of person ids is empty stop here
 		if (isEmptyArray($emps)) return success('No employees to be created');
@@ -173,6 +173,7 @@ class SyncEmployeesLib
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given users');
 
+		$error = false;
 		// Loops through users data
 		foreach (getData($empsAllData) as $empData)
 		{
@@ -202,7 +203,7 @@ class SyncEmployeesLib
 					),
 					'WorkAgreement' => array(
 						'TypeCode' => $empData->typeCode,
-						'AdministrativeCategoryCode' => 2,
+						'AdministrativeCategoryCode' => 2, //bezahlter Angestellter
 						'AgreedWorkingHoursRate' => array(
 							'DecimalValue' => $empData->decimalValue,
 							'BaseMeasureUnitCode' => 'WEE'
@@ -250,25 +251,40 @@ class SyncEmployeesLib
 			{
 				// If it is present a description from SAP then use it
 				if (isset($manageEmployee->Log) && isset($manageEmployee->Log->Item)
-					&& isset($manageEmployee->Log->Item)) {
-					if (!isEmptyArray($manageEmployee->Log->Item)) {
-						foreach ($manageEmployee->Log->Item as $item) {
+					&& isset($manageEmployee->Log->Item))
+				{
+					if (!isEmptyArray($manageEmployee->Log->Item))
+					{
+						foreach ($manageEmployee->Log->Item as $item)
+						{
 							if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note . ' for employee: ' . $empData->person_id);
 						}
-					} elseif ($manageEmployee->Log->Item->Note) {
+					}
+					elseif ($manageEmployee->Log->Item->Note)
+					{
 						$this->_ci->LogLibSAP->logWarningDB($manageEmployee->Log->Item->Note . ' for employee: ' . $empData->person_id);
 					}
-				} else {
+				}
+				else
+				{
 					// Default non blocking error
 					$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for employee: ' . $empData->person_id);
 				}
+				$error = true;
 				continue;
 			}
 		}
-		return success('Users data created successfully');
+
+		if ($job === false)
+		{
+			if ($error)
+				return error('Please check the logs');
+			else
+				return success('Users data created successfully');
+		}
 	}
 
-	public function update($emps)
+	public function update($emps, $job = true)
 	{
 		if (isEmptyArray($emps)) return success('No emps to be updated');
 
@@ -284,6 +300,7 @@ class SyncEmployeesLib
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given emps');
 
+		$error = false;
 		$dbModel = new DB_Model();
 
 		// Loops through users data
@@ -319,8 +336,13 @@ class SyncEmployeesLib
 						'UUID' => generateUUID(),
 						'actionCode' => '04',
 						'addressInformationListCompleteTransmissionIndicator' => true,
+						'workplaceAddressInformationListCompleteTransmissionIndicator' => true,
+						'identificationListCompleteTransmissionIndicator' => true,
 						'Identification' => array(
 							'actionCode' => '06',
+							'ObjectNodeSenderTechnicalID' => 'Identity',
+							'PartyIdentifierTypeCode' => 'HCM001',
+							'BusinessPartnerID' => '',
 							'EmployeeID' => getData($sapIdResult)[0]->sap_eeid,
 						),
 						'Common' => array(
@@ -359,10 +381,11 @@ class SyncEmployeesLib
 						'PaymentInformation' => array(
 							'actionCode' => '04',
 							'ObjectNodeSenderTechnicalID' => null,
-							'PaymentFormCode' => '05',
+							'PaymentFormCode' => '05', //Bank transfer
 							'BankDetails' => array(
+								'actionCode' => '04',
 								'ObjectNodeSenderTechnicalID' => null,
-								'ID' => '0000', //random ID
+								'ID' => '0001', //random ID
 								'BankAccountID' => $empData->accNumber,
 								'BankAccountTypeCode' => '03', //Checking Account
 								'BankAccountHolderName' => $empData->name . ' ' . $empData->surname,
@@ -370,6 +393,10 @@ class SyncEmployeesLib
 								'BankRoutingID' => $empData->bankNumber,
 								'BankRoutingIDTypeCode' => $empData->bankCountry,
 								'MainBankIndicator' => 'true',
+								'ValidityPeriod' => array(
+									'StartDate' => '0001-01-01',
+									'EndDate' => '9999-12-31'
+								),
 							)
 						)
 
@@ -423,15 +450,22 @@ class SyncEmployeesLib
 						// Default non blocking error
 						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the EmpData for user: '.$empData->person_id);
 					}
+					$error = true;
 					continue;
 				}
 			}
 		}
 
-		return success('Users data updated successfully');
+		if ($job === false)
+		{
+			if ($error)
+				return error('Please check the logs');
+			else
+				return success('Users data updated successfully');
+		}
 	}
 
-	public function updateEmployeeWorkAgreement($emps)
+	public function updateEmployeeWorkAgreement($emps, $job = true)
 	{
 		if (isEmptyArray($emps)) return success('No emps to be updated');
 
@@ -447,6 +481,7 @@ class SyncEmployeesLib
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given emps');
 
+		$error = false;
 		$dbModel = new DB_Model();
 
 		foreach (getData($empsAllData) as $empData)
@@ -530,10 +565,7 @@ class SyncEmployeesLib
 								}
 
 								/*wenn die OE nicht in der Sync Tabelle eingetragen ist, wird abgebrochen*/
-								if ($exists === false)
-								{
-									return error("Eine Organisation ist im SAPByD richtig hinterlegt");
-								}
+								return error("Eine Organisation ist im SAPByD nicht richtig hinterlegt");
 							}
 						}
 					}
@@ -573,10 +605,10 @@ class SyncEmployeesLib
 						Prüfen zuerst welcher Eintrag später beginnt, ob es die Bisverwendung oder die Benutzerfunktion ist und übernehmen das Startdatum von dem jeweiligen
 						Da es in SapByD keine Unterscheidung gibt, ob es eine Bisverwendung oder Benutzerfunktion ist
 						*/
-						if ($functionResult[0]->datum_von >= $oldBis->beginn)
-							$datum = $functionResult[0]->datum_von;
-						else
+						if(isset($sapEmpType['functions'][$oldBis->beginn]))
 							$datum = $oldBis->beginn;
+						else if (isset($sapEmpType['functions'][$functionResult[0]->datum_von]))
+							$datum = $functionResult[0]->datum_von;
 
 						$sapEndDate = $sapEmpType['functions'][$datum]->ValidityPeriod->EndDate;
 
@@ -615,11 +647,26 @@ class SyncEmployeesLib
 						/*Falls eine Organisatorische Zuordnung im SAPByD mit dem Datum der Benutzerfunktion bereits besteht*/
 						if (isset($sapEmpType['functions'][$currentFunction->datum_von]))
 						{
+
 							/*Prüfen ob die OE ID in SapByD eingetragen ist
 							Kam bei einem Test als Null zurück, ist eigentlich sonst immer eingetragen*/
 							if (isset($sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails))
 								$sapOE = $sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails->OrganisationalCenterID;
+							else if (is_array($position->OrganisationalCenterDetails))
+							{
+								/*Benutzer haben zum gleichen Zeitpunkt 2 Zuteilungen
+								Holen uns alle Zuteilungen und vergleichen sie dann mit der jetzigen OE
+								*/
+								$sapOE = array();
+								foreach ($position->OrganisationalCenterDetails as $orgCenterDetals)
+								{
+									$sapOE[] = $orgCenterDetals->OrganisationalCenterID;
+								}
+								sort($sapOE);
+								$sapOE = array_diff($sapOE, array($currentOE));
 
+								$sapOE = $sapOE[0];
+							}
 							/*Ist die OE aus der Benutzerfunktion nicht die gleiche wie die, die in SAPByD eingetragen ist findet ein Transfer zur der richtigen OE statt*/
 							if (isset($sapOE) && $currentOE !== $sapOE)
 							{
@@ -770,9 +817,12 @@ class SyncEmployeesLib
 						}
 
 						//Holen uns das Enddatum der alten Benutzerfunktion
+						if (isset($sapEmpType['functions'][$oldFunction->datum_von]))
+							$datum = $oldFunction->datum_von;
+						else if (isset($sapEmpType['functions'][$oldBis->beginn]))
+							$datum = $oldBis->beginn;
 
-						$oldFunctionEndDate = $sapEmpType['functions'][$oldFunction->datum_von]->ValidityPeriod->EndDate;
-
+						$oldFunctionEndDate = $sapEmpType['functions'][$datum]->ValidityPeriod->EndDate;
 						//Prüfen hier ab ob es noch eine neue Benutzerfunktion gibt, falls ja setzen wir Kündigungsdatum
 						if ($newFunction !== false)
 						{
@@ -804,7 +854,7 @@ class SyncEmployeesLib
 						{
 							//Wenn die alte OE die gleiche wie die jetzige ist, muss zuerst die Person gekündigt werden und dann neu eingestellt werden
 							//Da sonst SAPByD eine Rückmeldung gibt, dass die job ID oder OE ID eine andere sein muss
-							if ($oldFunctionEndDate === "9999-12-31" && $oldBis->ende !== $oldFunctionEndDate)
+							if ($oldFunctionEndDate === "9999-12-31" && $oldBis->ende !== $oldFunctionEndDate && $oldBis->ba1code === '103')
 							{
 								$updated = $this->addLeavingDate($sapID, $oldBis->ende, $empData->person_id);
 
@@ -837,7 +887,7 @@ class SyncEmployeesLib
 					$functionResult = array_reverse($functionResult);
 
 					/*Nehmen das spätere Startdatum von der Bisverwendung bzw Benutzerfunktion*/
-					if ($functionResult[0]->datum_von >= $oldBis->beginn)
+					if ($functionResult[0]->datum_von >= $currentBis->beginn)
 						$datum = $functionResult[0]->datum_von;
 					else
 						$datum = $currentBis->beginn;
@@ -872,14 +922,19 @@ class SyncEmployeesLib
 			}
 			else
 			{
-				//ist ein Error damit man beim Manuellen Syncen sieht, dass es fehlschlägt
-				//ansonsten wäre es ein Continue;
-				return error();
+				$error = true;
+				continue;
 			}
 		}
-		return success('Users data updated successfully');
-	}
 
+		if ($job === false)
+		{
+			if ($error)
+				return error('Please check the logs');
+			else
+				return success('Users data updated successfully');
+		}
+	}
 
 	private function checkIfObject($object)
 	{
@@ -910,12 +965,12 @@ class SyncEmployeesLib
 		$emp = array($empID);
 
 		if (!hasData($sapIdResult))
-			return $this->create($emp);
+			return $this->create($emp, false);
 		else
 		{
-			$update = $this->update($emp);
+			$update = $this->update($emp, false);
 			if (!isError($update))
-				return $this->updateEmployeeWorkAgreement($emp);
+				return $this->updateEmployeeWorkAgreement($emp, false);
 			else
 				return $update;
 		}
@@ -928,47 +983,60 @@ class SyncEmployeesLib
 
 		foreach ($emps as $emp)
 		{
-			if (!isset($emp->EmploymentData) || !isset($emp->EmploymentData->WorkAgreementData))
+			if (!isset($emp->EmploymentData))
 				continue;
 
 			$additionalClauses['emp'] = $emp->EmployeeID->_;
 			$additionalClauses['workingAgreement'] = [];
 
-			$workAgreement = $emp->EmploymentData->WorkAgreementData;
-			if (isset($workAgreement->AdditionalClauses))
+			if (is_array($emp->EmploymentData))
 			{
-				if (is_array($workAgreement->AdditionalClauses))
+				foreach($emp->EmploymentData as $empData)
 				{
-					foreach ($workAgreement->AdditionalClauses as $additionalClause)
-					{
-						$startDate = (isset($additionalClause->ValidityPeriod->StartDate)) ? $additionalClause->ValidityPeriod->StartDate : '';
-						$decimal = (isset($additionalClause->AgreedWorkingTimeRate->DecimalValue)) ? $additionalClause->AgreedWorkingTimeRate->DecimalValue : '';
-						$category = (isset($additionalClause->WorkAgreementAdministrativeCategoryCode->_)) ? $additionalClause->WorkAgreementAdministrativeCategoryCode->_ : '';
-						array_push($additionalClauses['workingAgreement'], array('startDate' => $startDate, 'timeRate' => $decimal, 'category' => $category));
-					}
-				}
-				else
-				{
-					$startDate = (isset($workAgreement->AdditionalClauses->ValidityPeriod->StartDate)) ? $workAgreement->AdditionalClauses->ValidityPeriod->StartDate : '';
-					$decimal = (isset($workAgreement->AdditionalClauses->AgreedWorkingTimeRate->DecimalValue)) ? $workAgreement->AdditionalClauses->AgreedWorkingTimeRate->DecimalValue : '';
-					$category = (isset($workAgreement->AdditionalClauses->WorkAgreementAdministrativeCategoryCode->_)) ? $workAgreement->AdditionalClauses->WorkAgreementAdministrativeCategoryCode->_: '';
-					array_push($additionalClauses['workingAgreement'], array('startDate' => $startDate, 'timeRate' => $decimal, 'category' => $category));
+					if (isset($empData->WorkAgreementData))
+						$additionalClauses['workingAgreement'] = $this->getWorkAgreementData($empData->WorkAgreementData, $additionalClauses['workingAgreement']);
 				}
 			}
+			else if(isset($emp->EmploymentData->WorkAgreementData))
+			{
+				$additionalClauses['workingAgreement'] = $this->getWorkAgreementData($emp->EmploymentData->WorkAgreementData, $additionalClauses['workingAgreement']);
+			}
+			else
+				continue;
 
 			array_push($data, $additionalClauses);
 		}
 
-		$out = fopen("test.csv", 'w');
-		fputcsv($out, array('Mitarbeiter', 'Startdatum', 'Stunden', 'Verwaltungskategorie'));
+		sort($data);
 
-		foreach ($data as $additionalClause){
-			foreach ($additionalClause['workingAgreement'] as $workAgreement){
-				$line = [$additionalClause['emp'], date_format(date_create($workAgreement['startDate']), "m/d/Y"), $workAgreement['timeRate'], $workAgreement['category']];
-				fputcsv($out, $line);
+		return $data;
+	}
+
+	public function getWorkAgreementData($workAgreement, $additionalClauses)
+	{
+		if (isset($workAgreement->AdditionalClauses))
+		{
+			if (is_array($workAgreement->AdditionalClauses))
+			{
+				foreach ($workAgreement->AdditionalClauses as $additionalClause)
+				{
+					$additionalClauses[] = $this->addAdditionalClause($additionalClause);
+				}
+			}
+			else
+			{
+				$additionalClauses[] =  $this->addAdditionalClause($workAgreement->AdditionalClauses);
 			}
 		}
-		fclose($out);
+		return $additionalClauses;
+	}
+
+	public function addAdditionalClause($additionalClause)
+	{
+		$startDate = (isset($additionalClause->ValidityPeriod->StartDate)) ? $additionalClause->ValidityPeriod->StartDate : '';
+		$decimal = (isset($additionalClause->AgreedWorkingTimeRate->DecimalValue)) ? $additionalClause->AgreedWorkingTimeRate->DecimalValue : '';
+		$category = (isset($additionalClause->WorkAgreementAdministrativeCategoryCode->_)) ? $additionalClause->WorkAgreementAdministrativeCategoryCode->_ : '';
+		return array('startDate' => $startDate, 'timeRate' => $decimal, 'category' => $category);
 	}
 
 	public function getAllEmps()
@@ -980,7 +1048,7 @@ class SyncEmployeesLib
 			$empsData = $this->_ci->QueryEmployeeInModel->findByIdentification(
 				array(
 					'PROCESSING_CONDITIONS' => array(
-						'QueryHitsMaximumNumberValue' => 10,
+						'QueryHitsMaximumNumberValue' => 40,
 						'QueryHitsUnlimitedIndicator' => false,
 						'LastReturnedObjectID' => $objID
 					)
@@ -1183,6 +1251,8 @@ class SyncEmployeesLib
 				$empAllData->endDate = getData($bisResult)[0]->ende;
 				$empAllData->decimalValue = getData($bisResult)[0]->vertragsstunden;
 			}
+			else
+				return error('No Bisverwendung available for the given user');
 
 			if (is_null($empAllData->endDate))
 			{
@@ -1213,6 +1283,8 @@ class SyncEmployeesLib
 			{
 				$empAllData->kstZuordnungen = getData($kstZuordnungen)[0];
 			}
+			else
+				return error('No Kstzuordnung available for the given user');
 
 			$empAllData->email = $empPersonalData->uid . '@technikum-wien.at';
 			// Stores all data for the current employee
@@ -1287,14 +1359,17 @@ class SyncEmployeesLib
 					'ChangeStateID' => null,
 					'UUID' => null,
 					'Identification' => array(
-						'actionCode' => '04',
+						'actionCode' => '06',
+						'ObjectNodeSenderTechnicalID' => 'Identity',
+						'PartyIdentifierTypeCode' => 'HCM001',
+						'BusinessPartnerID' => '',
 						'EmployeeID' => $emp
 					),
 					'PaymentInformation' => array(
 						'PaymentFormCode' => '05', //Bank Transfer
 						'BankDetails' => array(
 							'actionCode' => '04',
-							'ID' => '0000', //random ID
+							'ID' => '0001', //random ID
 							'BankAccountID' => $empData->accNumber,
 							'BankAccountTypeCode' => '03', //Checking Account
 							'BankAccountHolderName' => $empData->name . ' ' . $empData->surname,

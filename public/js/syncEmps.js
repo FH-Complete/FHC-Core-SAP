@@ -23,9 +23,13 @@ var Emps = {
 			{
 				successCallback: function(response, textStatus, jqXHR) {
 					if (FHC_AjaxClient.isError(response))
-						Emps._writeError("Fehler beim Syncen");
+					{
+						Emps._writeError(FHC_AjaxClient.getError(response));
+					}
 					else
+					{
 						Emps._writeSuccess(FHC_AjaxClient.getData(response))
+					}
 				},
 				errorCallback: function(jqXHR, textStatus, errorThrown)
 				{
