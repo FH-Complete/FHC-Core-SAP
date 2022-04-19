@@ -16,10 +16,14 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_EMPLOYEES = 'SAPEmployeesCreate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
+	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
+
+	// Maximum amount of elements to be placed in a single job
+	const MAX_JOB_ELEMENTS = 200;
 
 	// Update time interval
 	const UPDATE_TIME_INTERVAL = '24 hours';
@@ -96,11 +100,9 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\')
 								AND tbl_benutzer.aktiv
-						)
-						OR
-						EXISTS (
+						) OR EXISTS (
 							SELECT
 								1
 							FROM
@@ -108,7 +110,7 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 						)
 					)
 			      GROUP BY ps.person_id
@@ -144,6 +146,7 @@ class JQMSchedulerLib
 		$contacts = array();
 		$addresses = array();
 		$prestudents = array();
+		$bankData = array();
 
 		$dbModel = new DB_Model();
 
@@ -151,14 +154,10 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_person table
 		$personResult = $dbModel->execReadOnlyQuery('
-			SELECT p.person_id
+			SELECT DISTINCT p.person_id
 			  FROM public.tbl_person p
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - p.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				OR s.last_update IS NULL
-			)
+			 WHERE p.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -171,20 +170,13 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_prestudent = tbl_prestudentstatus table
 		$prestudentsResult = $dbModel->execReadOnlyQuery('
-			SELECT ps.person_id
+			SELECT DISTINCT ps.person_id
 			  FROM public.tbl_prestudent ps
 			  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE (
-					NOW() - pss.insertamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-					OR NOW() - pss.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				    	OR NOW() - pss.datum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				)
-			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				OR s.last_update IS NULL
-			)
-		      GROUP BY ps.person_id
+			 WHERE pss.insertamum > s.last_update
+			    OR pss.updateamum > s.last_update
+			    OR pss.datum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -197,15 +189,11 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_kontakt table
 		$contactsResult = $dbModel->execReadOnlyQuery('
-			SELECT k.person_id
+			SELECT DISTINCT k.person_id
 			  FROM public.tbl_kontakt k
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - k.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				OR s.last_update IS NULL
-			)
-		      GROUP BY k.person_id
+			 WHERE k.insertamum > s.last_update
+			    OR k.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -218,15 +206,11 @@ class JQMSchedulerLib
 
 		// Get users that have been updated in tbl_adresse table
 		$addressesResult = $dbModel->execReadOnlyQuery('
-			SELECT a.person_id
+			SELECT DISTINCT a.person_id
 			  FROM public.tbl_adresse a
 			  JOIN sync.tbl_sap_students s USING(person_id)
-			 WHERE NOW() - a.updateamum::timestamptz <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-			   AND (
-				NOW() - s.last_update <= INTERVAL \''.self::UPDATE_TIME_INTERVAL.'\'
-				OR s.last_update IS NULL
-			)
-		      GROUP BY a.person_id
+			 WHERE a.insertamum > s.last_update
+			    OR a.updateamum > s.last_update
 		');
 
 		// If error occurred while retrieving updated users from database then return the error
@@ -235,8 +219,25 @@ class JQMSchedulerLib
 		// If there are updated users
 		if (hasData($addressesResult)) $addresses = getData($addressesResult);
 
+		// Bank data
+
+		// Get users that have bank data updated
+		$bankDataResult = $dbModel->execReadOnlyQuery('
+			SELECT DISTINCT bv.person_id
+			  FROM public.tbl_bankverbindung bv
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE bv.insertamum > s.last_update
+			    OR bv.updateamum > s.last_update
+		');
+
+		// If error occurred while retrieving updated bank data from database then return the error
+		if (isError($bankDataResult)) return $bankDataResult;
+
+		// If there are updated bank data
+		if (hasData($bankDataResult)) $bankData = getData($bankDataResult);
+
 		// Return a success that contains all the arrays merged together
-		return success(uniquePersonIdArray(array_merge($persons, $contacts, $addresses, $prestudents)));
+		return success(uniquePersonIdArray(array_merge($persons, $contacts, $addresses, $prestudents, $bankData)));
 	}
 
 	/**
@@ -278,86 +279,100 @@ class JQMSchedulerLib
 	 */
 	public function newPayments()
 	{
-		$jobInput = null;
-
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
 
 		$dbModel = new DB_Model();
 
 		// Gets new permanent employees created in the last 42 hours
 		$newPaymentsResult = $dbModel->execReadOnlyQuery('
-		SELECT
-			distinct person_id
-		FROM
-			public.tbl_konto bk
-		WHERE
-			betrag < 0
-			AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
-			AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
-			AND
-			(
-				EXISTS(SELECT
-				1
-				FROM
-					public.tbl_prestudent
-					JOIN public.tbl_student USING(prestudent_id)
-					JOIN public.tbl_benutzer ON(uid=student_uid)
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-					AND tbl_benutzer.aktiv
-				)
-				OR
-				EXISTS(SELECT
+			SELECT
+				distinct person_id
+			FROM
+				public.tbl_konto bk
+			WHERE
+				betrag < 0
+				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
+				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+				AND
+				(
+					EXISTS(SELECT
 					1
-				FROM
-					public.tbl_prestudent
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND tbl_prestudent.studiengang_kz=10002
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-					AND EXISTS(SELECT
-							1
-						FROM
-							public.tbl_prestudent
-						WHERE
-							tbl_prestudent.person_id = bk.person_id
-							AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
-							AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+					FROM
+						public.tbl_prestudent
+						JOIN public.tbl_student USING(prestudent_id)
+						JOIN public.tbl_benutzer ON(uid=student_uid)
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+						AND tbl_benutzer.aktiv
+					)
+					OR
+					EXISTS(SELECT
+						1
+					FROM
+						public.tbl_prestudent
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND tbl_prestudent.studiengang_kz=10002
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
+						AND EXISTS(SELECT
+								1
+							FROM
+								public.tbl_prestudent
+							WHERE
+								tbl_prestudent.person_id = bk.person_id
+								AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+						)
+					)
+					OR
+					EXISTS(SELECT
+					1
+					FROM
+						public.tbl_prestudent
+					WHERE
+						tbl_prestudent.person_id = bk.person_id
+						AND studiengang_kz = bk.studiengang_kz
+						AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
 					)
 				)
-				OR
-				EXISTS(SELECT
-				1
-				FROM
-					public.tbl_prestudent
-				WHERE
-					tbl_prestudent.person_id = bk.person_id
-					AND studiengang_kz = bk.studiengang_kz
-					AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
-				)
-			)
-
-			AND buchungsnr_verweis is null
-			AND buchungsdatum <= now()
-			AND buchungsdatum >= ?
+	
+				AND buchungsnr_verweis is null
+				AND buchungsdatum <= now()
+				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
 
-		// If error occurred while retrieving new users from database then return the error
-		if (isError($newPaymentsResult)) return $newPaymentsResult;
-
-		// If new users are present
-		if (hasData($newPaymentsResult))
-		{
-			$jobInput = json_encode(getData($newPaymentsResult));
-		}
-
-		return success($jobInput);
+		return $newPaymentsResult;
 	}
 
 	/**
-	 * 
+	 * Looks for new credit memo
+	 */
+	public function creditMemo()
+	{
+		$dbModel = new DB_Model();
+
+		// Get users that have updated credit memo
+		$creditMemoResult = $dbModel->execReadOnlyQuery('
+			SELECT ko.person_id
+			  FROM public.tbl_konto ko
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE ko.betrag > 0
+			   AND ko.buchungstyp_kurzbz = \'ZuschussIO\'
+			   AND ko.buchungsnr NOT IN (
+				SELECT kos.buchungsnr_verweis
+				  FROM public.tbl_konto kos
+				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
+			)
+		      GROUP BY ko.person_id
+		');
+
+		return $creditMemoResult;
+	}
+
+	/**
+	 *
 	 */
 	public function newEmployees()
 	{
@@ -470,4 +485,3 @@ class JQMSchedulerLib
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
 	}
 }
-

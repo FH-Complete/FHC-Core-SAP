@@ -86,7 +86,7 @@ class JQMScheduler extends JQW_Controller
 			if (hasData($jobInputResult))
 			{
 				// Split array in arrays every LENGTH
-				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::UPDATE_LENGTH);
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
 
 				// Loops on arrays
 				foreach ($jobInputArrays as $jobInputArray)
@@ -174,17 +174,24 @@ class JQMScheduler extends JQW_Controller
 			// If a job input were generated
 			if (hasData($jobInputResult))
 			{
-				// Add the new job to the jobs queue
-				$addNewJobResult = $this->addNewJobsToQueue(
-					JQMSchedulerLib::JOB_TYPE_SAP_NEW_PAYMENTS, // job type
-					$this->generateJobs( // gnerate the structure of the new job
-						JobsQueueLib::STATUS_NEW,
-						getData($jobInputResult)
-					)
-				);
+				// Split array in arrays every LENGTH
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
 
-				// If error occurred return it
-				if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+				// Loops on arrays
+				foreach ($jobInputArrays as $jobInputArray)
+				{
+					// Add the new job to the jobs queue
+					$addNewJobResult = $this->addNewJobsToQueue(
+						JQMSchedulerLib::JOB_TYPE_SAP_NEW_PAYMENTS, // job type
+						$this->generateJobs( // generate the structure of the new job
+							JobsQueueLib::STATUS_NEW,
+							json_encode($jobInputArray)
+						)
+					);
+
+					// If error occurred return it
+					if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+				}
 			}
 			else // otherwise log info
 			{
@@ -193,6 +200,58 @@ class JQMScheduler extends JQW_Controller
 		}
 
 		$this->logInfo('End job queue scheduler FHC-Core-SAP->newPayments');
+	}
+
+	/**
+	 *
+	 */
+	public function creditMemo()
+	{
+		$this->logInfo('Start job queue scheduler FHC-Core-SAP->creditMemo');
+
+		// Generates the input for the new job
+		$jobInputResult = $this->jqmschedulerlib->creditMemo();
+
+		// If an error occured then log it
+		if (isError($jobInputResult))
+		{
+			$this->logError(getError($jobInputResult));
+		}
+		else
+		{
+			// If a job input were generated
+			if (hasData($jobInputResult))
+			{
+				// Split array in arrays every LENGTH
+				$jobInputArrays = array_chunk(getData($jobInputResult), JQMSchedulerLib::MAX_JOB_ELEMENTS);
+
+				// Loops on arrays
+				foreach ($jobInputArrays as $jobInputArray)
+				{
+					// Loops on arrays
+					foreach ($jobInputArrays as $jobInputArray)
+					{
+						// Add the new job to the jobs queue
+						$addNewJobResult = $this->addNewJobsToQueue(
+							JQMSchedulerLib::JOB_TYPE_SAP_CREDIT_MEMO, // job type
+							$this->generateJobs( // generate the structure of the new job
+								JobsQueueLib::STATUS_NEW,
+								json_encode($jobInputArray)
+							)
+						);
+
+						// If error occurred return it
+						if (isError($addNewJobResult)) $this->logError(getError($addNewJobResult));
+					}
+				}
+			}
+			else // otherwise log info
+			{
+				$this->logInfo('There are no jobs to generate');
+			}
+		}
+
+		$this->logInfo('End job queue scheduler FHC-Core-SAP->creditMemo');
 	}
 
 	/**
@@ -280,6 +339,7 @@ class JQMScheduler extends JQW_Controller
 
 		$this->logInfo('End job queue scheduler FHC-Core-SAP->updateEmployees');
 	}
+
 	public function updateEmployeeWorkAgreement()
 	{
 		$this->logInfo('Start job queue scheduler FHC-Core-SAP->updateEmployeesWorkAgreement');
@@ -325,6 +385,4 @@ class JQMScheduler extends JQW_Controller
 
 		$this->logInfo('End job queue scheduler FHC-Core-SAP->updateEmployeesWorkAgreement');
 	}
-
 }
-

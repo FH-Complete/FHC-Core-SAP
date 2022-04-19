@@ -76,36 +76,51 @@ class ManageServices extends JQW_Controller
 		{
 			$this->logError(getCode($lastJobs).': '.getError($lastJobs), $jobType);
 		}
-		else
+		elseif (hasData($lastJobs)) // if there jobs to work
 		{
-			// Create/update users on SAP side
-			if ($jobType == SyncServicesLib::SAP_SERVICES_CREATE)
-			{
-				$syncResult = $this->syncserviceslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
-			}
-			else
-			{
-				$syncResult = $this->syncserviceslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
-			}
-
-			// Log result
-			if (isError($syncResult))
-			{
-				$this->logError(getCode($syncResult).': '.getError($syncResult));
-			}
-			else
-			{
-				$this->logInfo(getData($syncResult));
-			}
-
-			// Update jobs properties values
+			// Update jobs properties s
 			$this->updateJobs(
 				getData($lastJobs), // Jobs to be updated
-				array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
-				array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date('Y-m-d H:i:s')) // Job properties new values
 			);
+			$updateResult = $this->updateJobsQueue($jobType, getData($lastJobs));
 
-			if (hasData($lastJobs)) $this->updateJobsQueue($jobType, getData($lastJobs));
+			// If an error occurred then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // works the jobs
+			{
+				// Create/update users on SAP side
+				if ($jobType == SyncServicesLib::SAP_SERVICES_CREATE)
+				{
+					$syncResult = $this->syncserviceslib->create(mergeUsersPersonIdArray(getData($lastJobs)));
+				}
+				else
+				{
+					$syncResult = $this->syncserviceslib->update(mergeUsersPersonIdArray(getData($lastJobs)));
+				}
+
+				// Log result
+				if (isError($syncResult))
+				{
+					$this->logError(getCode($syncResult).': '.getError($syncResult));
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($lastJobs), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				);
+				$this->updateJobsQueue($jobType, getData($lastJobs));
+			}
 		}
 
 		$this->logInfo('End data synchronization with SAP ByD: '.$operation);

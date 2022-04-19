@@ -7,6 +7,13 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class SyncProjectsLib
 {
+	// Job queue worker types
+	const SAP_PURCHASE_ORDERS_ACTIVATION = 'SAPPurchaseOrdersSync';
+
+	const SAP_PURCHASE_ORDER_ID = 'purchase_order_id'; // Name of the job input property
+
+	const SAP_PO_ACTIV_NUMBER = 100; // Number of purchase orders to be activated
+
 	// Config entry name to enable/disable log warnings
 	const PROJECT_WARNINGS_ENABLED = 'project_warnings_enabled';
 
@@ -57,6 +64,7 @@ class SyncProjectsLib
 	const PROJECT_SERVICE_TIME_BASED_NOT_VALID = 'PRO_PROJ_TEMPLATE:014';
 	const PROJECT_NOT_ENABLED = 'AP_ESI_COMMON:106';
 	const PROJECT_TASK_NOT_ENABLED = 'AP_ESI_COMMON:106';
+	const PROJECT_TASK_READ_ONLY = 'AP_ESI_COMMON:107';
 
 	// Employee types
 	const EMPLOYEE_VAUE = 'Mitarbeiter';
@@ -76,6 +84,11 @@ class SyncProjectsLib
 	// Data Services Request URI not found messages
 	const EN_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI';
 	const DE_DSRU_ERROR = 'The server has not found any resource matching the Data Services Request URI DE';
+
+	// SAP time recording values
+	const TIME_RECORDING_NOT_ALLOWED = '1';
+	const TIME_RECORDING_NO_APPROVAL = '2';
+	const TIME_RECORDING_APPROVAL = '3';
 
 	private $_ci; // Code igniter instance
 
@@ -175,6 +188,12 @@ class SyncProjectsLib
 			// Last or current study semester
 			$currentOrNextStudySemester = getData($currentOrNextStudySemesterResult)[0]->studiensemester_kurzbz;
 
+			// Get the next study semester
+			$nextStudySemesterResult = $this->_ci->StudiensemesterModel->getNextFrom($currentOrNextStudySemester);
+
+			// If an error occurred then return it
+			if (isError($nextStudySemesterResult)) return $nextStudySemesterResult;
+
 			// Project structures are optionals and are used to create tasks for a project
 			$projectStructures = $this->_ci->config->item(self::PROJECT_STRUCTURES);
 			// Project ID format
@@ -194,10 +213,10 @@ class SyncProjectsLib
 			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterStartDateTS = $dateTime->getTimestamp(); // project start date
 
-			// Get study semester end date
-			$studySemesterEndDate = getData($currentOrNextStudySemesterResult)[0]->ende;
-			// Get study semester end date in timestamp format
-			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($currentOrNextStudySemesterResult)[0]->ende.' 00:00:00');
+			// Get study semester end date (it's the start date of the next study semester)
+			$studySemesterEndDate = getData($nextStudySemesterResult)[0]->start;
+			// Get study semester end date in timestamp format (it's the start date of the next study semester)
+			$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', getData($nextStudySemesterResult)[0]->start.' 00:00:00');
 			$studySemesterEndDateTS = $dateTime->getTimestamp(); // project end date
 
 			// If it is requested a full sync or only for admin FHTW
@@ -463,22 +482,33 @@ class SyncProjectsLib
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
 					{
-						// If the current task is the project itself then update the name and skip to the next one
+						// Any other value means that the time recording is allowed on FHC
+						// If true it means the time recording is enabled
+						$timeRecording = $projectTask->TimeConfirmationProfileCode != self::TIME_RECORDING_NOT_ALLOWED;
+
+						// If the current task is the project itself then update:
+						// - name
+						// - time recording
+						// and skip to the next one
 						if ($project->ProjectID == $projectTask->ID)
 						{
-							// Updates only the name
+							// Updates only the name and time recording
 							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 								$projects_timesheet_id,
 								array(
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording,
+									// to enforce that this is a project and _not_ a task
+									'project_task_object_id' => null
 								)
 							);
 
 							// If error occurred during update return database error
 							if (isError($updateResult)) return $updateResult;
 
-							continue;
+							continue; // to the next task
 						}
+						// otherwise this is a task
 
 						// Check if the task is already present with the SAP project object id and SAP task object id
 						$sapProjectsTaskTimesheetsResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
@@ -517,7 +547,8 @@ class SyncProjectsLib
 									'updateamum' => 'NOW()',
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording
 								)
 							);
 
@@ -538,7 +569,8 @@ class SyncProjectsLib
 									'responsible_unit' => $projectTask->ResponsibleCostCentreID,
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
-									'name' => $projectTask->Name
+									'name' => $projectTask->Name,
+									'time_recording' => $timeRecording
 								)
 							);
 
@@ -756,8 +788,12 @@ class SyncProjectsLib
 								// Function covered by this user in this project
 								$userFunction = self::EMPLOYEE_VAUE; // by default it is a worker
 
-								// If it is the leader of this project
-								if ($partecipant->EmployeeID == $sapLeaderId) $userFunction = self::LEADER_VAUE;
+								// If it is the leader of this project or the substitute
+								if ($partecipant->EmployeeID == $sapLeaderId
+									|| $partecipant->ProjectResponsibleEmployeeSubstituteIndicator === true)
+								{
+									$userFunction = self::LEADER_VAUE;
+								}
 
 								// Get or create the ressource
 								$ressourceResult = $this->_getOrCreateRessource($partecipant->EmployeeID);
@@ -970,9 +1006,9 @@ class SyncProjectsLib
 	}
 
 	/**
-	 *
+	 * Updates tables fue.*project* using data from sync.tbl_sap_projects_timesheets
 	 */
-	public function importProjectsDates()
+	public function updateFUEProjects()
 	{
 		$dbModel = new DB_Model();
 
@@ -1037,8 +1073,13 @@ class SyncProjectsLib
 				// If a FHC project was linked to a SAP project
 				if ($linkedProject->projektphase_id == null)
 				{
-					// Get the project data from SAP
-					$projectResult = $this->_ci->ProjectsModel->getProjects(array($linkedProject->project_object_id));
+					// Get the project data from sync.tbl_sap_projects_timesheets
+					$projectResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_object_id' => $linkedProject->project_object_id,
+							'project_task_object_id' => null // do not get the tasks
+						)
+					);
 
 					// If an error occurred then return it
 					if (isError($projectResult)) return $projectResult;
@@ -1052,6 +1093,7 @@ class SyncProjectsLib
 						}
 						continue;
 					}
+
 					// SAP project
 					$project = getData($projectResult)[0];
 
@@ -1084,9 +1126,11 @@ class SyncProjectsLib
 							'projekt_kurzbz' => $projekt->projekt_kurzbz
 						),
 						array(
-							'beginn' => date('Y-m-d', toTimestamp($project->PlannedStartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($project->PlannedEndDateTime)-86400)
-							// Remove one day (86400 sec) because API delivers wrong date
+							'beginn' => $project->start_date,
+							'ende' => $project->end_date,
+							'titel' => $project->name,
+							'beschreibung' => $project->name,
+							'zeitaufzeichnung' => $project->time_recording
 						)
 					);
 
@@ -1095,17 +1139,15 @@ class SyncProjectsLib
 				}
 				else // otherwise if a SAP task was linked to a FHC phase
 				{
-					// Get the project data from SAP
-					$projectTaskResult = $this->_ci->ProjectsModel->getTask($linkedProject->project_task_object_id);
+					// Get the task data from sync.tbl_sap_projects_timesheets
+					$projectTaskResult = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_task_object_id' => $linkedProject->project_task_object_id
+						)
+					);
+
 					// If an error occurred then return it
-					if (isError($projectTaskResult))
-					{
-						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
-						{
-							$this->_ci->LogLibSAP->logWarningDB('Task not found in SAP: '.$linkedProject->project_task_id);
-						}
-						continue;
-					}
+					if (isError($projectTaskResult)) return $projectTaskResult;
 
 					// If no data are found in SAP
 					if (!hasData($projectTaskResult))
@@ -1118,7 +1160,7 @@ class SyncProjectsLib
 					}
 
 					// SAP project task
-					$projectTask = getData($projectTaskResult);
+					$projectTask = getData($projectTaskResult)[0];
 
 					// Checks if the project phase exists
 					$projektPhaseResult = $this->_ci->ProjektphaseModel->loadWhere(
@@ -1149,9 +1191,11 @@ class SyncProjectsLib
 							'projektphase_id' => $projektPhase->projektphase_id
 						),
 						array(
-							'start' => date('Y-m-d', toTimestamp($projectTask->StartDateTime)),
-							'ende' => date('Y-m-d', toTimestamp($projectTask->EndDateTime)-86400)
-							// Remove one day (86400 sec) because API delivers wrong date
+							'start' => $projectTask->start_date,
+							'ende' => $projectTask->end_date,
+							'bezeichnung' => substr($projectTask->name, 0, 32),
+							'beschreibung' => $projectTask->name,
+							'zeitaufzeichnung' => $projectTask->time_recording
 						)
 					);
 
@@ -1167,6 +1211,177 @@ class SyncProjectsLib
 
 		// If everything was fine
 		return success('All dates for linked project have been imported successfully');
+	}
+
+	/**
+	 *
+	 */
+	public function updateProjectDates($projectName, $startDate, $endDate)
+	{
+		// Get start date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $startDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$startDateTS = $dateTime->getTimestamp(); // project start date
+
+		// Get end date in timestamp format
+		$dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $endDate.' 00:00:00');
+
+		if ($dateTime === false) return error('Wrong date format. The required format is: yyyy-mm-dd');
+
+		$endDateTS = $dateTime->getTimestamp(); // project end date
+
+		$dbModel = new DB_Model();
+
+		// Gets 
+		$projectResults = $dbModel->execReadOnlyQuery('
+			SELECT p.project_object_id
+			  FROM sync.tbl_sap_projects p
+			 WHERE p.project_id = ?
+			',
+			array($projectName)
+		);
+
+		// If an error occurred then return it
+		if (isError($projectResults)) return $projectResults;
+
+		// If no data were found then return an error
+		if (!hasData($projectResults)) return error('No project found with such a name!');
+
+		// If more then one project have been found
+		if (count(getData($projectResults)) > 1) return error('Too many projects found with this name');
+
+		// Update the project dates
+		$updateProjectDatesResult = $this->_ci->ProjectsModel->setDates(
+			getData($projectResults)[0]->project_object_id,
+			$startDate.'T00:00:00Z',
+			$endDate.'T00:00:00Z'
+		);
+
+		// If an error occurred then return it
+		if (isError($updateProjectDatesResult)) return $updateProjectDatesResult;
+
+		// If the project was successfully updated then loads all the tasks for such project
+                $tasksResults = $dbModel->execReadOnlyQuery('
+			SELECT pc.project_task_object_id,
+				pc.project_task_id
+                          FROM sync.tbl_sap_projects_costcenters pc
+                         WHERE pc.project_object_id = ?
+			   AND pc.project_object_id != pc.project_task_object_id
+                        ',
+                        array(getData($projectResults)[0]->project_object_id)
+                );
+
+		// If this project has tasks
+		if (hasData($tasksResults))
+		{
+			// For each task set the days
+			foreach (getData($tasksResults) as $task)
+			{
+				// Update the task duration in days
+				$updateTaskDatesResult = $this->_ci->ProjectsModel->setTaskDates(
+					$task->project_task_object_id,
+					round(($endDateTS - $startDateTS) / 60 / 60 / 24) + 1
+				);
+
+				// If an error occurred then...
+				if (isError($updateTaskDatesResult))
+				{
+					// ...check if it is a _not_ blocking error
+					if (getCode($updateTaskDatesResult) == self::PROJECT_TASK_READ_ONLY)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Project task is read only: '.$task->project_task_id);
+					}
+					else // ...if it a blocking error then return it
+					{
+						return $updateTaskDatesResult;
+					}
+				}
+			}
+		}
+		// else this project doesn't have any task
+
+		// If everything was fine
+		return success('Project dates have been successfully updated');
+	}
+
+	/**
+	 * Activate purchase orders in SAPByD
+	 */
+	public function activatePurchaseOrders($purchaseOrdersIdArray)
+	{
+		// Request header
+		$request = array(
+			'BasicMessageHeader' => array(
+				'UUID' => generateUUID()
+			),
+			'PurchaseOrderMaintainBundle' => array()
+		);
+
+		// For each purchase order stored in the queue
+		foreach ($purchaseOrdersIdArray as $purchaseOrderId)
+		{
+			// Build the request body
+			$requestBody = array(
+				'actionCode' => '02',
+				'ItemListCompleteTransmissionIndicator' => false,
+				'PurchaseOrderID' => $purchaseOrderId,
+				'BusinessTransactionDocumentTypeCode' => '001',
+				'OrderPurchaseOrderActionIndicator' => true
+			);
+
+			// Check if the purchase order is activatable
+			$purchaseOrderCheckBundleResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderCheckBundle(
+				array(
+					'BasicMessageHeader' => array(
+						'UUID' => generateUUID()
+					),
+					'PurchaseOrderMaintainBundle' => $requestBody
+				)
+			);
+
+			// If a fatal error occurred then return it
+			if (isError($purchaseOrderCheckBundleResult)) return $purchaseOrderCheckBundleResult;
+
+			// If the response is not empty
+			if (hasData($purchaseOrderCheckBundleResult))
+			{
+				$purchaseOrderCheckBundle = getData($purchaseOrderCheckBundleResult);
+				
+				// If the purchase order check was fine
+				if ((isset($purchaseOrderCheckBundle->PurchaseOrder) && !isset($purchaseOrderCheckBundle->Log))
+					|| (isset($purchaseOrderCheckBundle->Log) && isEmptyArray((array)$purchaseOrderCheckBundle->Log)))
+				{
+					// Add this purchase order to those to be activated
+					$request['PurchaseOrderMaintainBundle'][] = $requestBody;
+				}
+				else // otherwise log a warning
+				{
+					if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Check failed for purchase order id: '.$purchaseOrderId);
+					}
+				}
+			}
+			else // otherwise log a warning
+			{
+				if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Check failed for purchase order id: '.$purchaseOrderId);
+				}
+			}
+		}
+
+		// Perform the SOAP call
+		$purchaseOrderResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+			$request
+		);
+
+		// If error occurred then return the error
+		if (isError($purchaseOrderResult)) return $purchaseOrderResult;
+
+		return success('Purchase orders activation success');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -1389,8 +1604,11 @@ class SyncProjectsLib
 				// If an error occurred then return it
 				if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-				// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-				if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+				// If the employee was successfully added to this project
+				// and it is _not_ an alredy existing employee in this project
+				// and if config entry that enables the purchase orders is true
+				if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+					&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 				{
 					// Create the course object
 					$course = new stdClass();
@@ -1594,8 +1812,11 @@ class SyncProjectsLib
 					// If an error occurred then return it
 					if (isError($addEmployeeResult)) return $addEmployeeResult;
 
-					// If config entry is true and it is the case then perform a call to ManagePurchaseOrderIn
-					if ($this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+					// If the employee was successfully added to this project
+					// and it is _not_ an alredy existing employee in this project
+					// and if config entry that enables the purchase orders is true
+					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+						&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
 					{
 						$purchaseOrder = $this->_purchaseOrderLG(
 							$courseEmployee,
@@ -1769,7 +1990,7 @@ class SyncProjectsLib
 				$eeid = getData($sapEeidResult)[0]->sap_eeid;
 
 				// Place the purchase order
-				$purchaseOrder = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
+				$purchaseOrderResult = $this->_ci->ManagePurchaseOrderInModel->purchaseOrderMaintainBundle(
 					array(
 						'BasicMessageHeader' => array(
 							'UUID' => generateUUID()
@@ -1892,6 +2113,11 @@ class SyncProjectsLib
 										'unitCode' => 'HUR',
 										'_' => $courseEmployee->planned_work
 									)
+								),
+								'ItemDeliveryTerms' => array(
+									'QuantityTolerance' => array(
+										'OverPercentUnlimitedIndicator' => true
+									)
 								)
 							)
 						)
@@ -1899,7 +2125,49 @@ class SyncProjectsLib
 				);
 
 				// If error occurred then return the error
-				if (isError($purchaseOrder)) return $purchaseOrder;
+				if (isError($purchaseOrderResult)) return $purchaseOrderResult;
+
+				// If the response is not empty...
+				if (hasData($purchaseOrderResult))
+				{
+					// ...get the response data...
+					$purchaseOrder = getData($purchaseOrderResult);
+
+					// ...and check the response data structure...
+					if (isset($purchaseOrder->PurchaseOrder)
+						&& isset($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID)
+						&& isset($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_)
+						&& !isEmptyString($purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_))
+					{
+						// ...if it is correct then get the purchase order id...
+						$purchaseOrderId = $purchaseOrder->PurchaseOrder->BusinessTransactionDocumentID->_;
+
+						// ...create the object to be stored into the job queue...
+						$inputPurchaseOrder = new stdClass();
+						$inputPurchaseOrder->{self::SAP_PURCHASE_ORDER_ID} = $purchaseOrderId;
+
+						// ...and store it in the job queue!
+						$addNewJobResult = $this->_ci->jobsqueuelib->addNewJobsToQueue(
+							self::SAP_PURCHASE_ORDERS_ACTIVATION, // job type
+							JobsQueueLib::generateJobs( // generate the structure of the new job
+								JobsQueueLib::STATUS_NEW,
+								json_encode($inputPurchaseOrder) // enconde in JSON
+							)
+						);
+
+						// If error occurred return it
+						if (isError($addNewJobResult)) return $addNewJobResult;
+					}
+					else // otherwise log a warning
+					{
+						if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB(
+								'Wrong response structure purchaseOrderMaintainBundle for project: '.$projectId
+							);
+						}
+					}
+				}
 			}
 		}
 
@@ -2004,8 +2272,8 @@ class SyncProjectsLib
 		// If the projects does not exist then update the time recording attribute
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
-			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+			// Set the time recording off for this project
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_NOT_ALLOWED);
 
 			// If an error occurred while setting the project time recording
 			if (isError($setTimeRecordingOffResult))
@@ -2049,7 +2317,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -2111,7 +2379,8 @@ class SyncProjectsLib
 							$projectObjectId,
 							substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 							$costCenter->oe_kurzbz_sap,
-							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
+							round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
+							self::TIME_RECORDING_NO_APPROVAL
 						);
 
 						// If an error occurred while creating the project task on ByD return the error
@@ -2175,7 +2444,7 @@ class SyncProjectsLib
 						  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 						  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 						  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-						 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+						 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 						   AND b.aktiv = TRUE
 						   AND m.fixangestellt = TRUE
 						   AND m.personalnummer > 0
@@ -2306,7 +2575,7 @@ class SyncProjectsLib
 		if (getCode($createProjectResult) != self::PROJECT_EXISTS_ERROR)
 		{
 			// Update the time recording attribute of the project
-			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecordingOff($projectObjectId);
+			$setTimeRecordingOffResult = $this->_ci->ProjectsModel->setTimeRecording($projectObjectId, self::TIME_RECORDING_NOT_ALLOWED);
 
 			// If an error occurred while setting the project time recording
 			if (isError($setTimeRecordingOffResult)) return $setTimeRecordingOffResult;
@@ -2345,7 +2614,7 @@ class SyncProjectsLib
 				  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 				  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+				 WHERE bf.funktion_kurzbz IN (\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 				   AND b.aktiv = TRUE
 				   AND m.personalnummer > 0
 				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
@@ -2411,7 +2680,8 @@ class SyncProjectsLib
 								$projectObjectId,
 								substr(sprintf($taskFormatName, $costCenter->oe_kurzbz), 0, 40),
 								$costCenter->oe_kurzbz_sap,
-								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24)
+								round(($studySemesterEndDateTS - $studySemesterStartDateTS) / 60 / 60 / 24),
+								self::TIME_RECORDING_NO_APPROVAL
 							);
 
 							// If an error occurred while creating the project task on ByD return the error
@@ -2474,7 +2744,7 @@ class SyncProjectsLib
 							  JOIN public.tbl_benutzer b ON(b.uid = m.mitarbeiter_uid)
 							  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
 							  JOIN sync.tbl_sap_organisationsstruktur so ON(bf.oe_kurzbz = so.oe_kurzbz)
-							 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\')
+							 WHERE bf.funktion_kurzbz IN(\'oezuordnung\', \'fachzuordnung\', \'kstzuordnung\', \'Leitung\')
 							   AND b.aktiv = TRUE
 							   AND m.fixangestellt = TRUE
 							   AND m.personalnummer > 0
@@ -2983,7 +3253,8 @@ class SyncProjectsLib
 		}
 
 		// If here then everything is fine
-		return success('Employee successfully added to this project');
+		// NOTE: it returns even the code of the latest attempt to add the employee to the project
+		return success('Employee successfully added to this project', getCode($addEmployeeResult));
 	}
 
 	/**
@@ -2996,3 +3267,4 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
+

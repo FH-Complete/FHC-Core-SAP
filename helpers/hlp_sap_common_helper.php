@@ -64,7 +64,7 @@ function mergeUsersPersonIdArray($jobs, $jobsAmount = 99999)
 }
 
 /**
- * 
+ *
  */
 function mergeUidArray($jobs, $jobsAmount = 99999)
 {
@@ -170,6 +170,32 @@ function uniquePersonIdArray($personIdArray)
 	}
 
 	return $uniquePersonIdArray; // return the new array with unique elements
+}
+
+/**
+ * Gets a list of jobs as parameter and returns a merged array of purchase orders
+ */
+function mergePurchaseOrdersIdArray($jobs)
+{
+	$mergedPOsArray = array();
+
+	// If no jobs then return an empty array
+	if (count($jobs) == 0) return $mergedPOsArray;
+
+	// For each job
+	foreach ($jobs as $job)
+	{
+		// Decode the json input
+		$decodedInput = json_decode($job->input);
+
+		// If decoding was fine
+		if ($decodedInput != null)
+		{
+			$mergedPOsArray[] = $decodedInput->purchase_order_id;
+		}
+	}
+
+	return $mergedPOsArray;
 }
 
 /**

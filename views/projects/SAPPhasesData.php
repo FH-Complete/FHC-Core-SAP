@@ -3,13 +3,20 @@
 // NOTE: This is a pseudo query to be able to start with an empty table.
 // Table will be filled with data by user interaction (ajax call).
 $qry = '
-	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1)) AS tmp (
+	SELECT * FROM (VALUES (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)) AS tmp (
 	"isSynced",
+	"status",
     "projects_timesheets_project",
     "projects_timesheet_id",
     "project_id",
+    "start_date",
+    "end_date",
+    "time_recording",
     "project_task_id",
-    "name"
+    "name",
+    "projektphase_id",
+    "bezeichnung",
+    "deleted"
 	) LIMIT 0;
 ';
 
@@ -20,14 +27,22 @@ $tableWidgetArray = array(
 	'datasetRepresentation' => 'tabulator',
 	'columnsAliases' => array(
 		'Synced',
+		'Status',
 		'SyncID',
 		'SAP ProjektTimesheetID',
-		'SAP ProjektID',
-		'SAP ProjektTaskID',
-		'SAP Projektphase'
+		'SAP Projekt-Nr',
+		'Start',
+		'Ende',
+		'ZA-pflichtig',
+		'SAP Phase-Nr',
+		'SAP Phasenname',
+		'FH Phase-ID',
+		'FH Phasenbz',
+		'Deleted'
 	),
 	'datasetRepOptions' => '{
 		index: "projects_timesheet_id",
+		height: "300px",
 		layout: "fitColumns",
 		persistantLayout: false,
 		headerFilterPlaceholder: " ",
@@ -35,23 +50,27 @@ $tableWidgetArray = array(
 	    selectable: true,
         selectableRangeMode: "click",
 		selectablePersistence: false,
-		selectableCheck: function(row){
-            return func_selectableCheck(row);
-        },
-        rowUpdated: function(row){
-            resortTable(row);
-        },
         rowAdded:function(row){
 	        resortTable(row);
 	    }
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
+		status: {
+			formatter:"lookup",
+			formatterParams:getSAPPhasesStatusbezeichnung
+		},
 		projects_timesheets_project: {visible: false},
 		projects_timesheet_id: {visible: false},
 		project_id: {visible:false},
-		project_task_id: {visible:false},
-		name: {visible:true}
+		start_date: {visible: true, mutator: mut_formatStringDate},
+		end_date: {visible: true, mutator: mut_formatStringDate},
+		time_recording: {visible: true},
+		project_task_id: {visible: true, tooltip: true},
+		name: {visible: true, tooltip: true},
+		projektphase_id: {visible: true, tooltip: true},
+		bezeichnung: {visible: true, tooltip: true},
+		deleted: {visible: false}
 	}'
 );
 
