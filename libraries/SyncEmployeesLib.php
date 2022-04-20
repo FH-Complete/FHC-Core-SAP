@@ -375,7 +375,17 @@ class SyncEmployeesLib
 									'StreetName' => $empData->street
 								),
 							),
-
+						),
+						'WorkplaceAddressInformation' => array(
+							'actionCode' => '04',
+							'Address' => array(
+								'actionCode' => '04',
+								'Email' => array(
+									'actionCode' => '04',
+									'ObjectNodeSenderTechnicalID' => null,
+									'URI' => $empData->email
+								)
+							)
 						),
 						'PaymentInformation' => array(
 							'actionCode' => '04',
