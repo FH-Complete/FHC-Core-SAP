@@ -71,7 +71,6 @@ class SyncEmployeesLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePersonnelRehireIn_model', 'ManagePersonnelRehireInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryEmployeeIn_model', 'QueryEmployeeInModel');
 		$this->_ci->load->model('person/benutzerfunktion_model', 'BenutzerfunktionModel');
-		$this->_ci->load->model('extensions/FHC-Core-SAPSF/fhcomplete/SAPOrganisationsstruktur_model', 'OrganisationsstrukturModel');
 		$this->_ci->load->model('codex/bisverwendung_model', 'BisverwendungModel');
 
 		// Loads Projects configuration
@@ -556,7 +555,11 @@ class SyncEmployeesLib
 							SAPByD zeigt es in der Mitarbeiterliste richtig an, aber nicht in den Informationen von dem Benutzer, Datum ist eingetragen aber keine Stelle bzw Abteilungs*/
 							if (isset($position->OrganisationalCenterDetails->OrganisationalCenterID))
 							{
-								$oeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz_sap' => $position->OrganisationalCenterDetails->OrganisationalCenterID));
+								$oeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz_sap = ?
+								', array($position->OrganisationalCenterDetails->OrganisationalCenterID));
 
 								if(hasData($oeResult))
 								{
@@ -637,7 +640,11 @@ class SyncEmployeesLib
 					/*Gehen dann alle Funktionen von der Person durch*/
 					foreach ($functionResult as $functionKey => $currentFunction)
 					{
-						$oeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz' => $currentFunction->oe_kurzbz));
+						$oeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($currentFunction->oe_kurzbz));
 
 						if (!hasData($oeResult))
 							return error("Keine Organisation in SAP gefunden");
@@ -685,7 +692,11 @@ class SyncEmployeesLib
 							if ($oldFunction === false)
 								continue;
 
-							$oldOeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz' => $oldFunction->oe_kurzbz));
+							$oldOeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($oldFunction->oe_kurzbz));
 
 							if (!hasData($oldOeResult))
 								return error("Keine Organisation in SAP gefunden");
@@ -768,7 +779,11 @@ class SyncEmployeesLib
 						return error("Fehler beim laden der Benutzerfunktionen");
 
 					$oldFunction = array_reverse(getData($oldFunctionResult))[0];
-					$oldOeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz' => $oldFunction->oe_kurzbz));
+					$oldOeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($oldFunction->oe_kurzbz));
 
 					/*Gehen die Benutzerfunktionen der aktuellen Bisverwendung durch*/
 					foreach ($functionResult as $functionKey => $currentFunction)
@@ -781,7 +796,11 @@ class SyncEmployeesLib
 						if ($functionKey > 0)
 						{
 							$oldFunction = isset($functionResult[$functionKey - 1]) ? $functionResult[$functionKey - 1] : false;
-							$oldOeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz' => $oldFunction->oe_kurzbz));
+							$oldOeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($oldFunction->oe_kurzbz));
 						}
 
 						//Hilft uns wenn mehrere Benutzerfunktionene für die Zukunft gleichzeitig eingetragen werden
@@ -794,7 +813,11 @@ class SyncEmployeesLib
 						$oldOE = getData($oldOeResult)[0]->oe_kurzbz_sap;
 
 						/*Holen uns die aktuelle OE Zuordnung*/
-						$oeResult = $this->_ci->OrganisationsstrukturModel->loadWhere(array('oe_kurzbz' => $currentFunction->oe_kurzbz));
+						$oeResult = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($currentFunction->oe_kurzbz));
 
 						if (!hasData($oeResult))
 							return error("Keine Organisation in SAP gefunden");
