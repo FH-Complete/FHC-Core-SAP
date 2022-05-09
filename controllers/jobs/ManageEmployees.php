@@ -176,7 +176,7 @@ class ManageEmployees extends JQW_Controller
 				// For each error found
 				foreach ($errors as $error)
 				{
-					$this->logError(getCode($syncResult).': '.$error);
+					$this->logError(getCode($syncResult) . $error);
 				}
 			}
 			else

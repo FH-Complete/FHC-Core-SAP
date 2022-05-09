@@ -30,6 +30,8 @@ class SyncEmployeesLib
 	const SAP_TYPE_TEMPORARY = 2;
 
 	const JOB_ID = 'ECINT_DUMMY_JOB';
+	const JOB_ID_2 = 'ECINT_DUMMY_JOB_2';
+	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 
 	private $_ci; // Code igniter instance
 
@@ -167,7 +169,7 @@ class SyncEmployeesLib
 		if (!hasData($diffUsers)) return success('No users to be created after diff');
 
 		// Retrieves all users data
-		$empsAllData = $this->_getAllEmpsData($diffUsers);
+		$empsAllData = $this->_getAllEmpsData($diffUsers, $job);
 
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given users');
@@ -274,13 +276,10 @@ class SyncEmployeesLib
 			}
 		}
 
-		if ($job === false)
-		{
-			if ($error)
-				return error('Please check the logs');
-			else
-				return success('Users data created successfully');
-		}
+		if ($job === false && $error)
+			return error('Please check the logs');
+
+		return success('Users data created successfully');
 	}
 
 	public function update($emps, $job = true)
@@ -294,7 +293,7 @@ class SyncEmployeesLib
 		if (!hasData($diffEmps)) return success('No emps to be created after diff');
 
 		// Retrieves all users data
-		$empsAllData = $this->_getAllEmpsData($diffEmps);
+		$empsAllData = $this->_getAllEmpsData($diffEmps, $job);
 
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given emps');
@@ -324,11 +323,14 @@ class SyncEmployeesLib
 			// If the current user is present in SAP
 			if (hasData($empDataSAP))
 			{
-				$data = array(
+				$basicHeader = array(
 					'BasicMessageHeader' => array(
 						'ID' => generateUID(self::UPDATE_EMP_PREFIX),
 						'UUID' => generateUUID()
-					),
+					)
+				);
+
+				$employeeData = array(
 					'EmployeeData' => array(
 						'ObjectNodeSenderTechnicalID' => null,
 						'ChangeStateID' => null,
@@ -387,6 +389,12 @@ class SyncEmployeesLib
 								)
 							)
 						),
+					)
+				);
+
+				if (isset($empData->iban))
+				{
+					$payment = array(
 						'PaymentInformation' => array(
 							'actionCode' => '04',
 							'ObjectNodeSenderTechnicalID' => null,
@@ -408,10 +416,10 @@ class SyncEmployeesLib
 								),
 							)
 						)
-
-					)
-				);
-
+					);
+					$employeeData['EmployeeData'] = array_merge($employeeData['EmployeeData'], $payment);
+				}
+				$data = array_merge($basicHeader, $employeeData);
 				// Then update it!
 				$manageEmpResult = $this->_ci->ManageEmployeeInModel->MaintainBundle($data);
 
@@ -465,13 +473,10 @@ class SyncEmployeesLib
 			}
 		}
 
-		if ($job === false)
-		{
-			if ($error)
-				return error('Please check the logs');
-			else
-				return success('Users data updated successfully');
-		}
+		if ($job === false && $error)
+			return error('Please check the logs');
+
+		return success('Users data updated successfully');
 	}
 
 	public function updateEmployeeWorkAgreement($emps, $job = true)
@@ -482,10 +487,10 @@ class SyncEmployeesLib
 		$diffEmps = $this->_removeNotCreatedEmps($emps);
 
 		if (isError($diffEmps)) return $diffEmps;
-		if (!hasData($diffEmps)) return success('No emps to be created after diff');
+		if (!hasData($diffEmps)) return success('No emps to be updated after diff');
 
 		// Holt sich alle Daten des Emps
-		$empsAllData = $this->_getAllEmpsData($diffEmps);
+		$empsAllData = $this->_getAllEmpsData($diffEmps, $job);
 
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given emps');
@@ -610,7 +615,8 @@ class SyncEmployeesLib
 
 				$functionResult = getData($functionResult);
 				/*Prüfen ob die Bisverwendung keine Fixanstellung ist */
-				if ($currentBis->ba1code !== '103')
+
+				if (!in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
 				{
 					if ($oldBis)
 					{
@@ -644,8 +650,12 @@ class SyncEmployeesLib
 					continue;
 				}
 
-				/*Prüfen ob dis Bisverwendung bereits mit dem Startdatum in SAPByD exestiert und ob der ba1code 103 (Fixanstellung) ist*/
-				if (isset($startDates[$currentBis->beginn]) && $currentBis->ba1code === '103')
+				/*Prüfen ob dis Bisverwendung bereits mit dem Startdatum in SAPByD exestiert und ob der ba1code 103/109 ist*/
+				if ((isset($startDates[$currentBis->beginn]) ||
+					(!isset($startDates[$currentBis->beginn]) && isset($startDates[reset($functionResult)->datum_von])) ||
+					(!isset($startDates[$currentBis->beginn]) && isset($sapEmpType['functions'][$currentBis->beginn]))
+					) &&
+					(in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))))
 				{
 					/*Gehen dann alle Funktionen von der Person durch*/
 					foreach ($functionResult as $functionKey => $currentFunction)
@@ -664,7 +674,6 @@ class SyncEmployeesLib
 						/*Falls eine Organisatorische Zuordnung im SAPByD mit dem Datum der Benutzerfunktion bereits besteht*/
 						if (isset($sapEmpType['functions'][$currentFunction->datum_von]))
 						{
-
 							/*Prüfen ob die OE ID in SapByD eingetragen ist
 							Kam bei einem Test als Null zurück, ist eigentlich sonst immer eingetragen*/
 							if (isset($sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails))
@@ -675,19 +684,22 @@ class SyncEmployeesLib
 								Holen uns alle Zuteilungen und vergleichen sie dann mit der jetzigen OE
 								*/
 								$sapOE = array();
+
 								foreach ($position->OrganisationalCenterDetails as $orgCenterDetals)
 								{
 									$sapOE[] = $orgCenterDetals->OrganisationalCenterID;
 								}
-								sort($sapOE);
-								$sapOE = array_diff($sapOE, array($currentOE));
 
-								$sapOE = $sapOE[0];
+								sort($sapOE);
+
+								$sapOE = array_diff($sapOE, array($currentOE));
+								$sapOE = reset($sapOE);
 							}
 							/*Ist die OE aus der Benutzerfunktion nicht die gleiche wie die, die in SAPByD eingetragen ist findet ein Transfer zur der richtigen OE statt*/
-							if (isset($sapOE) && $currentOE !== $sapOE)
+							if ((isset($sapOE) && $currentOE !== $sapOE) ||
+								($sapEmpType['functions'][$currentFunction->datum_von]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden))
 							{
-								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id);
+								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 
 								if (!$updated)
 									break 2;
@@ -775,7 +787,7 @@ class SyncEmployeesLib
 					}
 				}
 				/* Falls die Bisverwendung noch nicht im SapByD exestiert und es sich um eine Fixanstellung handelt*/
-				else if ($currentBis->ba1code === '103')
+				else if (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
 				{
 					/*Falls keine alte Bisverwendung besteht, machen wir weiter
 					Da die erste Bisverwendung eigentlich immer in SapByD eingetragen sein muss*/
@@ -862,7 +874,6 @@ class SyncEmployeesLib
 							$rehireLeaving = null;
 							$typeCode = self::SAP_TYPE_PERMANENT;
 						}
-
 						//wenn die OE nicht die gleiche ist, wird der Mitarbeiter transferiert
 						if ($oldOE !== $currentOE)
 						{
@@ -877,7 +888,7 @@ class SyncEmployeesLib
 							}
 							else
 							{
-								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id);
+								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 
 								if (!$updated)
 									break 2;
@@ -887,7 +898,7 @@ class SyncEmployeesLib
 						{
 							//Wenn die alte OE die gleiche wie die jetzige ist, muss zuerst die Person gekündigt werden und dann neu eingestellt werden
 							//Da sonst SAPByD eine Rückmeldung gibt, dass die job ID oder OE ID eine andere sein muss
-							if ($oldFunctionEndDate === "9999-12-31" && $oldBis->ende !== $oldFunctionEndDate && $oldBis->ba1code === '103')
+							if ($oldFunctionEndDate === "9999-12-31" && $oldBis->ende !== $oldFunctionEndDate && (in_array($oldBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))))
 							{
 								$updated = $this->addLeavingDate($sapID, $oldBis->ende, $empData->person_id);
 
@@ -907,7 +918,7 @@ class SyncEmployeesLib
 				}
 
 				//Wenn keine weitere Bisverwendung mehr vorhanden ist und ein Enddatum eingetragen ist wird ein Kündigungsdatum eingetragen
-				if ($newBis === false && $currentBis->ba1code === '103' && !is_null($currentBis->ende))
+				if ($newBis === false && (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))) && !is_null($currentBis->ende))
 				{
 					/*Holen uns nochmal alle Funktionen, von der jetzigen Bisverwendung*/
 					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
@@ -960,13 +971,10 @@ class SyncEmployeesLib
 			}
 		}
 
-		if ($job === false)
-		{
-			if ($error)
-				return error('Please check the logs');
-			else
-				return success('Users data updated successfully');
-		}
+		if ($job === false && $error)
+			return error('Please check the logs');
+
+		return success('Users data updated successfully');
 	}
 
 	private function checkIfObject($object)
@@ -1170,7 +1178,7 @@ class SyncEmployeesLib
 	/**
 	 * Retrieves all the data needed to create/update a employee on SAP side
 	 */
-	private function _getAllEmpsData($emps)
+	private function _getAllEmpsData($emps, $job = true)
 	{
 		$empsAllDataArray = array(); // returned array
 
@@ -1265,12 +1273,16 @@ class SyncEmployeesLib
 			{
 				$bankData = checkIBAN(getData($bankResult)[0]->iban);
 				if (!$bankData)
-					return error('No bank data available for the given user');
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Incorrect bank data available for the given user: '.$empPersonalData->person_id);
+				}
 				$empAllData->iban = $bankData['iban'];
 				$empAllData->accNumber = $bankData['accNumber'];
 				$empAllData->bankNumber = $bankData['bankNumber'];
 				$empAllData->bankCountry = $bankData['country'];
 			}
+			else
+				$this->_ci->LogLibSAP->logWarningDB('No bank data available for the given user: '.$empPersonalData->person_id);
 
 			// -------------------------------------------------------------------------------------------
 			// Bisverwendung
@@ -1280,12 +1292,31 @@ class SyncEmployeesLib
 			if (isError($bisResult)) return $bisResult;
 			if (hasData($bisResult))
 			{
+				if (!in_array(getData($bisResult)[0]->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
+				{
+					if ($job === true)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Wrong Bisverwendung for the given user: '.$empPersonalData->person_id);
+						continue;
+					}
+					else
+						return error('Wrong Bisverwendung for the given user');
+				}
 				$empAllData->startDate = getData($bisResult)[0]->beginn;
 				$empAllData->endDate = getData($bisResult)[0]->ende;
 				$empAllData->decimalValue = getData($bisResult)[0]->vertragsstunden;
 			}
 			else
-				return error('No Bisverwendung available for the given user');
+			{
+				if ($job === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('No Bisverwendung available for the given user: '.$empPersonalData->person_id);
+					continue;
+				}
+				else
+					return error('No Bisverwendung available for the given user');
+			}
+
 
 			if (is_null($empAllData->endDate))
 			{
@@ -1317,7 +1348,16 @@ class SyncEmployeesLib
 				$empAllData->kstZuordnungen = getData($kstZuordnungen)[0];
 			}
 			else
-				return error('No Kstzuordnung available for the given user');
+			{
+				if ($job === true)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('No Kstzuordnung available for the given user: '.$empPersonalData->person_id);
+					continue;
+				}
+				else
+					return error('No Kstzuordnung available for the given user');
+			}
+
 
 			$empAllData->email = $empPersonalData->uid . '@technikum-wien.at';
 			// Stores all data for the current employee
@@ -1379,57 +1419,69 @@ class SyncEmployeesLib
 
 	public function addPaymentInformation($emp, $empData)
 	{
-		return $this->_ci->ManageEmployeeInModel->MaintainBundle(
-			array(
-				'BasicMessageHeader' => array(
-					'ID' => generateUID(self::CREATE_EMP_PREFIX),
-					'UUID' => null
+		$basicHeader = array(
+			'BasicMessageHeader' => array(
+				'ID' => generateUID(self::CREATE_EMP_PREFIX),
+				'UUID' => null
+			)
+		);
+
+		$employeeData = array(
+			'EmployeeData' => array(
+				'workplaceAddressInformationListCompleteTransmissionIndicator' => true,
+				'actionCode' => '04',
+				'ObjectNodeSenderTechnicalID' => null,
+				'ChangeStateID' => null,
+				'UUID' => null,
+				'Identification' => array(
+					'actionCode' => '06',
+					'ObjectNodeSenderTechnicalID' => 'Identity',
+					'PartyIdentifierTypeCode' => 'HCM001',
+					'BusinessPartnerID' => '',
+					'EmployeeID' => $emp
 				),
-				'EmployeeData' => array(
-					'workplaceAddressInformationListCompleteTransmissionIndicator' => true,
+				'WorkplaceAddressInformation' => array(
 					'actionCode' => '04',
-					'ObjectNodeSenderTechnicalID' => null,
-					'ChangeStateID' => null,
-					'UUID' => null,
-					'Identification' => array(
-						'actionCode' => '06',
-						'ObjectNodeSenderTechnicalID' => 'Identity',
-						'PartyIdentifierTypeCode' => 'HCM001',
-						'BusinessPartnerID' => '',
-						'EmployeeID' => $emp
-					),
-					'PaymentInformation' => array(
-						'PaymentFormCode' => '05', //Bank Transfer
-						'BankDetails' => array(
-							'actionCode' => '04',
-							'ID' => '0001', //random ID
-							'BankAccountID' => $empData->accNumber,
-							'BankAccountTypeCode' => '03', //Checking Account
-							'BankAccountHolderName' => $empData->name . ' ' . $empData->surname,
-							'BankAccountStandardID' => $empData->iban,
-							'BankRoutingID' => $empData->bankNumber,
-							'BankRoutingIDTypeCode' => $empData->bankCountry,
-							'MainBankIndicator' => 'true',
-							'ValidityPeriod' => array(
-								'StartDate' => '1901-01-01',
-								'EndDate' => '9999-12-31'
-							),
-						),
-					),
-					'WorkplaceAddressInformation' => array(
+					'Address' => array(
 						'actionCode' => '04',
-						'Address' => array(
+						'Email' => array(
 							'actionCode' => '04',
-							'Email' => array(
-								'actionCode' => '04',
-								'ObjectNodeSenderTechnicalID' => null,
-								'URI' => $empData->email
-							)
+							'ObjectNodeSenderTechnicalID' => null,
+							'URI' => $empData->email
 						)
 					)
 				)
 			)
 		);
+
+		if (isset($empData->iban))
+		{
+			$payment = array(
+				'PaymentInformation' => array(
+					'PaymentFormCode' => '05', //Bank Transfer
+					'BankDetails' => array(
+						'actionCode' => '04',
+						'ID' => '0001', //random ID
+						'BankAccountID' => $empData->accNumber,
+						'BankAccountTypeCode' => '03', //Checking Account
+						'BankAccountHolderName' => $empData->name . ' ' . $empData->surname,
+						'BankAccountStandardID' => $empData->iban,
+						'BankRoutingID' => $empData->bankNumber,
+						'BankRoutingIDTypeCode' => $empData->bankCountry,
+						'MainBankIndicator' => 'true',
+						'ValidityPeriod' => array(
+							'StartDate' => '1901-01-01',
+							'EndDate' => '9999-12-31'
+						),
+					),
+				),
+			);
+			$employeeData['EmployeeData'] = array_merge($employeeData['EmployeeData'], $payment);
+		}
+
+		$data = array_merge($basicHeader, $employeeData);
+
+		return $this->_ci->ManageEmployeeInModel->MaintainBundle($data);
 	}
 
 	private function addLeavingDate($empID, $endDate, $person_id)
@@ -1558,7 +1610,7 @@ class SyncEmployeesLib
 		return false;
 	}
 
-	private function transferEmployee($empID, $transferDate, $hours, $oeID, $person_id)
+	private function transferEmployee($empID, $transferDate, $hours, $oeID, $person_id, $secondTry = false, $jobID = self::JOB_ID)
 	{
 		$manageEmpResult = $this->_ci->ManagePersonnelTransferInModel->MaintainBundle(
 			array(
@@ -1575,7 +1627,7 @@ class SyncEmployeesLib
 						'BaseMeasureUnitCode' => 'WEE'
 					),
 					'OrganisationalCentreID' => $oeID,
-					'JobID' => self::JOB_ID
+					'JobID' => $jobID
 				)
 			)
 		);
@@ -1586,7 +1638,14 @@ class SyncEmployeesLib
 
 		if (isset($manageEmp->PersonnelTransfer) && isset($manageEmp->PersonnelTransfer->ChangeStateID))
 		{
+		/*	if ($thirdTry === true)
+				return $this->transferEmployee($empID, $transferDate, $hours, $oeID, $person_id);*/
+
 			return true;
+		}
+		else if ($secondTry === true)
+		{
+			return $this->transferEmployee($empID, $transferDate, $hours, $oeID, $person_id, false, self::JOB_ID_2);
 		}
 		else if ($this->_ci->config->item(self::SAP_EMPLOYEES_WARNINGS_ENABLED) === true) // ...otherwise store a non blocking error and continue with the next user
 		{
