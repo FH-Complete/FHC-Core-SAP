@@ -614,6 +614,10 @@ class SyncEmployeesLib
 					return error("Fehler beim laden der Benutzerfunktionen");
 
 				$functionResult = getData($functionResult);
+
+				if ($currentBis->vertragsstunden === '0.00')
+					$currentBis->vertragsstunden = '0.10';
+
 				/*Prüfen ob die Bisverwendung keine Fixanstellung ist */
 
 				if (!in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
@@ -1304,7 +1308,11 @@ class SyncEmployeesLib
 				}
 				$empAllData->startDate = getData($bisResult)[0]->beginn;
 				$empAllData->endDate = getData($bisResult)[0]->ende;
-				$empAllData->decimalValue = getData($bisResult)[0]->vertragsstunden;
+				$vertragsstunden = getData($bisResult)[0]->vertragsstunden;
+				if ($vertragsstunden === '0.00')
+					$empAllData->decimalValue = '0.10';
+				else
+					$empAllData->decimalValue = $vertragsstunden;
 			}
 			else
 			{
