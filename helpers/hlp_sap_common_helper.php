@@ -64,6 +64,41 @@ function mergeUsersPersonIdArray($jobs, $jobsAmount = 99999)
 }
 
 /**
+ *
+ */
+function mergeUidArray($jobs, $jobsAmount = 99999)
+{
+	$jobsCounter = 0;
+	$mergedUsersArray = array();
+
+	// If no jobs then return an empty array
+	if (count($jobs) == 0) return $mergedUsersArray;
+
+	// For each job
+	foreach ($jobs as $job)
+	{
+		// Decode the json input
+		$decodedInput = json_decode($job->input);
+
+		// If decoding was fine
+		if ($decodedInput != null)
+		{
+			// For each element in the array
+			foreach ($decodedInput as $el)
+			{
+				$mergedUsersArray[] = $el->uid; //
+			}
+		}
+
+		$jobsCounter++; // jobs counter
+
+		if ($jobsCounter >= $jobsAmount) break; // if the required amount is reached then exit
+	}
+
+	return $mergedUsersArray;
+}
+
+/**
  * Convert a PHP timestamp date to a SAP ODATA date
  */
 function toDate($phpTimestamp)
@@ -161,5 +196,59 @@ function mergePurchaseOrdersIdArray($jobs)
 	}
 
 	return $mergedPOsArray;
+}
+
+/**
+ * Removes duplicated elements from the the given array
+ * Array elements: {mitarbeiter_uid => string}
+ */
+function uniqudMitarbeiterUidArray($mitarbeiterUidArray)
+{
+	$uniqueMitarbeiterUidArray = array(); // returned array
+
+	// For each element of the given array
+	foreach ($mitarbeiterUidArray as $muid)
+	{
+		$found = false; // found flag
+
+		// For each element of the array that will be returned
+		foreach ($uniqueMitarbeiterUidArray as $umuid)
+		{
+			// If the same element is found in the array that will be returned
+			if ($muid->uid == $umuid->uid)
+			{
+				$found = true; // set the flag as true
+				break; // stop looping
+			}
+		}
+
+		// If the element was not found in the array that will be returned then store it in this array
+		if (!$found) $uniqueMitarbeiterUidArray[] = $muid;
+	}
+
+	return $uniqueMitarbeiterUidArray; // return the new array with unique elements
+}
+
+// alle Informationen aus dem IBAN rausholen um die SAP richtig zu übermitteln
+function checkIBAN($iban)
+{
+	if (isEmptyString($iban))
+		return false;
+
+	$iban = strtolower(str_replace(' ','',$iban));
+	$ibanCountry = substr($iban, 0, 2);
+
+	$ibanArr = array(
+		'at' => array('accnumber' => 11, 'bankcode' => 5, 'length' => 20),
+		'de' => array('accnumber' => 10, 'bankcode' => 8, 'length' => 22)
+	);
+
+	if (strlen($iban) !== $ibanArr[$ibanCountry]['length'])
+		return false;
+
+	$accNumber = substr($iban, 4 + $ibanArr[$ibanCountry]['bankcode'], $ibanArr[$ibanCountry]['accnumber']);
+	$bankNumber = substr($iban, 4, $ibanArr[$ibanCountry]['bankcode']);
+
+	return array('country' => strtoupper($ibanCountry), 'iban' => strtoupper($iban), 'accNumber' => $accNumber, 'bankNumber' => $bankNumber);
 }
 
