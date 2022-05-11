@@ -615,7 +615,7 @@ class SyncEmployeesLib
 
 				$functionResult = getData($functionResult);
 
-				if ($currentBis->vertragsstunden === '0.00')
+				if ($currentBis->vertragsstunden === '0.00' || is_null($currentBis->vertragsstunden))
 					$currentBis->vertragsstunden = '0.10';
 
 				/*Prüfen ob die Bisverwendung keine Fixanstellung ist */
@@ -682,16 +682,16 @@ class SyncEmployeesLib
 							Kam bei einem Test als Null zurück, ist eigentlich sonst immer eingetragen*/
 							if (isset($sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails))
 								$sapOE = $sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails->OrganisationalCenterID;
-							else if (is_array($position->OrganisationalCenterDetails))
+							else if (is_array($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails))
 							{
 								/*Benutzer haben zum gleichen Zeitpunkt 2 Zuteilungen
 								Holen uns alle Zuteilungen und vergleichen sie dann mit der jetzigen OE
 								*/
 								$sapOE = array();
 
-								foreach ($position->OrganisationalCenterDetails as $orgCenterDetals)
+								foreach ($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails as $orgCenterDetails)
 								{
-									$sapOE[] = $orgCenterDetals->OrganisationalCenterID;
+									$sapOE[] = $orgCenterDetails->OrganisationalCenterID;
 								}
 
 								sort($sapOE);
@@ -1309,7 +1309,7 @@ class SyncEmployeesLib
 				$empAllData->startDate = getData($bisResult)[0]->beginn;
 				$empAllData->endDate = getData($bisResult)[0]->ende;
 				$vertragsstunden = getData($bisResult)[0]->vertragsstunden;
-				if ($vertragsstunden === '0.00')
+				if ($vertragsstunden === '0.00' || is_null($vertragsstunden))
 					$empAllData->decimalValue = '0.10';
 				else
 					$empAllData->decimalValue = $vertragsstunden;
