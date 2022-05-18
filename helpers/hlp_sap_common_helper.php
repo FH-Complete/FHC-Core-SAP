@@ -235,12 +235,10 @@ function checkIBAN($iban)
 	if (isEmptyString($iban))
 		return false;
 
-	$iban = strtolower(str_replace(' ','',$iban));
 	$ibanCountry = substr($iban, 0, 2);
 
 	$ibanArr = array(
-		'at' => array('accnumber' => 11, 'bankcode' => 5, 'length' => 20),
-		'de' => array('accnumber' => 10, 'bankcode' => 8, 'length' => 22)
+		'AT' => array('accnumber' => 11, 'bankcode' => 5, 'length' => 20)
 	);
 
 	if (strlen($iban) !== $ibanArr[$ibanCountry]['length'])
@@ -249,6 +247,6 @@ function checkIBAN($iban)
 	$accNumber = substr($iban, 4 + $ibanArr[$ibanCountry]['bankcode'], $ibanArr[$ibanCountry]['accnumber']);
 	$bankNumber = substr($iban, 4, $ibanArr[$ibanCountry]['bankcode']);
 
-	return array('country' => strtoupper($ibanCountry), 'iban' => strtoupper($iban), 'accNumber' => $accNumber, 'bankNumber' => $bankNumber);
+	return array('country' => $ibanCountry, 'iban' => $iban, 'accNumber' => $accNumber, 'bankNumber' => $bankNumber);
 }
 

@@ -417,6 +417,10 @@ class SyncEmployeesLib
 							)
 						)
 					);
+					if (isset($empData->bankInternalID))
+					{
+						$payment['PaymentInformation']['BankDetails'] = array_merge($payment['PaymentInformation']['BankDetails'], ['BankInternalID' => $empData->bankInternalID]);
+					}
 					$employeeData['EmployeeData'] = array_merge($employeeData['EmployeeData'], $payment);
 				}
 				$data = array_merge($basicHeader, $employeeData);
@@ -701,12 +705,23 @@ class SyncEmployeesLib
 							}
 							/*Ist die OE aus der Benutzerfunktion nicht die gleiche wie die, die in SAPByD eingetragen ist findet ein Transfer zur der richtigen OE statt*/
 							if ((isset($sapOE) && $currentOE !== $sapOE) ||
-								($sapEmpType['functions'][$currentFunction->datum_von]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden))
+								($sapEmpType['functions'][$currentFunction->datum_von]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden) &&
+								$currentBis->beginn <= $currentFunction->datum_von)
 							{
 								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 
 								if (!$updated)
 									break 2;
+							}
+							else if ((isset($sapOE) && $currentOE !== $sapOE) ||
+								(isset($sapEmpType['functions'][$currentBis->beginn]) &&
+								($sapEmpType['functions'][$currentBis->beginn]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden) &&
+								$currentBis->beginn > $currentFunction->datum_von))
+							{
+								$updated = $this->transferEmployee($sapID, $currentBis->beginn, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
+								if (!$updated)
+									break 2;
+
 							}
 						}
 						else
@@ -1273,17 +1288,44 @@ class SyncEmployeesLib
 
 			if (isError($bankResult)) return $bankResult;
 
+			$empAllData->accNumber = null;
+			$empAllData->bankNumber = null;
+
 			if (hasData($bankResult))
 			{
-				$bankData = checkIBAN(getData($bankResult)[0]->iban);
-				if (!$bankData)
+				$bankData = getData($bankResult)[0];
+
+				$iban = strtoupper(str_replace(' ','', $bankData->iban));
+				$ibanCountry = substr($iban, 0, 2);
+
+				$empAllData->bankCountry = $ibanCountry;
+
+				if ($ibanCountry === 'AT')
 				{
-					$this->_ci->LogLibSAP->logWarningDB('Incorrect bank data available for the given user: '.$empPersonalData->person_id);
+					$bankIBAN = checkIBAN($iban);
+					if (!$bankIBAN)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Incorrect bank data available for the given user: '.$empPersonalData->person_id);
+					}
+					else
+					{
+						$empAllData->iban = $bankIBAN['iban'];
+						$empAllData->accNumber = $bankIBAN['accNumber'];
+						$empAllData->bankNumber = $bankIBAN['bankNumber'];
+					}
 				}
-				$empAllData->iban = $bankData['iban'];
-				$empAllData->accNumber = $bankData['accNumber'];
-				$empAllData->bankNumber = $bankData['bankNumber'];
-				$empAllData->bankCountry = $bankData['country'];
+				else if (!is_null($bankData->bic))
+				{
+					$this->_ci->load->model('extensions/FHC-Core-SAP/SAPBanks_model', 'SAPBanksModel');
+					$sapBankData = $this->_ci->SAPBanksModel->loadWhere(array('sap_bank_swift' => strtoupper(str_replace(' ', '', $bankData->bic))));
+
+					if (hasData($sapBankData))
+					{
+						$sapBankData = getData($sapBankData)[0];
+						$empAllData->bankInternalID = $sapBankData->sap_bank_id;
+						$empAllData->iban = $iban;
+					}
+				}
 			}
 			else
 				$this->_ci->LogLibSAP->logWarningDB('No bank data available for the given user: '.$empPersonalData->person_id);
@@ -1484,6 +1526,10 @@ class SyncEmployeesLib
 					),
 				),
 			);
+			if (isset($empData->bankInternalID))
+			{
+				$payment['PaymentInformation']['BankDetails'] = array_merge($payment['PaymentInformation']['BankDetails'], ['BankInternalID' => $empData->bankInternalID]);
+			}
 			$employeeData['EmployeeData'] = array_merge($employeeData['EmployeeData'], $payment);
 		}
 
@@ -1646,9 +1692,6 @@ class SyncEmployeesLib
 
 		if (isset($manageEmp->PersonnelTransfer) && isset($manageEmp->PersonnelTransfer->ChangeStateID))
 		{
-		/*	if ($thirdTry === true)
-				return $this->transferEmployee($empID, $transferDate, $hours, $oeID, $person_id);*/
-
 			return true;
 		}
 		else if ($secondTry === true)
