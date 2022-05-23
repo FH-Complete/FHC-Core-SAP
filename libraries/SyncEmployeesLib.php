@@ -1287,6 +1287,10 @@ class SyncEmployeesLib
 						$empAllData->bankInternalID = $sapBankData->sap_bank_id;
 						$empAllData->iban = $iban;
 					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('The bank swift code is not present in database: '. $bankData->bic);
+					}
 				}
 				else
 				{
