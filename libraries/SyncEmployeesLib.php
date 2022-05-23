@@ -169,7 +169,7 @@ class SyncEmployeesLib
 		if (!hasData($diffUsers)) return success('No users to be created after diff');
 
 		// Retrieves all users data
-		$empsAllData = $this->_getAllEmpsData($diffUsers, $job);
+		$empsAllData = $this->_getAllEmpsData($diffUsers, $job, true);
 
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given users');
@@ -609,7 +609,13 @@ class SyncEmployeesLib
 
 			foreach($bisResult as $bisKey => $currentBis)
 			{
-				$oldBis = isset($bisResult[$bisKey - 1]) ? $bisResult[$bisKey - 1] : false;
+				$oldBisKey = $bisKey;
+				do
+				{
+					$oldBisKey--;
+					$oldBis = isset($bisResult[$oldBisKey]) ? $bisResult[$oldBisKey] : false;
+				} while($oldBis && !in_array($oldBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+
 				$newBis = isset($bisResult[$bisKey + 1]) ? $bisResult[$bisKey + 1] : false;
 
 				$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
@@ -624,7 +630,7 @@ class SyncEmployeesLib
 
 				/*Prüfen ob die Bisverwendung keine Fixanstellung ist */
 
-				if (!in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
+				if (!in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)) && $newBis === false)
 				{
 					if ($oldBis)
 					{
@@ -632,12 +638,9 @@ class SyncEmployeesLib
 						Prüfen zuerst welcher Eintrag später beginnt, ob es die Bisverwendung oder die Benutzerfunktion ist und übernehmen das Startdatum von dem jeweiligen
 						Da es in SapByD keine Unterscheidung gibt, ob es eine Bisverwendung oder Benutzerfunktion ist
 						*/
-						if(isset($sapEmpType['functions'][$oldBis->beginn]))
-							$datum = $oldBis->beginn;
-						else if (isset($sapEmpType['functions'][$functionResult[0]->datum_von]))
-							$datum = $functionResult[0]->datum_von;
-
-						$sapEndDate = $sapEmpType['functions'][$datum]->ValidityPeriod->EndDate;
+						krsort($sapEmpType['functions']);
+						$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
+						$sapEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
 
 						$leavingDate = $oldBis->ende;
 
@@ -647,10 +650,10 @@ class SyncEmployeesLib
 							$leavingDate = date("Y-m-d", $previousDay);
 						}
 
-						if ($sapEndDate === '9999-12-31' && $leavingDate != $sapEndDate)
+						if ($leavingDate != $sapEndDate)
 						{
 							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
-
+							$sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate = $leavingDate;
 							if (!$updated)
 								break;
 						}
@@ -660,7 +663,6 @@ class SyncEmployeesLib
 
 				/*Prüfen ob dis Bisverwendung bereits mit dem Startdatum in SAPByD exestiert und ob der ba1code 103/109 ist*/
 				if ((isset($startDates[$currentBis->beginn]) ||
-					(!isset($startDates[$currentBis->beginn]) && isset($startDates[reset($functionResult)->datum_von])) ||
 					(!isset($startDates[$currentBis->beginn]) && isset($sapEmpType['functions'][$currentBis->beginn]))
 					) &&
 					(in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))))
@@ -685,8 +687,11 @@ class SyncEmployeesLib
 							/*Prüfen ob die OE ID in SapByD eingetragen ist
 							Kam bei einem Test als Null zurück, ist eigentlich sonst immer eingetragen*/
 							if (isset($sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails))
+							{
 								$sapOE = $sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails->OrganisationalCenterID;
-							else if (is_array($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails))
+							}
+							else if (isset($sapEmpType['organisation'][$currentFunction->datum_von]) &&
+									is_array($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails))
 							{
 								/*Benutzer haben zum gleichen Zeitpunkt 2 Zuteilungen
 								Holen uns alle Zuteilungen und vergleichen sie dann mit der jetzigen OE
@@ -703,9 +708,10 @@ class SyncEmployeesLib
 								$sapOE = array_diff($sapOE, array($currentOE));
 								$sapOE = reset($sapOE);
 							}
+
 							/*Ist die OE aus der Benutzerfunktion nicht die gleiche wie die, die in SAPByD eingetragen ist findet ein Transfer zur der richtigen OE statt*/
-							if ((isset($sapOE) && $currentOE !== $sapOE) ||
-								($sapEmpType['functions'][$currentFunction->datum_von]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden) &&
+							if (((isset($sapOE) && $currentOE !== $sapOE) ||
+								($sapEmpType['functions'][$currentFunction->datum_von]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden)) &&
 								$currentBis->beginn <= $currentFunction->datum_von)
 							{
 								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
@@ -714,15 +720,16 @@ class SyncEmployeesLib
 									break 2;
 							}
 							else if ((isset($sapOE) && $currentOE !== $sapOE) ||
-								(isset($sapEmpType['functions'][$currentBis->beginn]) &&
-								($sapEmpType['functions'][$currentBis->beginn]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden) &&
-								$currentBis->beginn > $currentFunction->datum_von))
+									(isset($sapEmpType['functions'][$currentBis->beginn]) &&
+									($sapEmpType['functions'][$currentBis->beginn]->AgreedWorkingTimeRate->DecimalValue . '0' !== $currentBis->vertragsstunden) &&
+									$currentBis->beginn > $currentFunction->datum_von))
 							{
 								$updated = $this->transferEmployee($sapID, $currentBis->beginn, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
+
 								if (!$updated)
 									break 2;
-
 							}
+
 						}
 						else
 						{
@@ -733,77 +740,63 @@ class SyncEmployeesLib
 							if ($oldFunction === false)
 								continue;
 
-							$oldOeResult = $dbModel->execReadOnlyQuery('
-									SELECT *
-									FROM sync.tbl_sap_organisationsstruktur
-									WHERE oe_kurzbz = ?
-								', array($oldFunction->oe_kurzbz));
-
-							if (!hasData($oldOeResult))
-								return error("Keine Organisation in SAP gefunden");
-
-							$oldOE = getData($oldOeResult)[0]->oe_kurzbz_sap;
-
-							/*Prüfen ob die alte Funktion bereits ein Endedatum eingetragen hat, und nehmen das als Kündigungsdatum*/
-							if (isset($oldFunction->datum_bis) && !is_null($oldFunction->datum_bis))
-							{
-								$leavingDate = $oldFunction->datum_bis;
-							}
-							else
-							{
-								/*ansonsten ziehen wir von dem Startdatum ein Tag ab und nehmen das als Kündigungsdatum*/
-								$previousDay = strtotime("-1 day", strtotime($currentFunction->datum_von));
-								$leavingDate = date("Y-m-d", $previousDay);
-							}
-
-							/*Prüfen ob in der aktuellen Benutzerfunktion bereits ein Enddatum eingetragen ist
-							Falls nicht ist es ein unbefristeter Vertrag mit keinem Kündigungsdatum*/
-							if (is_null($currentFunction->datum_bis))
-							{
-								$typeCode = self::SAP_TYPE_PERMANENT;
-								$rehireLeaving = null;
-								$newEndDate = '9999-12-31';
-							}
-							else
-							{
-								/*ansonsten ist es ein befristeter Vertrag mit einem Enddatum*/
-								$typeCode = self::SAP_TYPE_TEMPORARY;
-								$rehireLeaving = $currentFunction->datum_bis;
-								$newEndDate = $currentFunction->datum_bis;
-							}
+							$typeCode = self::SAP_TYPE_PERMANENT;
+							$rehireLeaving = null;
+							$newEndDate = '9999-12-31';
 
 							//Holen uns das EndDate von SapByD, ist immer ein Datum gesetzt
 							//Falls Austritt Datum "unbegrenzt" ist, ist es 9999-12-31
-							$oldFunctionEndDate = $sapEmpType['functions'][$oldFunction->datum_von]->ValidityPeriod->EndDate;
+							if ($oldFunction->datum_von >= $currentBis->beginn && isset($sapEmpType['functions'][$oldFunction->datum_von]))
+							{
+								$oldSAPEndDate = $sapEmpType['functions'][$oldFunction->datum_von]->ValidityPeriod->EndDate;
+							}
+							elseif ($currentBis->beginn >= $oldFunction->datum_von && isset($sapEmpType['functions'][$currentBis->beginn]))
+							{
+								$oldSAPEndDate = $sapEmpType['functions'][$currentBis->beginn]->ValidityPeriod->EndDate;
+							}
+							else
+							{
+								$this->_ci->LogLibSAP->logWarningDB('No SAP EndDate: '. $empData->person_id);
+								break 2;
+							}
+
+							$oldFASEndDate = null;
+							if (!is_null($oldFunction->datum_bis))
+								$oldFASEndDate = $oldFunction->datum_bis;
 
 							/*Prüfen ob die alte OE der aktuellen entspricht
 							Wenn ja muss die Person zuerst gekündigt werden, falls dass nicht bereits der Fall ist und neueingestellt werden
 							Ansonsten findet nur ein Transfer statt*/
-							if ($oldOE !== $currentOE)
+							if ($currentBis->beginn <= $currentFunction->datum_von && $oldSAPEndDate === '9999-12-31')
 							{
 								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id);
-
+								$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 								if (!$updated)
 									break 2;
-								$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
+							}
+							else if($currentBis->beginn > $currentFunction->datum_von && $oldSAPEndDate === '9999-12-31')
+							{
+								$updated = $this->transferEmployee($sapID, $currentBis->beginn, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
+								$sapEmpType['functions'][$currentBis->beginn] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
+								if (!$updated)
+									break 2;
 							}
 							else
 							{
-								if ($oldFunctionEndDate === "9999-12-31" && $leavingDate !== $oldFunctionEndDate)
+								if (!is_null($oldFASEndDate) && $oldSAPEndDate !== $oldFASEndDate)
 								{
-									$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
-
+									$updated = $this->addLeavingDate($sapID, $oldFASEndDate, $empData->person_id);
 									if (!$updated)
 										break 2;
 								}
-
 								$updated = $this->rehireEmployee($sapID, $currentFunction->datum_von, $typeCode, $currentBis->vertragsstunden, $currentOE, $empData->person_id, $rehireLeaving);
-
+								$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 								if (!$updated)
 									break 2;
 							}
 						}
 					}
+					continue;
 				}
 				/* Falls die Bisverwendung noch nicht im SapByD exestiert und es sich um eine Fixanstellung handelt*/
 				else if (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
@@ -812,6 +805,41 @@ class SyncEmployeesLib
 					Da die erste Bisverwendung eigentlich immer in SapByD eingetragen sein muss*/
 					if ($oldBis === false)
 						continue;
+
+					krsort($sapEmpType['functions']);
+					$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
+					$oldSAPEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
+
+					if (!is_null($oldBis->ende))
+					{
+						$currBisStartDate = new DateTime($currentBis->beginn);
+						$oldBisEndDate = new DateTime($oldBis->ende);
+
+						$dateDiff = date_diff($currBisStartDate, $oldBisEndDate)->days;
+
+						if ($dateDiff !== 1 || ($oldSAPEndDate !== '9999-12-31'))
+						{
+							$newEndDate = $oldBis->ende;
+						}
+						else
+						{
+							$newEndDate = '9999-12-31';
+						}
+					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Bisverwendung has no Enddate for the given user: '. $empData->person_id);
+						break;
+					}
+
+					if ($oldSAPEndDate !== $newEndDate)
+					{
+						$updated = $this->addLeavingDate($sapID, $newEndDate, $empData->person_id);
+						$sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate = $newEndDate;
+
+						if (!$updated)
+							break 2;
+					}
 
 					/*Holen uns die letzte Benutzerfunktion von der letzten Bisverwendung um uns dann die letzte OE zu holen*/
 					$oldFunctionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $oldBis->beginn, $oldBis->ende);
@@ -832,26 +860,8 @@ class SyncEmployeesLib
 						if ($oldFunction === false)
 							continue;
 
-						//Beim ersten Durchlauf einer neuen Bisverwendung, nehmen wir die älteste Benutzerfunktion der alten Bisverwendung
-						//Ansonsten nehmen wir ältere Benutzerfunktion
-						if ($functionKey > 0)
-						{
-							$oldFunction = isset($functionResult[$functionKey - 1]) ? $functionResult[$functionKey - 1] : false;
-							$oldOeResult = $dbModel->execReadOnlyQuery('
-									SELECT *
-									FROM sync.tbl_sap_organisationsstruktur
-									WHERE oe_kurzbz = ?
-								', array($oldFunction->oe_kurzbz));
-						}
-
-						//Hilft uns wenn mehrere Benutzerfunktionene für die Zukunft gleichzeitig eingetragen werden
-						//Damit nicht immer ein Enddatum eingetragen wird
-						$newFunction = isset($functionResult[$functionKey + 1]) ? $functionResult[$functionKey + 1] : false;
-
 						if (!hasData($oldOeResult))
 							return error("Keine Organisation in SAP gefunden");
-
-						$oldOE = getData($oldOeResult)[0]->oe_kurzbz_sap;
 
 						/*Holen uns die aktuelle OE Zuordnung*/
 						$oeResult = $dbModel->execReadOnlyQuery('
@@ -865,106 +875,58 @@ class SyncEmployeesLib
 
 						$currentOE = getData($oeResult)[0]->oe_kurzbz_sap;
 
-						/*Prüfen ob in der alten Benutzerfunktion bereits ein Enddatum eingetragen ist
-						Falls ja wird das als Kündigungsdatum genommen*/
-						if (is_null($currentFunction->datum_bis))
+						krsort($sapEmpType['functions']);
+						$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
+						$oldSAPEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
+
+						$typeCode = self::SAP_TYPE_PERMANENT;
+						$rehireLeaving = null;
+						$newEndDate = '9999-12-31';
+
+						if ($currentBis->beginn >= $currentFunction->datum_von)
 						{
-							$typeCode = self::SAP_TYPE_PERMANENT;
-							$rehireLeaving = null;
-							$newEndDate = '9999-12-31';
+							$startDate = $currentBis->beginn;
 						}
 						else
 						{
-							$typeCode = self::SAP_TYPE_TEMPORARY;
-							$rehireLeaving = $currentFunction->datum_bis;
-							$newEndDate = $currentFunction->datum_bis;
+							$startDate = $currentFunction->datum_von;
 						}
-
-						//Holen uns das Enddatum der alten Benutzerfunktion
-						if (isset($sapEmpType['functions'][$oldFunction->datum_von]))
-							$datum = $oldFunction->datum_von;
-						else if (isset($sapEmpType['functions'][$oldBis->beginn]))
-							$datum = $oldBis->beginn;
-
-						$oldFunctionEndDate = $sapEmpType['functions'][$datum]->ValidityPeriod->EndDate;
-						//Prüfen hier ab ob es noch eine neue Benutzerfunktion gibt, falls ja setzen wir Kündigungsdatum
-						if ($newFunction !== false)
+						if ($oldSAPEndDate === "9999-12-31")
 						{
-							$rehireLeaving = null;
-							$typeCode = self::SAP_TYPE_PERMANENT;
-						}
-						//wenn die OE nicht die gleiche ist, wird der Mitarbeiter transferiert
-						if ($oldOE !== $currentOE)
-						{
-							//Führt ein Rehire nur dann durch, wenn es sich um die Erste neue Benutzerfunktion in der neuen Bisverwendung handelt,
-							//da es sonst immer ein Transfer sein muss, da es sich nicht um die gleichen OEs handelt
-							if ($oldFunctionEndDate !== "9999-12-31" && $functionKey === 0)
-							{
-								$updated = $this->rehireEmployee($sapID, $currentFunction->datum_von, $typeCode, $currentBis->vertragsstunden, $currentOE, $empData->person_id, $rehireLeaving);
-
-								if (!$updated)
-									break 2;
-							}
-							else
-							{
-								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
-
-								if (!$updated)
-									break 2;
-							}
+							$updated = $this->transferEmployee($sapID, $startDate, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
+							$sapEmpType['functions'][$startDate] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 						}
 						else
 						{
-							//Wenn die alte OE die gleiche wie die jetzige ist, muss zuerst die Person gekündigt werden und dann neu eingestellt werden
-							//Da sonst SAPByD eine Rückmeldung gibt, dass die job ID oder OE ID eine andere sein muss
-							if ($oldFunctionEndDate === "9999-12-31" && $oldBis->ende !== $oldFunctionEndDate && (in_array($oldBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))))
-							{
-								$updated = $this->addLeavingDate($sapID, $oldBis->ende, $empData->person_id);
-
-								if (!$updated)
-									break 2;
-							}
-
-							$updated = $this->rehireEmployee($sapID, $currentBis->beginn, $typeCode, $currentBis->vertragsstunden, $currentOE, $empData->person_id, $rehireLeaving);
-
-							if (!$updated)
-								break 2;
+							$updated = $this->rehireEmployee($sapID, $startDate, $typeCode, $currentBis->vertragsstunden, $currentOE, $empData->person_id, $rehireLeaving);
 						}
 
-						//Erweitern das Array, mit den neuen Informationen
-						$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
+						if (!$updated)
+							break 2;
 					}
 				}
 
 				//Wenn keine weitere Bisverwendung mehr vorhanden ist und ein Enddatum eingetragen ist wird ein Kündigungsdatum eingetragen
 				if ($newBis === false && (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))) && !is_null($currentBis->ende))
 				{
-					/*Holen uns nochmal alle Funktionen, von der jetzigen Bisverwendung*/
-					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
+					$currentBisEndDate = date($currentBis->ende, strtotime("+1 day"));
+					$today = Date('Y-m-d');
 
-					if (!hasData($functionResult))
-						return error("Fehler beim laden der Benutzerfunktionen");
-
-					$functionResult = getData($functionResult);
-
-					$functionResult = array_reverse($functionResult);
-
-					/*Nehmen das spätere Startdatum von der Bisverwendung bzw Benutzerfunktion*/
-					if ($functionResult[0]->datum_von >= $currentBis->beginn)
-						$datum = $functionResult[0]->datum_von;
-					else
-						$datum = $currentBis->beginn;
-
-					$sapEndDate = $sapEmpType['functions'][$datum]->ValidityPeriod->EndDate;
-
-					$leavingDate = $currentBis->ende;
-
-					if (!is_null($leavingDate) && $sapEndDate === '9999-12-31' && $leavingDate != $sapEndDate)
+					if ($today === $currentBisEndDate)
 					{
-						$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
+						krsort($sapEmpType['functions']);
+						$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
+						$sapEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
 
-						if (isError($updated))
-							break;
+						$leavingDate = $currentBis->ende;
+
+						if ($leavingDate != $sapEndDate)
+						{
+							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
+
+							if (isError($updated))
+								break;
+						}
 					}
 				}
 			}
@@ -1197,7 +1159,7 @@ class SyncEmployeesLib
 	/**
 	 * Retrieves all the data needed to create/update a employee on SAP side
 	 */
-	private function _getAllEmpsData($emps, $job = true)
+	private function _getAllEmpsData($emps, $job = true, $create = false)
 	{
 		$empsAllDataArray = array(); // returned array
 
@@ -1332,82 +1294,74 @@ class SyncEmployeesLib
 
 			// -------------------------------------------------------------------------------------------
 			// Bisverwendung
-
-			$this->_ci->load->model('codex/bisverwendung_model', 'BisverwendungModel');
-			$bisResult = $this->_ci->BisverwendungModel->getLast($empPersonalData->uid, false);
-			if (isError($bisResult)) return $bisResult;
-			if (hasData($bisResult))
+			if ($create)
 			{
-				if (!in_array(getData($bisResult)[0]->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
+				$this->_ci->load->model('codex/bisverwendung_model', 'BisverwendungModel');
+				$bisResult = $this->_ci->BisverwendungModel->getLast($empPersonalData->uid, false);
+				if (isError($bisResult))
+					return $bisResult;
+				if (hasData($bisResult))
+				{
+					if (!in_array(getData($bisResult)[0]->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)))
+					{
+						if ($job === true)
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Wrong Bisverwendung for the given user: ' . $empPersonalData->person_id);
+							continue;
+						} else
+							return error('Wrong Bisverwendung for the given user');
+					}
+					$empAllData->startDate = getData($bisResult)[0]->beginn;
+					$empAllData->endDate = getData($bisResult)[0]->ende;
+					$vertragsstunden = getData($bisResult)[0]->vertragsstunden;
+					if ($vertragsstunden === '0.00' || is_null($vertragsstunden))
+						$empAllData->decimalValue = '0.10';
+					else
+						$empAllData->decimalValue = $vertragsstunden;
+				} else
 				{
 					if ($job === true)
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Wrong Bisverwendung for the given user: '.$empPersonalData->person_id);
+						$this->_ci->LogLibSAP->logWarningDB('No Bisverwendung available for the given user: ' . $empPersonalData->person_id);
 						continue;
-					}
-					else
-						return error('Wrong Bisverwendung for the given user');
+					} else
+						return error('No Bisverwendung available for the given user');
 				}
-				$empAllData->startDate = getData($bisResult)[0]->beginn;
-				$empAllData->endDate = getData($bisResult)[0]->ende;
-				$vertragsstunden = getData($bisResult)[0]->vertragsstunden;
-				if ($vertragsstunden === '0.00' || is_null($vertragsstunden))
-					$empAllData->decimalValue = '0.10';
-				else
-					$empAllData->decimalValue = $vertragsstunden;
-			}
-			else
-			{
-				if ($job === true)
+
+
+				if (is_null($empAllData->endDate))
 				{
-					$this->_ci->LogLibSAP->logWarningDB('No Bisverwendung available for the given user: '.$empPersonalData->person_id);
-					continue;
-				}
-				else
-					return error('No Bisverwendung available for the given user');
-			}
-
-
-			if (is_null($empAllData->endDate))
-			{
-				$empAllData->typeCode = self::SAP_TYPE_PERMANENT;
-			}
-			else
-			{
-				$empAllData->typeCode = self::SAP_TYPE_TEMPORARY;
-			}
-
-			$this->_ci->load->model('person/benutzerfunktion_model', 'BenutzerfunktionModel');
-
-			$this->_ci->BenutzerfunktionModel->addJoin('sync.tbl_sap_organisationsstruktur', 'public.tbl_benutzerfunktion.oe_kurzbz = sync.tbl_sap_organisationsstruktur.oe_kurzbz');
-
-			$this->_ci->BenutzerfunktionModel->addOrder('datum_von', 'DESC');
-			$this->_ci->BenutzerfunktionModel->addLimit(1);
-
-			$kstZuordnungen = $this->_ci->BenutzerfunktionModel->loadWhere(
-				array(
-					'funktion_kurzbz' => 'kstzuordnung',
-					'uid' => $empPersonalData->uid
-				)
-			);
-
-			if (isError($kstZuordnungen)) return $kstZuordnungen;
-
-			if (hasData($kstZuordnungen))
-			{
-				$empAllData->kstZuordnungen = getData($kstZuordnungen)[0];
-			}
-			else
-			{
-				if ($job === true)
+					$empAllData->typeCode = self::SAP_TYPE_PERMANENT;
+				} else
 				{
-					$this->_ci->LogLibSAP->logWarningDB('No Kstzuordnung available for the given user: '.$empPersonalData->person_id);
-					continue;
+					$empAllData->typeCode = self::SAP_TYPE_TEMPORARY;
 				}
-				else
-					return error('No Kstzuordnung available for the given user');
-			}
 
+				$this->_ci->load->model('person/benutzerfunktion_model', 'BenutzerfunktionModel');
+
+				$this->_ci->BenutzerfunktionModel->addJoin('sync.tbl_sap_organisationsstruktur', 'public.tbl_benutzerfunktion.oe_kurzbz = sync.tbl_sap_organisationsstruktur.oe_kurzbz');
+
+				$this->_ci->BenutzerfunktionModel->addOrder('datum_von', 'DESC');
+				$this->_ci->BenutzerfunktionModel->addLimit(1);
+
+				$kstZuordnungen = $this->_ci->BenutzerfunktionModel->loadWhere(array('funktion_kurzbz' => 'kstzuordnung', 'uid' => $empPersonalData->uid));
+
+				if (isError($kstZuordnungen))
+					return $kstZuordnungen;
+
+				if (hasData($kstZuordnungen))
+				{
+					$empAllData->kstZuordnungen = getData($kstZuordnungen)[0];
+				} else
+				{
+					if ($job === true)
+					{
+						$this->_ci->LogLibSAP->logWarningDB('No Kstzuordnung available for the given user: ' . $empPersonalData->person_id);
+						continue;
+					} else
+						return error('No Kstzuordnung available for the given user');
+				}
+			}
 
 			$empAllData->email = $empPersonalData->uid . '@technikum-wien.at';
 			// Stores all data for the current employee
