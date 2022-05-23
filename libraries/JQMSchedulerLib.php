@@ -474,6 +474,7 @@ class JQMSchedulerLib
 			WHERE bv.updateamum > sm.last_update_workagreement
 				OR sm.last_update_workagreement IS NULL
 				OR bf.updateamum > sm.last_update_workagreement
+				OR (current_date = (SELECT sbv.ende::date + 1 FROM bis.tbl_bisverwendung sbv WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid ORDER by sbv.ende DESC LIMIT 1))
 			GROUP BY bv.mitarbeiter_uid
 		');
 
