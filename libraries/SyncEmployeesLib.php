@@ -1288,6 +1288,10 @@ class SyncEmployeesLib
 						$empAllData->iban = $iban;
 					}
 				}
+				else
+				{
+					$this->_ci->LogLibSAP->logWarningDB('No bank data available for the given user: '.$empPersonalData->person_id);
+				}
 			}
 			else
 				$this->_ci->LogLibSAP->logWarningDB('No bank data available for the given user: '.$empPersonalData->person_id);
