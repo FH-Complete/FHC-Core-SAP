@@ -323,7 +323,7 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = bk.person_id
 								AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
+								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\')
 						)
 					)
 					OR
@@ -337,7 +337,7 @@ class JQMSchedulerLib
 						AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
 					)
 				)
-	
+
 				AND buchungsnr_verweis is null
 				AND buchungsdatum <= now()
 				AND buchungsdatum >= ?
@@ -387,7 +387,9 @@ class JQMSchedulerLib
 			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
 			LEFT JOIN sync.tbl_sap_mitarbeiter sm ON (m.mitarbeiter_uid = sm.mitarbeiter_uid)
 			WHERE m.fixangestellt = TRUE
-			AND sm.mitarbeiter_uid IS NULL;
+			AND sm.mitarbeiter_uid IS NULL
+			AND b.aktiv
+			AND personalnummer > 0
 		');
 
 		// If error occurred while retrieving new users from database then return the error
