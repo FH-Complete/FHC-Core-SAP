@@ -91,6 +91,7 @@ class JQMSchedulerLib
 				   AND
 					(
 						EXISTS (
+							-- With benutzer
 							SELECT
 								1
 							FROM
@@ -100,9 +101,10 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\', \'Unterbrecher\')
 								AND tbl_benutzer.aktiv
 						) OR EXISTS (
+							-- No benutzer
 							SELECT
 								1
 							FROM
@@ -291,54 +293,62 @@ class JQMSchedulerLib
 				public.tbl_konto bk
 			WHERE
 				betrag < 0
-				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
+				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
 				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
 				AND
 				(
-					EXISTS(SELECT
-					1
-					FROM
-						public.tbl_prestudent
-						JOIN public.tbl_student USING(prestudent_id)
-						JOIN public.tbl_benutzer ON(uid=student_uid)
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-						AND tbl_benutzer.aktiv
+					EXISTS(
+						-- Standard student
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+							JOIN public.tbl_student USING(prestudent_id)
+							JOIN public.tbl_benutzer ON(uid = student_uid)
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\', \'Unterbrecher\')
+							AND tbl_benutzer.aktiv
 					)
 					OR
-					EXISTS(SELECT
-						1
-					FROM
-						public.tbl_prestudent
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND tbl_prestudent.studiengang_kz=10002
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-						AND EXISTS(SELECT
-								1
-							FROM
-								public.tbl_prestudent
-							WHERE
-								tbl_prestudent.person_id = bk.person_id
-								AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\')
-						)
+					EXISTS(
+						-- Students form study program 10002 -> qualification course
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND tbl_prestudent.studiengang_kz = 10002
+							AND get_rolle_prestudent(prestudent_id,null) IN (\'Student\', \'Incoming\', \'Diplomand\')
+							AND EXISTS(SELECT
+									1
+								FROM
+									public.tbl_prestudent
+								WHERE
+									tbl_prestudent.person_id = bk.person_id
+									AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+									AND get_rolle_prestudent(prestudent_id, NULL) IN (
+										\'Student\', \'Incoming\', \'Diplomand\', \'Interessent\', \'Bewerber\', \'Aufgenommener\', \'Wartender\'
+									)
+							)
 					)
 					OR
-					EXISTS(SELECT
-					1
-					FROM
-						public.tbl_prestudent
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND studiengang_kz = bk.studiengang_kz
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+					EXISTS(
+						-- No benutzer
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND studiengang_kz = bk.studiengang_kz
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 					)
 				)
 
-				AND buchungsnr_verweis is null
+				AND buchungsnr_verweis IS NULL
 				AND buchungsdatum <= now()
 				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
