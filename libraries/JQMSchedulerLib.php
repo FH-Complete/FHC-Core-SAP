@@ -14,11 +14,20 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
 	const JOB_TYPE_SAP_UPDATE_SERVICES = 'SAPServicesUpdate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
+	const JOB_TYPE_SAP_NEW_EMPLOYEES = 'SAPEmployeesCreate';
+	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
+	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 
+	// Maximum amount of users to be placed in a single job
+	const UPDATE_LENGTH = 200;
+
 	// Maximum amount of elements to be placed in a single job
 	const MAX_JOB_ELEMENTS = 200;
+
+	// Update time interval
+	const UPDATE_TIME_INTERVAL = '24 hours';
 
 	/**
 	 * Object initialization
@@ -83,6 +92,7 @@ class JQMSchedulerLib
 				   AND
 					(
 						EXISTS (
+							-- With benutzer
 							SELECT
 								1
 							FROM
@@ -92,9 +102,10 @@ class JQMSchedulerLib
 							WHERE
 								tbl_prestudent.person_id = ps.person_id
 								AND tbl_prestudent.studiengang_kz = ps.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\')
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\', \'Unterbrecher\')
 								AND tbl_benutzer.aktiv
 						) OR EXISTS (
+							-- No benutzer
 							SELECT
 								1
 							FROM
@@ -311,54 +322,62 @@ class JQMSchedulerLib
 				public.tbl_konto bk
 			WHERE
 				betrag < 0
-				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
+				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
 				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
 				AND
 				(
-					EXISTS(SELECT
-					1
-					FROM
-						public.tbl_prestudent
-						JOIN public.tbl_student USING(prestudent_id)
-						JOIN public.tbl_benutzer ON(uid=student_uid)
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-						AND tbl_benutzer.aktiv
+					EXISTS(
+						-- Standard student
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+							JOIN public.tbl_student USING(prestudent_id)
+							JOIN public.tbl_benutzer ON(uid = student_uid)
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Student\', \'Incoming\', \'Diplomand\', \'Unterbrecher\')
+							AND tbl_benutzer.aktiv
 					)
 					OR
-					EXISTS(SELECT
-						1
-					FROM
-						public.tbl_prestudent
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND tbl_prestudent.studiengang_kz=10002
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\')
-						AND EXISTS(SELECT
-								1
-							FROM
-								public.tbl_prestudent
-							WHERE
-								tbl_prestudent.person_id = bk.person_id
-								AND tbl_prestudent.studiengang_kz=bk.studiengang_kz
-								AND get_rolle_prestudent(prestudent_id,null) IN(\'Student\',\'Incoming\',\'Diplomand\',\'Interessent\',\'Bewerber\',\'Aufgenommener\',\'Wartender\') 
-						)
+					EXISTS(
+						-- Students form study program 10002 -> qualification course
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND tbl_prestudent.studiengang_kz = 10002
+							AND get_rolle_prestudent(prestudent_id,null) IN (\'Student\', \'Incoming\', \'Diplomand\')
+							AND EXISTS(SELECT
+									1
+								FROM
+									public.tbl_prestudent
+								WHERE
+									tbl_prestudent.person_id = bk.person_id
+									AND tbl_prestudent.studiengang_kz = bk.studiengang_kz
+									AND get_rolle_prestudent(prestudent_id, NULL) IN (
+										\'Student\', \'Incoming\', \'Diplomand\', \'Interessent\', \'Bewerber\', \'Aufgenommener\', \'Wartender\'
+									)
+							)
 					)
 					OR
-					EXISTS(SELECT
-					1
-					FROM
-						public.tbl_prestudent
-					WHERE
-						tbl_prestudent.person_id = bk.person_id
-						AND studiengang_kz = bk.studiengang_kz
-						AND get_rolle_prestudent(prestudent_id,null) IN(\'Aufgenommener\')
+					EXISTS(
+						-- No benutzer
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND studiengang_kz = bk.studiengang_kz
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 					)
 				)
-	
-				AND buchungsnr_verweis is null
+
+				AND buchungsnr_verweis IS NULL
 				AND buchungsdatum <= now()
 				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
@@ -390,5 +409,121 @@ class JQMSchedulerLib
 
 		return $creditMemoResult;
 	}
-}
 
+	/**
+	 *
+	 */
+	public function newEmployees()
+	{
+		$jobInput = null;
+
+		$dbModel = new DB_Model();
+
+		$newUsersResult = $dbModel->execReadOnlyQuery('
+			SELECT m.mitarbeiter_uid AS uid
+			FROM public.tbl_person p
+			JOIN public.tbl_benutzer b USING(person_id)
+			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
+			LEFT JOIN sync.tbl_sap_mitarbeiter sm ON (m.mitarbeiter_uid = sm.mitarbeiter_uid)
+			WHERE m.fixangestellt = TRUE
+			AND sm.mitarbeiter_uid IS NULL
+			AND b.aktiv
+			AND personalnummer > 0
+		');
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($newUsersResult)) return $newUsersResult;
+
+		// If new users are present
+		if (hasData($newUsersResult))
+		{
+			$jobInput = json_encode(getData($newUsersResult));
+		}
+
+		return success($jobInput);
+	}
+
+	public function updateEmployees()
+	{
+		$persons = array();
+		$addresses = array();
+		$banks = array();
+
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+			SELECT m.mitarbeiter_uid AS uid
+			FROM public.tbl_person p
+			JOIN public.tbl_benutzer b USING(person_id)
+			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
+			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
+			WHERE p.updateamum > sm.last_update
+				OR sm.last_update IS NULL
+			GROUP BY m.mitarbeiter_uid
+		');
+
+		if (isError($personResult)) return $personResult;
+
+		if (hasData($personResult)) $persons = getData($personResult);
+
+		$addressesResult = $dbModel->execReadOnlyQuery('
+			SELECT m.mitarbeiter_uid AS uid
+			FROM public.tbl_person p
+			JOIN public.tbl_adresse a USING(person_id)
+			JOIN public.tbl_benutzer b USING(person_id)
+			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
+			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
+			WHERE a.updateamum > sm.last_update
+				OR sm.last_update IS NULL
+			GROUP BY m.mitarbeiter_uid
+		');
+
+		if (isError($addressesResult)) return $addressesResult;
+
+		if (hasData($addressesResult)) $addresses = getData($personResult);
+
+		$banksResult = $dbModel->execReadOnlyQuery('
+			SELECT m.mitarbeiter_uid AS uid
+			FROM public.tbl_person p
+			JOIN public.tbl_bankverbindung ba USING(person_id)
+			JOIN public.tbl_benutzer b USING(person_id)
+			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
+			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
+			WHERE ba.updateamum > sm.last_update
+				OR sm.last_update IS NULL
+			GROUP BY m.mitarbeiter_uid
+		');
+
+		if (isError($banksResult)) return $banksResult;
+
+		if (hasData($banksResult)) $banks = getData($banksResult);
+
+		return success(uniqudMitarbeiterUidArray(array_merge($persons, $addresses, $banks)));
+	}
+
+	public function updateEmployeesWorkAgreement()
+	{
+		$functions = array();
+
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+			SELECT bv.mitarbeiter_uid AS uid
+			FROM bis.tbl_bisverwendung bv
+			JOIN public.tbl_benutzerfunktion bf ON (bf.uid = bv.mitarbeiter_uid)
+			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = bv.mitarbeiter_uid)
+			WHERE bv.updateamum > sm.last_update_workagreement
+				OR sm.last_update_workagreement IS NULL
+				OR bf.updateamum > sm.last_update_workagreement
+				OR (current_date = (SELECT sbv.ende::date + 1 FROM bis.tbl_bisverwendung sbv WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid ORDER by sbv.ende DESC LIMIT 1))
+			GROUP BY bv.mitarbeiter_uid
+		');
+
+
+		if (isError($personResult)) return $personResult;
+
+		if (hasData($personResult)) $functions = getData($personResult);
+
+		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
+	}
+}

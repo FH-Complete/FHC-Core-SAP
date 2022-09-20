@@ -23,7 +23,7 @@ class Projects_model extends ODATAClientModel
 	// Public methods GET API calls
 
 	/**
-	 * 
+	 *
 	 */
 	public function getProjects($projectObjectIds = null)
 	{
@@ -47,7 +47,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function getTask($projectTaskObjectId)
 	{
@@ -58,7 +58,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function getProjectsAndTasks($projectObjectIds = null)
 	{
@@ -82,9 +82,9 @@ class Projects_model extends ODATAClientModel
 			$odataParameters
 		);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	public function getProjectsAndPartecipants($projectObjectIds)
 	{
@@ -111,7 +111,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function getProjectById($id)
 	{
@@ -122,7 +122,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function getProjectTasks($id)
 	{
@@ -133,7 +133,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function getProjectTaskService($id)
 	{
@@ -147,7 +147,7 @@ class Projects_model extends ODATAClientModel
 	// Public methods POST API calls
 
 	/**
-	 * 
+	 *
 	 */
 	public function create($projectId, $type, $unitResponsible, $personResponsible, $startDate, $endDate)
 	{
@@ -167,54 +167,18 @@ class Projects_model extends ODATAClientModel
 				// Constants
 				'LanguageCode' => 'DE',
 
-				// Maybe not usefull
-				'Annahmewahrscheinlichkeitcontent_KUT' => '0.00000000000000',
-				'ArtificialIntelligenceDataAnalytics_KUT' => false,
-				'Ausschreibung_KUT' => '',
-				'AutomationSensorTechnology_KUT' => false,
-				'CellTechnologiesBiomaterials_KUT' => false,
-				'DeMinimis_KUT' => false,
+				// Maybe  usefull
 				'DecimalValue' => '0.00000000000000',
-				'DepartmentCS_KUT' => false,
-				'DepartmentEE_KUT' => false,
-				'DepartmentIE_KUT' => false,
-				'DepartmentLSE_KUT' => false,
-				'DigitalEnterpriseUsabilityExperience_KUT' => false,
-				'DigitalManufactoringRobotics_KUT' => false,
-				'ElectronicBasedSystems_KUT' => false,
-				'ElektronikKommunikationstechnik_KUT' => false,
 				'EstimatedCompletionPercent' => 0,
-				'ForschungieS_KUT' => false,
-				'FrdergeberID_KUT' => '',
-				'InformationSecurity_KUT' => false,
-				'IntegratedHealthcare_KUT' => false,
-				'KaufmnnischeLeitung_KUT' => '',
-				'MedicalDevicesHealthEngineering_KUT' => false,
-				'Meldedatum_KUT' => null,
 				'PlanningMeasureUnitCode' => 'HUR',
 				'ProgrammeID' => '',
-				'Projektnamelang_KUT' => '',
-				'RenewableEnergySystems_KUT' => false,
 				'RequestingCostCentreID' => '',
-				'RolleFH_KUT' => '',
-				'SchwerpunktAutomationRobotics_KUT' => false,
-				'SchwerpunktEmbeddedSystemsCyberPhysicalSystems_KUT' => false,
-				'SchwerpunktRenewableUrbanEnergySystems_KUT' => false,
-				'SchwerpunktSecureServiceseHealthMobility_KUT' => false,
-				'SchwerpunktSonstige_KUT' => false,
-				'SchwerpunktTissueEngineeringMolecularLifeScienceTechnologies_KUT' => false,
-				'Schwerpunktbergreifend_KUT' => false,
-				'Schwerpunktkeine_KUT' => false,
-				'SoftwareEngineeringDevOps_KUT' => false,
-				'SportsEngBiomechanicsErgonomics_KUT' => false,
-				'Status_KUT' => '',
-				'VirtualTechnologiesSystemsEng_KUT' => false
 			)
 		);
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function createTask($parentObjectID, $name, $responsibleCostCentreID, $duration, $timeRecording)
 	{
@@ -234,9 +198,9 @@ class Projects_model extends ODATAClientModel
 			)
 		);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	public function addEmployee($parentObjectID, $employeeID, $plannedStartDateTime, $plannedEndDateTime, $committedWork)
 	{
@@ -254,7 +218,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function addEmployeeToTask($taskObjectID, $employeeID, $productID, $plannedWorkQuantity, $lehreGrobplanung = '0', $maSollStunden = '0')
 	{
@@ -275,7 +239,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function setActive($projectObjectId)
 	{
@@ -292,7 +256,7 @@ class Projects_model extends ODATAClientModel
 	// Public methods MERGE API calls
 
 	/**
-	 * 
+	 *
 	 */
 	public function updateTaskCollection($projectObjectId, $name)
 	{
@@ -307,7 +271,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function setTimeRecording($projectObjectId, $timeRecording)
 	{
@@ -322,7 +286,7 @@ class Projects_model extends ODATAClientModel
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function setTaskDates($taskObjectID, $duration)
 	{
@@ -340,7 +304,7 @@ class Projects_model extends ODATAClientModel
 	// Public methods PATCH API calls
 
 	/**
-	 * 
+	 *
 	 */
 	public function setDates($projectObjectId, $startDate, $endDate)
 	{
@@ -355,4 +319,3 @@ class Projects_model extends ODATAClientModel
 		);
 	}
 }
-
