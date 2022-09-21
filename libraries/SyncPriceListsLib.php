@@ -344,7 +344,7 @@ class SyncPriceListsLib
 			}
 			else
 			{
-				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find the root organization unit for this service: '.$serviceId);
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find the root organization unit for this service: '.$user->sap_service_id);
 			}
 		}
 

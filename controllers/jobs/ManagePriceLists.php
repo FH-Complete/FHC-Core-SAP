@@ -55,25 +55,17 @@ class ManagePriceLists extends JOB_Controller
 	{
 		$this->logInfo('Start price list linking');
 
-		// If data have been retrieved
-		if (hasData($dbSyncdUsers))
-		{
-			// Add the user/service to the current price list
-			$syncResult = $this->syncpricelistslib->addServicesToPriceList();
+		// Add the user/service to the current price list
+		$syncResult = $this->syncpricelistslib->addServicesToPriceList();
 
-			// Log result
-			if (isError($syncResult))
-			{
-				$this->logError(getCode($syncResult).': '.getError($syncResult));
-			}
-			else
-			{
-				$this->logInfo(getData($syncResult));
-			}
-		}
-		else // if the sync table is empty
+		// Log result
+		if (isError($syncResult))
 		{
-			$this->logInfo('No data to be updated');
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else
+		{
+			$this->logInfo(getData($syncResult));
 		}
 
 		$this->logInfo('End price list linking');
