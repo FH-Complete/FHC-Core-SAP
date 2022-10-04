@@ -91,7 +91,7 @@ class SyncPriceListsLib
 			)
 		);
 	}
-	
+
 	/**
 	 * Create a new price list for the current month
 	 */
@@ -264,7 +264,7 @@ class SyncPriceListsLib
 			SELECT p.person_id,
 				s.sap_service_id,
 				(
-					SELECT bf.oe_kurzbz        
+					SELECT bf.oe_kurzbz
 					  FROM public.tbl_benutzerfunktion bf
 					 WHERE bf.uid = b.uid
 					   AND bf.funktion_kurzbz = \'oezuordnung\'
@@ -284,6 +284,7 @@ class SyncPriceListsLib
 			  JOIN sync.tbl_sap_services s USING(person_id)
 			  JOIN public.tbl_benutzer b USING(person_id)
 			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
+			  WHERE b.aktiv
 		      ORDER BY p.person_id
 		');
 
@@ -351,4 +352,3 @@ class SyncPriceListsLib
 		return success('Services successfully added to the current price list');
 	}
 }
-
