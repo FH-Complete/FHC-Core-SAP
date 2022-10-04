@@ -18,7 +18,9 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
+
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
+	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
@@ -38,6 +40,8 @@ class JQMSchedulerLib
 
 		// Load users configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
+		// Load payments configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -398,14 +402,17 @@ class JQMSchedulerLib
 			  FROM public.tbl_konto ko
 			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE ko.betrag > 0
-			   AND ko.buchungstyp_kurzbz = \'ZuschussIO\'
+			   AND ko.buchungstyp_kurzbz IN ?
 			   AND ko.buchungsnr NOT IN (
 				SELECT kos.buchungsnr_verweis
 				  FROM public.tbl_konto kos
 				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
 			)
 		      GROUP BY ko.person_id
-		');
+		',
+		array(
+			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+		));
 
 		return $creditMemoResult;
 	}

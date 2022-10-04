@@ -28,3 +28,5 @@ $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
 // International office sales unit party id (aka organization unit id)
 $config['payments_international_office_sales_unit_party_id'] = '100097';
 
+$config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungstipendium');
+
