@@ -20,6 +20,7 @@ class SyncPaymentsLib
 
 	// Incoming/outgoing grant config entry name
 	const INCOMING_OUTGOING_GRANT = 'payments_incoming_outgoing_grant';
+	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
@@ -852,10 +853,14 @@ class SyncPaymentsLib
 				AND buchungsnr_verweis IS NULL
 				AND person_id = ?
 				AND buchungsdatum >= ?
-				AND buchungstyp_kurzbz = ?
+				AND buchungstyp_kurzbz IN ?
 			ORDER BY
 				studiengang_kz
-		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)));
+		', array(
+			$person_id,
+			self::BUCHUNGSDATUM_SYNC_START,
+			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+		));
 
 		return $dbPaymentData;
 	}
