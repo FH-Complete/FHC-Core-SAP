@@ -27,7 +27,7 @@ class SyncEmployeesLib
 	const SAP_GENDER_NON_BINARY = 3;
 
 	const SAP_TYPE_PERMANENT = 1;
-	const SAP_TYPE_TEMPORARY = 2;
+	//const SAP_TYPE_TEMPORARY = 2;
 
 	const JOB_ID = 'ECINT_DUMMY_JOB';
 	const JOB_ID_2 = 'ECINT_DUMMY_JOB_2';
@@ -72,6 +72,7 @@ class SyncEmployeesLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePersonnelTransferIn_model', 'ManagePersonnelTransferInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePersonnelRehireIn_model', 'ManagePersonnelRehireInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryEmployeeIn_model', 'QueryEmployeeInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryEmployeeBankDetailsIn_model', 'QueryEmployeeBankDetailsInModel');
 		$this->_ci->load->model('person/benutzerfunktion_model', 'BenutzerfunktionModel');
 		$this->_ci->load->model('codex/bisverwendung_model', 'BisverwendungModel');
 
@@ -186,7 +187,7 @@ class SyncEmployeesLib
 				'PersonnelHiring' => array(
 					'actionCode' => '01',
 					'HireDate' => $empData->startDate,
-					'LeavingDate' => $empData->endDate,
+					'LeavingDate' => null,
 					'Employee' => array(
 						'GivenName' => $empData->name,
 						'FamilyName' => $empData->surname,
@@ -236,7 +237,7 @@ class SyncEmployeesLib
 				$sapEmployee = getData($sapEmployeeResult);
 
 				// Add payment information for the employee
-				$this->addPaymentInformation($sapEmployee->BasicData->EmployeeID, $empData);
+				$this->addPaymentInformation($sapEmployee->BasicData->EmployeeID, $empData, $empData->person_id);
 				// Store in database the couple person_id sap_user_id
 				$insert = $this->_ci->SAPMitarbeiterModel->insert(
 					array(
@@ -392,7 +393,24 @@ class SyncEmployeesLib
 					)
 				);
 
-				if (isset($empData->iban))
+				$sapBankData = $this->getBankDetails(getData($sapIdResult)[0]->sap_eeid);
+				$bankDetailsOfEmployee = getData(($sapBankData))->BankDetailsOfEmployee;
+				$sapBanksIban = [];
+				$newBankKeyId = '0001';
+
+				if (isset($bankDetailsOfEmployee->BankDetailsOfEmployee))
+				{
+					$sapBanksData = $bankDetailsOfEmployee->BankDetailsOfEmployee;
+					if (!is_array($sapBanksData))
+						$sapBanksData = [$bankDetailsOfEmployee->BankDetailsOfEmployee];
+
+					$sapBanksIban = array_column($sapBanksData, 'BankAccountStandardID');
+
+					$maxBankKeyId = max(array_map('intval', array_column($sapBanksData, 'KeyID')));
+					$newBankKeyId = str_pad($maxBankKeyId + 1, 4, 0, STR_PAD_LEFT);
+				}
+
+				if (isset($empData->iban) && !(in_array($empData->iban, $sapBanksIban)))
 				{
 					$payment = array(
 						'PaymentInformation' => array(
@@ -402,7 +420,7 @@ class SyncEmployeesLib
 							'BankDetails' => array(
 								'actionCode' => '04',
 								'ObjectNodeSenderTechnicalID' => null,
-								'ID' => '0001', //random ID
+								'ID' => $newBankKeyId, //random ID
 								'BankAccountID' => $empData->accNumber,
 								'BankAccountTypeCode' => '03', //Checking Account
 								'BankAccountHolderName' => $empData->name . ' ' . $empData->surname,
@@ -563,8 +581,6 @@ class SyncEmployeesLib
 						falls keine in der Tabelle vorhanden ist brechen wir ab*/
 						$positions = $this->checkIfObject($benutzerOrganisationalSAP->PositionAssignment);
 
-						$exists = false;
-
 						foreach ($positions as $position)
 						{
 							$organisationStart = $position->ValidityPeriod->StartDate;
@@ -605,7 +621,7 @@ class SyncEmployeesLib
 
 			$bisResult = getData($bisResult);
 
-			$updated = true;
+			$updated = null;
 
 			foreach($bisResult as $bisKey => $currentBis)
 			{
@@ -618,18 +634,7 @@ class SyncEmployeesLib
 
 				$newBis = isset($bisResult[$bisKey + 1]) ? $bisResult[$bisKey + 1] : false;
 
-				$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
-
-				if (!hasData($functionResult))
-					return error("Fehler beim laden der Benutzerfunktionen");
-
-				$functionResult = getData($functionResult);
-
-				if ($currentBis->vertragsstunden === '0.00' || is_null($currentBis->vertragsstunden))
-					$currentBis->vertragsstunden = '0.10';
-
 				/*Prüfen ob die Bisverwendung keine Fixanstellung ist */
-
 				if (!in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)) && $newBis === false)
 				{
 					if ($oldBis)
@@ -661,12 +666,46 @@ class SyncEmployeesLib
 					continue;
 				}
 
+				//Wenn keine weitere Bisverwendung mehr vorhanden ist und ein Enddatum eingetragen ist wird ein Kündigungsdatum eingetragen
+				if ($newBis === false && (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))) && !is_null($currentBis->ende))
+				{
+					$currentBisEndDate = new DateTime($currentBis->ende);
+					$currentBisEndDate->modify('+1 month');
+
+					$today = Date('Y-m-d');
+					if ($today >= $currentBisEndDate->format('Y-m-d'))
+					{
+						krsort($sapEmpType['functions']);
+						$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
+						$sapEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
+
+						$leavingDate = $currentBis->ende;
+						if ($leavingDate != $sapEndDate)
+						{
+							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
+
+							if (!$updated)
+								break;
+						}
+					}
+				}
+
+				if ($currentBis->vertragsstunden === '0.00' || is_null($currentBis->vertragsstunden))
+					$currentBis->vertragsstunden = '0.10';
+
 				/*Prüfen ob dis Bisverwendung bereits mit dem Startdatum in SAPByD exestiert und ob der ba1code 103/109 ist*/
 				if ((isset($startDates[$currentBis->beginn]) ||
 					(!isset($startDates[$currentBis->beginn]) && isset($sapEmpType['functions'][$currentBis->beginn]))
 					) &&
 					(in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))))
 				{
+					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
+
+					if (!hasData($functionResult))
+						return error("Fehler beim laden der Benutzerfunktionen");
+
+					$functionResult = getData($functionResult);
+
 					/*Gehen dann alle Funktionen von der Person durch*/
 					foreach ($functionResult as $functionKey => $currentFunction)
 					{
@@ -691,6 +730,7 @@ class SyncEmployeesLib
 								$sapOE = $sapEmpType['organisation'][$currentFunction->datum_von]->OrganisationalCenterDetails->OrganisationalCenterID;
 							}
 							else if (isset($sapEmpType['organisation'][$currentFunction->datum_von]) &&
+									isset($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails) &&
 									is_array($sapEmpType['organisation'][$currentFunction->datum_von]->PositionAssignment->OrganisationalCenterDetails))
 							{
 								/*Benutzer haben zum gleichen Zeitpunkt 2 Zuteilungen
@@ -854,6 +894,12 @@ class SyncEmployeesLib
 									WHERE oe_kurzbz = ?
 								', array($oldFunction->oe_kurzbz));
 
+					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
+
+					if (!hasData($functionResult))
+						return error("Fehler beim laden der Benutzerfunktionen");
+
+					$functionResult = getData($functionResult);
 					/*Gehen die Benutzerfunktionen der aktuellen Bisverwendung durch*/
 					foreach ($functionResult as $functionKey => $currentFunction)
 					{
@@ -905,30 +951,6 @@ class SyncEmployeesLib
 							break 2;
 					}
 				}
-
-				//Wenn keine weitere Bisverwendung mehr vorhanden ist und ein Enddatum eingetragen ist wird ein Kündigungsdatum eingetragen
-				if ($newBis === false && (in_array($currentBis->ba1code, $this->_ci->config->item(self::FHC_CONTRACT_TYPES))) && !is_null($currentBis->ende))
-				{
-					$currentBisEndDate = date($currentBis->ende, strtotime("+1 day"));
-					$today = Date('Y-m-d');
-
-					if ($today === $currentBisEndDate)
-					{
-						krsort($sapEmpType['functions']);
-						$lastSAPFunctionDate = array_keys($sapEmpType['functions'])[0];
-						$sapEndDate = $sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate;
-
-						$leavingDate = $currentBis->ende;
-
-						if ($leavingDate != $sapEndDate)
-						{
-							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
-
-							if (isError($updated))
-								break;
-						}
-					}
-				}
 			}
 
 			if ($updated)
@@ -945,7 +967,7 @@ class SyncEmployeesLib
 				// If database error occurred then return it
 				if (isError($update)) return $update;
 			}
-			else
+			else if ($updated === false)
 			{
 				$error = true;
 				continue;
@@ -1320,7 +1342,6 @@ class SyncEmployeesLib
 							return error('Wrong Bisverwendung for the given user');
 					}
 					$empAllData->startDate = getData($bisResult)[0]->beginn;
-					$empAllData->endDate = getData($bisResult)[0]->ende;
 					$vertragsstunden = getData($bisResult)[0]->vertragsstunden;
 					if ($vertragsstunden === '0.00' || is_null($vertragsstunden))
 						$empAllData->decimalValue = '0.10';
@@ -1336,14 +1357,7 @@ class SyncEmployeesLib
 						return error('No Bisverwendung available for the given user');
 				}
 
-
-				if (is_null($empAllData->endDate))
-				{
-					$empAllData->typeCode = self::SAP_TYPE_PERMANENT;
-				} else
-				{
-					$empAllData->typeCode = self::SAP_TYPE_TEMPORARY;
-				}
+				$empAllData->typeCode = self::SAP_TYPE_PERMANENT;
 
 				$this->_ci->load->model('person/benutzerfunktion_model', 'BenutzerfunktionModel');
 
@@ -1379,7 +1393,7 @@ class SyncEmployeesLib
 		return success($empsAllDataArray); // everything was fine!
 	}
 
-	public function getEmployeeById($id)
+	private function getEmployeeById($id)
 	{
 		// Calls SAP to find a employee with the given id
 		return $this->_ci->QueryEmployeeInModel->findByIdentification(
@@ -1399,7 +1413,27 @@ class SyncEmployeesLib
 		);
 	}
 
-	public function getEmployeeAfterCreation($name, $surname, $date)
+	private function getBankDetails($id)
+	{
+		// Calls SAP to find employee - bankdetails with the given id
+		return $this->_ci->QueryEmployeeBankDetailsInModel->findByElements(
+			array (
+				'BankDetailsByEmployee' => array(
+					'SelectionByEmployeeId' => array(
+						'LowerBoundaryEmployeeID' => $id,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsMaximumNumberValue' => 1,
+					'QueryHitsUnlimitedIndicator' => false
+				)
+			)
+		);
+	}
+
+	private function getEmployeeAfterCreation($name, $surname, $date)
 	{
 		return $this->_ci->QueryEmployeeInModel->FindBasicDataByIdentification(
 			array(
@@ -1429,7 +1463,7 @@ class SyncEmployeesLib
 		);
 	}
 
-	public function addPaymentInformation($emp, $empData)
+	private function addPaymentInformation($emp, $empData, $person_id)
 	{
 		$basicHeader = array(
 			'BasicMessageHeader' => array(
@@ -1497,7 +1531,40 @@ class SyncEmployeesLib
 
 		$data = array_merge($basicHeader, $employeeData);
 
-		return $this->_ci->ManageEmployeeInModel->MaintainBundle($data);
+		$manageEmpResult = $this->_ci->ManageEmployeeInModel->MaintainBundle($data);
+
+		if (isError($manageEmpResult)) return $manageEmpResult;
+
+		$manageEmp = getData($manageEmpResult);
+
+		if (isset($manageEmp->EmployeeData) && isset($manageEmp->EmployeeData->ChangeStateID))
+		{
+			return true;
+		}
+		else if ($this->_ci->config->item(self::SAP_EMPLOYEES_WARNINGS_ENABLED) === true)// ...otherwise store a non blocking error and continue
+		{
+			// If it is present a description from SAP then use it
+			if (isset($manageEmp->Log) && isset($manageEmp->Log->Item))
+			{
+				if (!isEmptyArray($manageEmp->Log->Item))
+				{
+					foreach ($manageEmp->Log->Item as $item)
+					{
+						if (isset($item->Note)) $this->_ci->LogLibSAP->logWarningDB($item->Note . ' for user: ' . $person_id);
+					}
+				}
+				elseif ($manageEmp->Log->Item->Note)
+				{
+					$this->_ci->LogLibSAP->logWarningDB($manageEmp->Log->Item->Note . ' for user: ' . $person_id);
+				}
+			}
+			else
+			{
+				// Default non blocking error
+				$this->_ci->LogLibSAP->logWarningDB('SAP did not add a leaving date for the user: ' . $person_id);
+			}
+		}
+		return false;
 	}
 
 	private function addLeavingDate($empID, $endDate, $person_id)
