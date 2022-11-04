@@ -54,6 +54,8 @@ class SyncPaymentsLib
 		);
 
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QuerySalesOrderIn_model', 'QuerySalesOrderInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryCustomerInvoiceIn_model', 'QueryCustomerInvoiceInModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/QueryDocumentOutputRequestIn_model', 'QueryDocumentOutputRequestInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesOrderIn_model', 'ManageSalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerInvoiceRequestIn_model', 'ManageCustomerInvoiceRequestInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/SORelease_model', 'SOReleaseModel');
@@ -71,6 +73,167 @@ class SyncPaymentsLib
 
 	// --------------------------------------------------------------------------------------------
 	// Public methods
+
+	/**
+	 *
+	 */
+	public function listInvoices($person_id)
+	{
+		$dbModel = new DB_Model();
+
+		//
+		$sapStudentResult = $dbModel->execReadOnlyQuery('
+			SELECT ss.sap_user_id
+			  FROM sync.tbl_sap_students ss
+			 WHERE ss.person_id = ?
+		', array(
+			$person_id
+		));
+
+		// 
+		if (!hasData($sapStudentResult)) return error('Person id not found');
+
+		// Calls SAP to find a user with the given email
+		$customerInvoiceResult = $this->_ci->QueryCustomerInvoiceInModel->findByElements(
+			array(
+				'CustomerInvoiceSelectionByElements' => array(
+					'SelectionByBillToPartyID' => array(
+						'LowerBoundaryIdentifier' => getData($sapStudentResult)[0]->sap_user_id,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+				)
+			)
+		);
+
+		var_dump($customerInvoiceResult);
+		return;
+
+		// 
+		if (!hasData($customerInvoiceResult)) return error('No invoices found for the given person id');
+
+		//
+		$sapInvoices = array();
+		//
+		$soIds = array();
+
+		// 
+		foreach (getData($customerInvoiceResult) as $customerInvoices)
+		{
+			// 
+			foreach ($customerInvoices as $customerInvoice)
+			{
+				// 
+				if (isset($customerInvoice->Item))
+				{
+					// 
+					if (!isEmptyArray($customerInvoice->Item))
+					{
+						// 
+						foreach ($customerInvoice->Item as $ciItem)
+						{
+							$listInvoices[] = $ciItem;
+
+							if (isset($ciItem->SalesOrderReference)
+								&& isset($ciItem->SalesOrderReference->ID)
+								&& isset($ciItem->SalesOrderReference->ID->_))
+							{
+								$sapInvoices[] = $ciItem;
+
+								//
+								if (!in_array($ciItem->SalesOrderReference->ID->_, $soIds))
+								{
+									$soIds[] = $ciItem->SalesOrderReference->ID->_;
+								}
+							}
+						}
+					}
+					elseif (isset($customerInvoice->Item->SalesOrderReference)
+						&& isset($customerInvoice->Item->SalesOrderReference->ID)
+						&& isset($customerInvoice->Item->SalesOrderReference->ID->_))
+					{
+						$sapInvoices[] = $customerInvoice->Item;
+
+						//
+						if (!in_array($customerInvoice->Item->SalesOrderReference->ID->_, $soIds))
+						{
+							$soIds[] = $customerInvoice->Item->SalesOrderReference->ID->_;
+						}
+					}
+				}
+			}
+		}
+
+		//
+		$sapSOsResult = $dbModel->execReadOnlyQuery('
+			SELECT ss.sap_sales_order_id, ss.buchungsnr
+			  FROM sync.tbl_sap_salesorder ss
+			 WHERE ss.sap_sales_order_id IN ?
+		', array(
+			$soIds
+		));
+
+		// 
+		if (!hasData($sapSOsResult)) return error('These SOs are not in database');
+
+		//
+		$tmpSapInvoices = array();
+
+		//
+		foreach (getData($sapSOsResult) as $sapSO)
+		{
+			//
+			foreach ($sapInvoices as $sapInvoice)
+			{
+				if ($sapInvoice->SalesOrderReference->ID->_ == $sapSO->sap_sales_order_id)
+				{
+					$tmpSapInvoices[] = $sapInvoice;
+				}
+			}
+		}
+
+		return $tmpSapInvoices;
+	}
+
+	/**
+	 *
+	 */
+	public function getDocumentUUID($invoiceUUID)
+	{
+		// Calls SAP to find a user with the given email
+		return $this->_ci->QueryDocumentOutputRequestInModel->findByElements(
+			array(
+				'DocumentOutputRequestSelectionByElements' => array(
+					'SelectionByDocumentUUID' => array(
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1,
+						'LowerBoundaryUUID' => $invoiceUUID
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+				)
+			)
+		);
+	}
+
+	/**
+	 *
+	 */
+	public function getPDF($documentUUID)
+	{
+		// Calls SAP to find a user with the given email
+		return $this->_ci->QueryDocumentOutputRequestInModel->readOutputPDF(
+			array(
+				'DocumentOutputRequestPDFInformation' => array(
+					'ReadByDocumentUUID' => $documentUUID
+				)
+			)
+		);
+	}
 
 	/**
 	 * Check if a SalesOrder is already fully paid
