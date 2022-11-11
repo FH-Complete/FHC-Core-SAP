@@ -393,6 +393,16 @@ class SyncEmployeesLib
 					)
 				);
 
+				if (isset($empData->nummer))
+				{
+					$telephone = array(
+						'actionCode' => '04',
+						'ObjectNodeSenderTechnicalID' => null,
+						'TelephoneFormattedNumberDescription' => $empData->nummer
+					);
+					$employeeData['EmployeeData']['WorkplaceAddressInformation']['Address']['Telephone'] = $telephone;
+				}
+
 				$sapBankData = $this->getBankDetails(getData($sapIdResult)[0]->sap_eeid);
 				$bankDetailsOfEmployee = getData(($sapBankData))->BankDetailsOfEmployee;
 				$sapBanksIban = [];
@@ -1384,6 +1394,33 @@ class SyncEmployeesLib
 						return error('No Kstzuordnung available for the given user');
 				}
 			}
+			
+			$this->_ci->load->model('ressource/mitarbeiter_model', 'MitarbeiterModel');
+			$mitarbeiter = $this->_ci->MitarbeiterModel->loadWhere(array('mitarbeiter_uid' => $empPersonalData->uid));
+			
+			if (isError($mitarbeiter))
+				return $mitarbeiter;
+			
+			if (hasData($mitarbeiter))
+			{
+				$mitarbeiter = getData($mitarbeiter)[0];
+				$this->_ci->load->model('organisation/standort_model', 'StandortModel');
+				
+				$this->_ci->StandortModel->addJoin('public.tbl_kontakt', 'standort_id');
+				$vorwahl = $this->_ci->StandortModel->loadWhere(array(
+					'public.tbl_kontakt.standort_id' => $mitarbeiter->standort_id,
+					'public.tbl_kontakt.kontakttyp' => 'telefon'
+					)
+				);
+				
+				if (isError($vorwahl))
+					return $vorwahl;
+				
+				if (hasData($vorwahl) && $mitarbeiter->telefonklappe !== null)
+				{
+					$empAllData->nummer = getData($vorwahl)[0]->kontakt . ' ' . $mitarbeiter->telefonklappe;
+				}
+			}
 
 			$empAllData->email = $empPersonalData->uid . '@technikum-wien.at';
 			// Stores all data for the current employee
@@ -1499,6 +1536,17 @@ class SyncEmployeesLib
 				)
 			)
 		);
+		
+		if (isset($empData->nummer))
+		{
+			$telephone = array(
+				'actionCode' => '04',
+				'ObjectNodeSenderTechnicalID' => null,
+				'TelephoneFormattedNumberDescription' => $empData->nummer
+			);
+
+			$employeeData['EmployeeData']['WorkplaceAddressInformation']['Address']['Telephone'] = $telephone;
+		}
 
 		if (isset($empData->iban))
 		{
