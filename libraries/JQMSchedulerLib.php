@@ -18,6 +18,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
+	const EMPLOYEE_BLACKLIST = 'sap_employees_blacklist';
 
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
@@ -37,6 +38,7 @@ class JQMSchedulerLib
 
 		// Load users configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Employees');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -428,10 +430,11 @@ class JQMSchedulerLib
 			JOIN public.tbl_benutzer b USING(person_id)
 			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
 			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
-			WHERE p.updateamum > sm.last_update
-				OR sm.last_update IS NULL
+			WHERE (p.updateamum > sm.last_update
+				OR sm.last_update IS NULL)
+				AND m.mitarbeiter_uid NOT IN ?
 			GROUP BY m.mitarbeiter_uid
-		');
+		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
 
 		if (isError($personResult)) return $personResult;
 
@@ -444,10 +447,11 @@ class JQMSchedulerLib
 			JOIN public.tbl_benutzer b USING(person_id)
 			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
 			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
-			WHERE a.updateamum > sm.last_update
-				OR sm.last_update IS NULL
+			WHERE (a.updateamum > sm.last_update
+				OR sm.last_update IS NULL)
+				AND m.mitarbeiter_uid NOT IN ?
 			GROUP BY m.mitarbeiter_uid
-		');
+		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
 
 		if (isError($addressesResult)) return $addressesResult;
 
@@ -460,10 +464,11 @@ class JQMSchedulerLib
 			JOIN public.tbl_benutzer b USING(person_id)
 			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
 			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = m.mitarbeiter_uid)
-			WHERE ba.updateamum > sm.last_update
-				OR sm.last_update IS NULL
+			WHERE (ba.updateamum > sm.last_update
+				OR sm.last_update IS NULL)
+				AND m.mitarbeiter_uid NOT IN ?
 			GROUP BY m.mitarbeiter_uid
-		');
+		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
 
 		if (isError($banksResult)) return $banksResult;
 
@@ -483,12 +488,13 @@ class JQMSchedulerLib
 			FROM bis.tbl_bisverwendung bv
 			JOIN public.tbl_benutzerfunktion bf ON (bf.uid = bv.mitarbeiter_uid)
 			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = bv.mitarbeiter_uid)
-			WHERE bv.updateamum > sm.last_update_workagreement
+			WHERE (bv.updateamum > sm.last_update_workagreement
 				OR sm.last_update_workagreement IS NULL
 				OR bf.updateamum > sm.last_update_workagreement
-				OR (current_date = (SELECT sbv.ende::date + 1 FROM bis.tbl_bisverwendung sbv WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid ORDER by sbv.ende DESC LIMIT 1))
+				OR (current_date = (SELECT sbv.ende::date + 1 FROM bis.tbl_bisverwendung sbv WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid ORDER by sbv.ende DESC LIMIT 1)))
+				AND bv.mitarbeiter_uid NOT IN ?
 			GROUP BY bv.mitarbeiter_uid
-		');
+		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
 
 
 		if (isError($personResult)) return $personResult;
