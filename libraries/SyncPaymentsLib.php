@@ -2,6 +2,8 @@
 
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
+use \stdClass as stdClass;
+
 /**
  * This library contains the logic used to perform data synchronization between FHC and SAP Business by Design
  */
@@ -24,6 +26,11 @@ class SyncPaymentsLib
 
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
+
+	// 
+	const NOT_EXISTS_SAP = 'NOT_EXISTS_SAP';
+	const SESSION_NAME_CIS_INVOICES = 'CIS_INVOICES';
+	const SESSION_NAME_CIS_INVOICES_ELEMENT = 'INVOICE_LIST';
 
 	private $_ci; // Code igniter instance
 	private $_isInvoiceClearedCache; // Cache Invoice Status Results
@@ -81,7 +88,7 @@ class SyncPaymentsLib
 	{
 		$dbModel = new DB_Model();
 
-		//
+		// Get the sap_user_id using the given person_id
 		$sapStudentResult = $dbModel->execReadOnlyQuery('
 			SELECT ss.sap_user_id
 			  FROM sync.tbl_sap_students ss
@@ -90,10 +97,10 @@ class SyncPaymentsLib
 			$person_id
 		));
 
-		// 
+		// If data have been found
 		if (!hasData($sapStudentResult)) return error('Person id not found');
 
-		// Calls SAP to find a user with the given email
+		// Calls SAP to get all the invoices related to the given SAP user
 		$customerInvoiceResult = $this->_ci->QueryCustomerInvoiceInModel->findByElements(
 			array(
 				'CustomerInvoiceSelectionByElements' => array(
@@ -109,55 +116,53 @@ class SyncPaymentsLib
 			)
 		);
 
-		var_dump($customerInvoiceResult);
-		return;
+		// There are no invoices for this user
+		if (!hasData($customerInvoiceResult)) return success('Currently there are no invoices');
 
-		// 
-		if (!hasData($customerInvoiceResult)) return error('No invoices found for the given person id');
-
-		//
+		// SAP invoices
 		$sapInvoices = array();
-		//
+		// SAP sale order ids
 		$soIds = array();
 
-		// 
+		// For each SAP list of invoices
 		foreach (getData($customerInvoiceResult) as $customerInvoices)
 		{
-			// 
+			// For each SAP invoice
 			foreach ($customerInvoices as $customerInvoice)
 			{
-				// 
+				// If The Item property exists
 				if (isset($customerInvoice->Item))
 				{
-					// 
+					// If the item property is an array
 					if (!isEmptyArray($customerInvoice->Item))
 					{
-						// 
+						// For each sale order
 						foreach ($customerInvoice->Item as $ciItem)
 						{
-							$listInvoices[] = $ciItem;
-
+							// Check if the sale order id exists
 							if (isset($ciItem->SalesOrderReference)
 								&& isset($ciItem->SalesOrderReference->ID)
 								&& isset($ciItem->SalesOrderReference->ID->_))
 							{
-								$sapInvoices[] = $ciItem;
+								// Add the SAP invoice to the list
+								$sapInvoices[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
 
-								//
+								// Add the sale order id to the list without duplicates
 								if (!in_array($ciItem->SalesOrderReference->ID->_, $soIds))
 								{
 									$soIds[] = $ciItem->SalesOrderReference->ID->_;
 								}
 							}
 						}
-					}
+					} // Otherwise check if the sale order id exists
 					elseif (isset($customerInvoice->Item->SalesOrderReference)
 						&& isset($customerInvoice->Item->SalesOrderReference->ID)
 						&& isset($customerInvoice->Item->SalesOrderReference->ID->_))
 					{
-						$sapInvoices[] = $customerInvoice->Item;
+						// Add the SAP invoice to the list
+						$sapInvoices[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
 
-						//
+						// Add the sale order id to the list without duplicates
 						if (!in_array($customerInvoice->Item->SalesOrderReference->ID->_, $soIds))
 						{
 							$soIds[] = $customerInvoice->Item->SalesOrderReference->ID->_;
@@ -167,47 +172,158 @@ class SyncPaymentsLib
 			}
 		}
 
-		//
+		// Get the info from the tbl_konto database table
 		$sapSOsResult = $dbModel->execReadOnlyQuery('
-			SELECT ss.sap_sales_order_id, ss.buchungsnr
-			  FROM sync.tbl_sap_salesorder ss
-			 WHERE ss.sap_sales_order_id IN ?
+			SELECT b.uid,
+				k.buchungsnr,
+				k.buchungstext,
+				k.studiensemester_kurzbz,
+				k.betrag,
+				ss.sap_sales_order_id,
+				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid
+			  FROM public.tbl_konto k
+			  JOIN public.tbl_benutzer b USING(person_id)
+		     LEFT JOIN (SELECT * FROM sync.tbl_sap_salesorder WHERE sap_sales_order_id IN ?) AS ss USING(buchungsnr)
+			 WHERE k.person_id = ?
+			   AND k.buchungsnr_verweis IS NULL
+			   AND k.buchungsdatum >= ?
+		      ORDER BY k.buchungsdatum DESC
 		', array(
-			$soIds
+			$soIds, $person_id, self::BUCHUNGSDATUM_SYNC_START
 		));
 
-		// 
-		if (!hasData($sapSOsResult)) return error('These SOs are not in database');
+		// No Sails Orders in database
+		if (!hasData($sapSOsResult)) return success('Currently there are no sales orders');
 
-		//
+		// List of invoices
 		$tmpSapInvoices = array();
+		// List of invoices that do not exist on SAP
+		$tmpSapInvoices[self::NOT_EXISTS_SAP] = array();
 
-		//
+		// For each database invoice
 		foreach (getData($sapSOsResult) as $sapSO)
 		{
-			//
-			foreach ($sapInvoices as $sapInvoice)
+			// For each SAP invoice
+			foreach ($sapInvoices as $soId => $sapInvoice)
 			{
-				if ($sapInvoice->SalesOrderReference->ID->_ == $sapSO->sap_sales_order_id)
+				// Object that represents a record: SAP invoice data + DB invoice data
+				$tmpObj = new stdClass();
+
+				// User uid
+				$tmpObj->uid = $sapSO->uid;
+
+				// DB invoice data
+				$tmpObj->buchungsnr = $sapSO->buchungsnr;
+				$tmpObj->bezeichnung = $sapSO->buchungstext;
+				$tmpObj->studiensemester = $sapSO->studiensemester_kurzbz;
+				$tmpObj->betrag = $sapSO->betrag * -1;
+				$tmpObj->paid = $sapSO->paid == 0;
+
+				// SAP invoice data
+				$tmpObj->datum = null;
+				$tmpObj->faellingAm = null;
+				$tmpObj->email = null;
+				$tmpObj->status = null;
+				$tmpObj->invoiceUUID = null;
+
+				// If this invoice exists on SAP
+				if ($soId == $sapSO->sap_sales_order_id)
 				{
-					$tmpSapInvoices[] = $sapInvoice;
+					// SAP invoice creation date formatted
+					if (isset($sapInvoice->SystemAdministrativeData) && isset($sapInvoice->SystemAdministrativeData->CreationDateTime))
+					{
+						$tmpObj->datum = $sapInvoice->SystemAdministrativeData->CreationDateTime;
+						$tmpObj->datum = substr($tmpObj->datum, 0, 10);
+						$tmpObj->datum = date('d.m.y', strtotime($tmpObj->datum));
+					}
+
+					// SAP invoice expiring date formatted
+					if (isset($sapInvoice->CashDiscountTerms) && isset($sapInvoice->CashDiscountTerms->FullPaymentEndDate))
+					{
+						$tmpObj->faellingAm = $sapInvoice->CashDiscountTerms->FullPaymentEndDate;
+						$tmpObj->faellingAm = substr($tmpObj->faellingAm, 0, 10);
+						$tmpObj->faellingAm = date('d.m.y', strtotime($tmpObj->faellingAm));
+					}
+
+					// SAP invoice recipient data
+					if (isset($sapInvoice->BillToParty) && isset($sapInvoice->BillToParty->Address)
+						&& isset($sapInvoice->BillToParty->Address->EmailURI) && isset($sapInvoice->BillToParty->Address->EmailURI->_))
+					{
+						$tmpObj->email = $sapInvoice->BillToParty->Address->EmailURI->_;
+					}
+
+					// SAP invoice status
+					if (isset($sapInvoice->Status)) $tmpObj->status = $sapInvoice->Status;
+
+					// SAP invoice UUID
+					if (isset($sapInvoice->UUID) && isset($sapInvoice->UUID->_)) $tmpObj->invoiceUUID = $sapInvoice->UUID->_;
+
+					// If this invoice does not exists in the array
+					if (!array_key_exists($sapInvoice->ID->_, $tmpSapInvoices)) $tmpSapInvoices[$sapInvoice->ID->_] = array();
+
+					// Save a record for this invoice
+					$tmpSapInvoices[$sapInvoice->ID->_][] = $tmpObj;
+				}
+				else // Otherwise save the invoice record in the array of invoices that do not exists on SAP
+				{
+					$tmpSapInvoices[self::NOT_EXISTS_SAP][] = $tmpObj;
 				}
 			}
 		}
 
-		return $tmpSapInvoices;
+		return success($tmpSapInvoices);
 	}
 
 	/**
-	 *
+	 * Get the PDF for the given invoice
+	 */
+	public function getSapInvoicePDF($invoiceUuid)
+	{
+                // Get the document from SAP using the invoice UUID
+                $sapDocumentResult = $this->getDocumentUUID($invoiceUuid);
+
+		// SAP returned data about this invoice
+		if (hasData($sapDocumentResult))
+		{
+			$sapDocument = getData($sapDocumentResult);
+
+			// If the structure of the returned data is fine
+			if (isset($sapDocument->DocumentOutputRequestInformation)
+				&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID)
+				&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_))
+			{
+	                	// Get the PDF document from SAP using the document UUID
+        	        	$sapPDFResult = $this->getPDF($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_);
+			}
+
+			// If SAP returned valid PDF data about this document
+			if (hasData($sapPDFResult))
+			{
+				$sapPDF = getData($sapPDFResult);
+
+				// If the structure of the returned data is fine
+				if (isset($sapPDF->DocumentOutputRequestPDF)
+					&& isset($sapPDF->DocumentOutputRequestPDF->OutputPDF)
+					&& isset($sapPDF->DocumentOutputRequestPDF->OutputPDF->_))
+				{
+					// Return the PDF
+					return success($sapPDF->DocumentOutputRequestPDF->OutputPDF->_);
+				}
+			}
+		}
+
+		return error('Generic error');
+	}
+
+	/**
+	 * Get the documents for the given invoice
 	 */
 	public function getDocumentUUID($invoiceUUID)
 	{
-		// Calls SAP to find a user with the given email
 		return $this->_ci->QueryDocumentOutputRequestInModel->findByElements(
 			array(
 				'DocumentOutputRequestSelectionByElements' => array(
-					'SelectionByDocumentUUID' => array(
+					'SelectionByHostObjectUUID' => array(
 						'InclusionExclusionCode' => 'I',
 						'IntervalBoundaryTypeCode' => 1,
 						'LowerBoundaryUUID' => $invoiceUUID
@@ -221,11 +337,10 @@ class SyncPaymentsLib
 	}
 
 	/**
-	 *
+	 * Gets the PDF version of the given document
 	 */
 	public function getPDF($documentUUID)
 	{
-		// Calls SAP to find a user with the given email
 		return $this->_ci->QueryDocumentOutputRequestInModel->readOutputPDF(
 			array(
 				'DocumentOutputRequestPDFInformation' => array(
