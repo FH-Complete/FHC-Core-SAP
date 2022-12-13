@@ -84,6 +84,44 @@ class SyncPaymentsLib
 	/**
 	 *
 	 */
+	public function listInvoicesByPersonId($person_id)
+	{
+		$dbModel = new DB_Model();
+
+		// Get the sap_user_id using the given person_id
+		$sapStudentResult = $dbModel->execReadOnlyQuery('
+			SELECT ss.sap_user_id
+			  FROM sync.tbl_sap_students ss
+			 WHERE ss.person_id = ?
+		', array(
+			$person_id
+		));
+
+		// If data have been found
+		if (!hasData($sapStudentResult)) return error('Person id not found');
+
+		// Calls SAP to get all the invoices related to the given SAP user
+		$customerInvoiceResult = $this->_ci->QueryCustomerInvoiceInModel->findByElements(
+			array(
+				'CustomerInvoiceSelectionByElements' => array(
+					'SelectionByBillToPartyID' => array(
+						'LowerBoundaryIdentifier' => getData($sapStudentResult)[0]->sap_user_id,
+						'InclusionExclusionCode' => 'I',
+						'IntervalBoundaryTypeCode' => 1
+					)
+				),
+				'ProcessingConditions' => array(
+					'QueryHitsUnlimitedIndicator' => true
+				)
+			)
+		);
+
+		return $customerInvoiceResult;
+	}
+
+	/**
+	 *
+	 */
 	public function listInvoices($person_id)
 	{
 		$dbModel = new DB_Model();
@@ -171,6 +209,9 @@ class SyncPaymentsLib
 				}
 			}
 		}
+
+		//
+		if (isEmptyArray($soIds)) return success('Currently there are no sales orders');
 
 		// Get the info from the tbl_konto database table
 		$sapSOsResult = $dbModel->execReadOnlyQuery('
