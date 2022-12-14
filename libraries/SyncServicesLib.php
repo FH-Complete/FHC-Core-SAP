@@ -807,7 +807,7 @@ class SyncServicesLib
 					'CostRate' => array(
 						'actionCode' => '04',
 						'SetOfBooksID' => $this->_ci->config->item(self::SET_OF_BOOKS_ID),
-						'StartDate' => $this->_ci->config->item(self::START_DATE),
+						'StartDate' => date('Y-m-d'),
 						'Amount' => array(
 							'_' => $amount,
 							'currencyCode' => 'EUR'
