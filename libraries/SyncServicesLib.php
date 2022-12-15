@@ -212,7 +212,8 @@ class SyncServicesLib
 						$valuationResult = $this->_manageServiceProductValuationDataIn(
 							$serviceId,
 							$companyId,
-							$stundensatz
+							$stundensatz,
+							$this->_ci->config->item(self::START_DATE)
 						);
 
 						if (isError($valuationResult)) return $valuationResult; // if fatal error
@@ -401,7 +402,8 @@ class SyncServicesLib
 						$valuationResult = $this->_manageServiceProductValuationDataIn(
 							$serviceId,
 							$companyId,
-							$stundensatz
+							$stundensatz,
+							date('Y-m-d')
 						);
 
 						if (isError($valuationResult)) return $valuationResult; // if fatal error
@@ -792,7 +794,7 @@ class SyncServicesLib
 	 * Once the service is created its valuations are still inactive, this method activates a single valuation
 	 * specified by service id and company id
 	 */
-	private function _manageServiceProductValuationDataIn($sap_service_id, $company_id, $amount)
+	private function _manageServiceProductValuationDataIn($sap_service_id, $company_id, $amount, $startDate)
 	{
 		$manageServiceProductValuationResult = $this->_ci->ManageServiceProductValuationDataInModel->MaintainBundle(
 			array(
@@ -807,7 +809,7 @@ class SyncServicesLib
 					'CostRate' => array(
 						'actionCode' => '04',
 						'SetOfBooksID' => $this->_ci->config->item(self::SET_OF_BOOKS_ID),
-						'StartDate' => date('Y-m-d'),
+						'StartDate' => $startDate,
 						'Amount' => array(
 							'_' => $amount,
 							'currencyCode' => 'EUR'
