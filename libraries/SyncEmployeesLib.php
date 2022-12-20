@@ -1278,8 +1278,9 @@ class SyncEmployeesLib
 			if (hasData($bankResult))
 			{
 				$bankData = getData($bankResult)[0];
+				$pattern = '/[^A-Z0-9]/';
+				$iban = preg_replace($pattern, '', strtoupper($bankData->iban));
 
-				$iban = strtoupper(str_replace(' ','', $bankData->iban));
 				$ibanCountry = substr($iban, 0, 2);
 
 				$empAllData->bankCountry = $ibanCountry;
