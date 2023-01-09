@@ -31,7 +31,7 @@ export const SAPInvoicesAPIs = {
 				person_id: person_id
 			},
 			{
-				timeout: 7000
+				timeout: 10000
 			}
                 );
 	}
