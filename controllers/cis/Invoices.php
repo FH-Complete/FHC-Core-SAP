@@ -1,5 +1,22 @@
 <?php
 
+/**
+ * Copyright (C) 2023 fhcomplete.org
+ *
+ * This program is free software: you can redistribute it and/or modify   
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 if (! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
@@ -54,7 +71,7 @@ class Invoices extends FHC_Controller
 			setSessionElement(
 				SyncPaymentsLib::SESSION_NAME_CIS_INVOICES,
 				SyncPaymentsLib::SESSION_NAME_CIS_INVOICES_ELEMENT,
-				getData($invoices)
+				getData($invoices)->{SyncPaymentsLib::INVOICES_EXISTS_SAP}
 			);
 		}
 
@@ -84,24 +101,20 @@ class Invoices extends FHC_Controller
 			$found = false; //
 
 			// Search if the user has the rights to get this PDF
-			foreach ($invoices as $key => $invoice)
+			foreach ($invoices as $invoice)
 			{
-				// Skip the invoices that do not exist on SAP
-				if ($key != SyncPaymentsLib::NOT_EXISTS_SAP)
+				// Search into the invoice entry
+				foreach ($invoice as $invoiceEntry)
 				{
-					// Search into the invoice entry
-					foreach ($invoice as $invoiceEntry)
+					// If the invoice is found
+					if ($invoiceEntry->invoiceUUID == $invoiceUuid)
 					{
-						// If the invoice is found
-						if ($invoiceEntry->invoiceUUID == $invoiceUuid)
-						{
-							$found = true;
-							break; // exit the first loop
-						}
+						$found = true;
+						break; // exit the first loop
 					}
-
-					if ($found) break; // exit the second loop
 				}
+
+				if ($found) break; // exit the second loop
 			}
 
 			// If the logged user has the rights to get this PDF
@@ -139,7 +152,8 @@ class Invoices extends FHC_Controller
 		if (!isEmptyString($askedPersonId) && is_numeric($askedPersonId) && $authPersonId != $askedPersonId)
 		{
 			// If the logged user is admin then grant it
-			if ($this->permissionlib->isEntitled(array('getInvoices' => 'admin:r', 'getSapInvoicePDF' => 'admin:r'), $this->router->method))
+			if ($this->permissionlib->isEntitled(array('getInvoices' => 'admin:r', 'getSapInvoicePDF' => 'admin:r'), $this->router->method)
+				|| $this->permissionlib->isEntitled(array('getInvoices' => 'student/zahlungAdmin:r', 'getSapInvoicePDF' => 'student/zahlungAdmin:r'), $this->router->method))
 			{
 				$returnPersonId = $askedPersonId;
 			}

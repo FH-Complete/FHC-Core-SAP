@@ -1,5 +1,22 @@
 <?php
 
+/**
+ * Copyright (C) 2023 fhcomplete.org
+ *
+ * This program is free software: you can redistribute it and/or modify   
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 use \stdClass as stdClass;
@@ -28,7 +45,12 @@ class SyncPaymentsLib
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
 	// 
-	const NOT_EXISTS_SAP = 'NOT_EXISTS_SAP';
+	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
+	const INVOICES_NOT_EXISTS_SAP = 'INVOICES_NOT_EXISTS_SAP';
+	//
+	const GMBH_INVOICES_EXISTS = 'GMBH_INVOICES_EXISTS';
+	const FHTW_INVOICES_EXISTS = 'FHTW_INVOICES_EXISTS';
+	//
 	const SESSION_NAME_CIS_INVOICES = 'CIS_INVOICES';
 	const SESSION_NAME_CIS_INVOICES_ELEMENT = 'INVOICE_LIST';
 
@@ -221,12 +243,15 @@ class SyncPaymentsLib
 				k.studiensemester_kurzbz,
 				k.betrag,
 				ss.sap_sales_order_id,
-				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid
+				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid,
+				k.studiengang_kz
 			  FROM public.tbl_konto k
 			  JOIN public.tbl_benutzer b USING(person_id)
 		     LEFT JOIN (SELECT * FROM sync.tbl_sap_salesorder WHERE sap_sales_order_id IN ?) AS ss USING(buchungsnr)
 			 WHERE k.person_id = ?
+			   AND b.aktiv = TRUE
 			   AND k.buchungsnr_verweis IS NULL
+			   AND (k.studiengang_kz > 0 OR k.studiengang_kz = -18 OR k.studiengang_kz = -30)
 			   AND k.buchungsdatum >= ?
 		      ORDER BY k.buchungsdatum DESC
 		', array(
@@ -237,35 +262,50 @@ class SyncPaymentsLib
 		if (!hasData($sapSOsResult)) return success('Currently there are no sales orders');
 
 		// List of invoices
-		$tmpSapInvoices = array();
+		$resultInvoices = new stdClass();
+		// List of invoices that exists on SAP
+		$resultInvoices->{self::INVOICES_EXISTS_SAP} = array();
 		// List of invoices that do not exist on SAP
-		$tmpSapInvoices[self::NOT_EXISTS_SAP] = array();
+		$resultInvoices->{self::INVOICES_NOT_EXISTS_SAP} = array();
+		// By default no GMBH invoices
+		$resultInvoices->{self::GMBH_INVOICES_EXISTS} = false;
+		// By default no FHTW invoices
+		$resultInvoices->{self::FHTW_INVOICES_EXISTS} = false;
 
 		// For each database invoice
 		foreach (getData($sapSOsResult) as $sapSO)
 		{
+			$found = false; //
+
 			// For each SAP invoice
 			foreach ($sapInvoices as $soId => $sapInvoice)
 			{
 				// Object that represents a record: SAP invoice data + DB invoice data
-				$tmpObj = new stdClass();
+				$resultInvoiceObj = new stdClass();
 
 				// User uid
-				$tmpObj->uid = $sapSO->uid;
+				$resultInvoiceObj->uid = $sapSO->uid;
 
 				// DB invoice data
-				$tmpObj->buchungsnr = $sapSO->buchungsnr;
-				$tmpObj->bezeichnung = $sapSO->buchungstext;
-				$tmpObj->studiensemester = $sapSO->studiensemester_kurzbz;
-				$tmpObj->betrag = $sapSO->betrag * -1;
-				$tmpObj->paid = $sapSO->paid == 0;
+				$resultInvoiceObj->buchungsnr = $sapSO->buchungsnr;
+				$resultInvoiceObj->bezeichnung = $sapSO->buchungstext;
+				$resultInvoiceObj->studiensemester = $sapSO->studiensemester_kurzbz;
+				$resultInvoiceObj->betrag = $sapSO->betrag * -1;
+				$resultInvoiceObj->partial = 0;
+				$resultInvoiceObj->paid = $sapSO->paid == 0;
+				$resultInvoiceObj->studiengang_kz = $sapSO->studiengang_kz;
+
+				// If there are invoices from the FHTW
+				if ($sapSO->studiengang_kz >= 0) $resultInvoices->{self::FHTW_INVOICES_EXISTS} = true;
+				// If there are invoices from the GMBH
+				if ($sapSO->studiengang_kz < 0) $resultInvoices->{self::GMBH_INVOICES_EXISTS} = true;
 
 				// SAP invoice data
-				$tmpObj->datum = null;
-				$tmpObj->faellingAm = null;
-				$tmpObj->email = null;
-				$tmpObj->status = null;
-				$tmpObj->invoiceUUID = null;
+				$resultInvoiceObj->datum = null;
+				$resultInvoiceObj->faellingAm = null;
+				$resultInvoiceObj->email = null;
+				$resultInvoiceObj->status = null;
+				$resultInvoiceObj->invoiceUUID = null;
 
 				// If this invoice exists on SAP
 				if ($soId == $sapSO->sap_sales_order_id)
@@ -273,46 +313,55 @@ class SyncPaymentsLib
 					// SAP invoice creation date formatted
 					if (isset($sapInvoice->SystemAdministrativeData) && isset($sapInvoice->SystemAdministrativeData->CreationDateTime))
 					{
-						$tmpObj->datum = $sapInvoice->SystemAdministrativeData->CreationDateTime;
-						$tmpObj->datum = substr($tmpObj->datum, 0, 10);
-						$tmpObj->datum = date('d.m.y', strtotime($tmpObj->datum));
+						$resultInvoiceObj->datum = $sapInvoice->SystemAdministrativeData->CreationDateTime;
+						$resultInvoiceObj->datum = substr($resultInvoiceObj->datum, 0, 10);
+						$resultInvoiceObj->datum = date('d.m.y', strtotime($resultInvoiceObj->datum));
 					}
 
 					// SAP invoice expiring date formatted
 					if (isset($sapInvoice->CashDiscountTerms) && isset($sapInvoice->CashDiscountTerms->FullPaymentEndDate))
 					{
-						$tmpObj->faellingAm = $sapInvoice->CashDiscountTerms->FullPaymentEndDate;
-						$tmpObj->faellingAm = substr($tmpObj->faellingAm, 0, 10);
-						$tmpObj->faellingAm = date('d.m.y', strtotime($tmpObj->faellingAm));
+						$resultInvoiceObj->faellingAm = $sapInvoice->CashDiscountTerms->FullPaymentEndDate;
+						$resultInvoiceObj->faellingAm = substr($resultInvoiceObj->faellingAm, 0, 10);
+						$resultInvoiceObj->faellingAm = date('d.m.y', strtotime($resultInvoiceObj->faellingAm));
 					}
 
 					// SAP invoice recipient data
 					if (isset($sapInvoice->BillToParty) && isset($sapInvoice->BillToParty->Address)
 						&& isset($sapInvoice->BillToParty->Address->EmailURI) && isset($sapInvoice->BillToParty->Address->EmailURI->_))
 					{
-						$tmpObj->email = $sapInvoice->BillToParty->Address->EmailURI->_;
+						$resultInvoiceObj->email = $sapInvoice->BillToParty->Address->EmailURI->_;
 					}
 
 					// SAP invoice status
-					if (isset($sapInvoice->Status)) $tmpObj->status = $sapInvoice->Status;
+					if (isset($sapInvoice->Status)) $resultInvoiceObj->status = $sapInvoice->Status;
 
 					// SAP invoice UUID
-					if (isset($sapInvoice->UUID) && isset($sapInvoice->UUID->_)) $tmpObj->invoiceUUID = $sapInvoice->UUID->_;
+					if (isset($sapInvoice->UUID) && isset($sapInvoice->UUID->_)) $resultInvoiceObj->invoiceUUID = $sapInvoice->UUID->_;
 
 					// If this invoice does not exists in the array
-					if (!array_key_exists($sapInvoice->ID->_, $tmpSapInvoices)) $tmpSapInvoices[$sapInvoice->ID->_] = array();
+					if (!array_key_exists($sapInvoice->ID->_, $resultInvoices->{self::INVOICES_EXISTS_SAP}))
+					{
+						$resultInvoices->{self::INVOICES_EXISTS_SAP}[$sapInvoice->ID->_] = array();
+					}
 
 					// Save a record for this invoice
-					$tmpSapInvoices[$sapInvoice->ID->_][] = $tmpObj;
+					$resultInvoices->{self::INVOICES_EXISTS_SAP}[$sapInvoice->ID->_][] = $resultInvoiceObj;
+
+					$found = true;
+					break;
 				}
-				else // Otherwise save the invoice record in the array of invoices that do not exists on SAP
-				{
-					$tmpSapInvoices[self::NOT_EXISTS_SAP][] = $tmpObj;
-				}
+			}
+
+			//
+			if (!$found)
+			{
+				// Save a record for this invoice
+				$resultInvoices->{self::INVOICES_NOT_EXISTS_SAP}[] = $resultInvoiceObj;
 			}
 		}
 
-		return success($tmpSapInvoices);
+		return success($resultInvoices);
 	}
 
 	/**

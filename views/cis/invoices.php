@@ -50,17 +50,11 @@
 								Sämtliche Zahlungen sind an die nachstehende Kontonummer zu leisten und die Rechnungsnummer muss als Zahlungsreferenz eingegeben werden.
 
 								<br/>
-								<br/>
 
 								<h6>
-									<strong>
-										Fachhochschule Technikum Wien
-										<br/>
-										IBAN: AT131 2349 5188 1234
-									</strong>
+									<div id="ibans"></div>
 								</h6>
 
-								<br/>
 								<br/>
 
 								<div class="content">
