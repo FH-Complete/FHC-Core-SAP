@@ -239,8 +239,7 @@ class SyncPaymentsLib
 
 		// Get the info from the tbl_konto database table
 		$sapSOsResult = $dbModel->execReadOnlyQuery('
-			SELECT b.uid,
-				k.buchungsnr,
+			SELECT k.buchungsnr,
 				k.buchungstext,
 				k.studiensemester_kurzbz,
 				k.betrag,
@@ -248,10 +247,8 @@ class SyncPaymentsLib
 				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid,
 				k.studiengang_kz
 			  FROM public.tbl_konto k
-			  JOIN public.tbl_benutzer b USING(person_id)
 		     LEFT JOIN (SELECT * FROM sync.tbl_sap_salesorder WHERE sap_sales_order_id IN ?) AS ss USING(buchungsnr)
 			 WHERE k.person_id = ?
-			   AND b.aktiv = TRUE
 			   AND k.buchungsnr_verweis IS NULL
 			   AND (k.studiengang_kz > 0 OR k.studiengang_kz IN ?)
 			   AND k.buchungsdatum >= ?
@@ -284,9 +281,6 @@ class SyncPaymentsLib
 			{
 				// Object that represents a record: SAP invoice data + DB invoice data
 				$resultInvoiceObj = new stdClass();
-
-				// User uid
-				$resultInvoiceObj->uid = $sapSO->uid;
 
 				// DB invoice data
 				$resultInvoiceObj->buchungsnr = $sapSO->buchungsnr;
