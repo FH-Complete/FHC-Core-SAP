@@ -53,6 +53,8 @@ class SyncPaymentsLib
 	//
 	const SESSION_NAME_CIS_INVOICES = 'CIS_INVOICES';
 	const SESSION_NAME_CIS_INVOICES_ELEMENT = 'INVOICE_LIST';
+	//
+	const GMBH_LEHRGAENGE_LIST = array(-18, -30);
 
 	private $_ci; // Code igniter instance
 	private $_isInvoiceClearedCache; // Cache Invoice Status Results
@@ -251,11 +253,11 @@ class SyncPaymentsLib
 			 WHERE k.person_id = ?
 			   AND b.aktiv = TRUE
 			   AND k.buchungsnr_verweis IS NULL
-			   AND (k.studiengang_kz > 0 OR k.studiengang_kz = -18 OR k.studiengang_kz = -30)
+			   AND (k.studiengang_kz > 0 OR k.studiengang_kz IN ?)
 			   AND k.buchungsdatum >= ?
 		      ORDER BY k.buchungsdatum DESC
 		', array(
-			$soIds, $person_id, self::BUCHUNGSDATUM_SYNC_START
+			$soIds, $person_id, self::GMBH_LEHRGAENGE_LIST, self::BUCHUNGSDATUM_SYNC_START
 		));
 
 		// No Sails Orders in database
