@@ -49,6 +49,29 @@ class ManagePriceLists extends JOB_Controller
 	}
 
 	/**
+	 * Adds all the active services (employees) to the current price list
+	 */
+	public function addServicesToPriceList()
+	{
+		$this->logInfo('Start price list linking');
+
+		// Add the user/service to the current price list
+		$syncResult = $this->syncpricelistslib->addServicesToPriceList();
+
+		// Log result
+		if (isError($syncResult))
+		{
+			$this->logError(getCode($syncResult).': '.getError($syncResult));
+		}
+		else
+		{
+			$this->logInfo(getData($syncResult));
+		}
+
+		$this->logInfo('End price list linking');
+	}
+
+	/**
 	 * Method used mostly for testing or debugging, it performs a call to SAP to find a price list with the given customer id
 	 * and then returns the raw SOAP result
 	 */
