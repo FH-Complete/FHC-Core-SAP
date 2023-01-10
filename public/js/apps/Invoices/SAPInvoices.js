@@ -24,7 +24,8 @@ const SAPInvoicesApp = Vue.createApp({
 	data: function() {
 		return {
 			syncedInvoices: null,
-			notSyncedInvoices: null
+			notSyncedInvoices: null,
+			notRelevantInvoices: null
 		};
 	},
 	components: {
@@ -46,9 +47,15 @@ const SAPInvoicesApp = Vue.createApp({
 			}
 
 			//
-			if (payloadData.hasOwnProperty("INVOICES_NOT_EXISTS_SAP"))
+			if (payloadData.hasOwnProperty("INVOICES_TO_BE_SYNCED"))
 			{
-				this.notSyncedInvoices = payloadData.INVOICES_NOT_EXISTS_SAP;
+				this.notSyncedInvoices = payloadData.INVOICES_TO_BE_SYNCED;
+			}
+
+			//
+			if (payloadData.hasOwnProperty("INVOICES_NOT_RELEVANT"))
+			{
+				this.notRelevantInvoices = payloadData.INVOICES_NOT_RELEVANT;
 			}
 
 			// 
@@ -94,6 +101,15 @@ const SAPInvoicesApp = Vue.createApp({
 
 			//
 			for (let i = 0; i < invoice.length; i++) total += parseFloat(invoice[i].betrag);
+
+			return total.toFixed(2);
+		},
+		getTotalPartial: function(invoice) {
+
+			let total = 0.0;
+
+			//
+			for (let i = 0; i < invoice.length; i++) total += parseFloat(invoice[i].partial);
 
 			return total.toFixed(2);
 		}
@@ -155,7 +171,7 @@ const SAPInvoicesApp = Vue.createApp({
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.datum) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.faellingAm) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotal(invoice)) }}</td>
-								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.partial) }}</td>
+								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotalPartial(invoice)) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.email) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': invoiceEntry.paid, 'bg-warning': !invoiceEntry.paid}">
 									<template v-if="invoiceEntry.status != null && invoiceEntry.status.ReleaseStatusCode == 3 && invoiceEntry.status.ClearingStatusCode == 4">
@@ -192,6 +208,24 @@ const SAPInvoicesApp = Vue.createApp({
 							</template>
 						</tr>
 					</template>
+
+					<!-- Not relevant invoices -->
+					<template v-for="(invoice, invoiceIndex) in notRelevantInvoices">
+						<tr>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">Nicht relevant</td>
+							<td class="align-middle">{{ formatValueIfNull(invoice.bezeichnung) }}</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotal(notRelevantInvoices)) }}</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
+							<td class="align-middle bg-success" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length"><strong>Bezahlt</strong></td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
+						</tr>
+					</template>
+
 				</tbody>
 			</table>
 		</div>

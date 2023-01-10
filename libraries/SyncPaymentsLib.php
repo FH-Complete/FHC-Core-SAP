@@ -46,7 +46,8 @@ class SyncPaymentsLib
 
 	// 
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
-	const INVOICES_NOT_EXISTS_SAP = 'INVOICES_NOT_EXISTS_SAP';
+	const INVOICES_TO_BE_SYNCED = 'INVOICES_TO_BE_SYNCED';
+	const INVOICES_NOT_RELEVANT = 'INVOICES_NOT_RELEVANT';
 	//
 	const GMBH_INVOICES_EXISTS = 'GMBH_INVOICES_EXISTS';
 	const FHTW_INVOICES_EXISTS = 'FHTW_INVOICES_EXISTS';
@@ -248,14 +249,13 @@ class SyncPaymentsLib
 		// List of invoices that exists on SAP
 		$resultInvoices->{self::INVOICES_EXISTS_SAP} = array();
 		// List of invoices that do not exist on SAP
-		$resultInvoices->{self::INVOICES_NOT_EXISTS_SAP} = array();
+		$resultInvoices->{self::INVOICES_TO_BE_SYNCED} = array();
+		// List of invoices that are not going to be synced
+		$resultInvoices->{self::INVOICES_NOT_RELEVANT} = array();
 		// By default no GMBH invoices
 		$resultInvoices->{self::GMBH_INVOICES_EXISTS} = false;
 		// By default no FHTW invoices
 		$resultInvoices->{self::FHTW_INVOICES_EXISTS} = false;
-
-		$resultInvoices->TEST_DB = getData($sapSOsResult);
-		$resultInvoices->TEST_SAP = $sapInvoicesWithSO;
 
 		// For each database invoice
 		foreach (getData($sapSOsResult) as $sapSO)
@@ -268,7 +268,7 @@ class SyncPaymentsLib
 			$resultInvoiceObj->bezeichnung = $sapSO->buchungstext;
 			$resultInvoiceObj->studiensemester = $sapSO->studiensemester_kurzbz;
 			$resultInvoiceObj->betrag = $sapSO->betrag * -1;
-			$resultInvoiceObj->partial = 0;
+			$resultInvoiceObj->partial = $resultInvoiceObj->betrag;
 			$resultInvoiceObj->paid = $sapSO->paid == 0;
 			$resultInvoiceObj->studiengang_kz = $sapSO->studiengang_kz;
 
@@ -330,8 +330,17 @@ class SyncPaymentsLib
 			}
 			else // otherwise save the invoice in the _not_ existing on SAP list
 			{
-				// Save a record for this invoice
-				$resultInvoices->{self::INVOICES_NOT_EXISTS_SAP}[] = $resultInvoiceObj;
+				// If already paid
+				if ($resultInvoiceObj->paid)
+				{
+					// It will not be synced
+					$resultInvoices->{self::INVOICES_NOT_RELEVANT}[] = $resultInvoiceObj;
+				}
+				else // otherwise it is going to be synced
+				{
+					// Save a record for this invoice
+					$resultInvoices->{self::INVOICES_TO_BE_SYNCED}[] = $resultInvoiceObj;
+				}
 			}
 		}
 
