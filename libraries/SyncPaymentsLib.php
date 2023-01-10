@@ -204,6 +204,7 @@ class SyncPaymentsLib
 						{
 							// Add the SAP invoice to the list
 							$sapInvoicesWithSO[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
+							break;
 						}
 					}
 				} // Otherwise check if the sale order id exists
@@ -216,6 +217,8 @@ class SyncPaymentsLib
 				}
 			}
 		}
+
+		var_dump_to_error_log($sapInvoicesWithSO);
 
 		//
 		if (isEmptyArray($sapInvoicesWithSO)) return success('Currently there are no invoices related to sales orders');
@@ -253,6 +256,9 @@ class SyncPaymentsLib
 		$resultInvoices->{self::GMBH_INVOICES_EXISTS} = false;
 		// By default no FHTW invoices
 		$resultInvoices->{self::FHTW_INVOICES_EXISTS} = false;
+
+		$resultInvoices->TEST_DB = getData($sapSOsResult);
+		$resultInvoices->TEST_SAP = $sapInvoicesWithSO;
 
 		// For each database invoice
 		foreach (getData($sapSOsResult) as $sapSO)
