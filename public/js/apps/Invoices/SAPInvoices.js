@@ -73,23 +73,29 @@ const SAPInvoicesApp = Vue.createApp({
 		getSapPDFURL: function() {
 			return FHC_JS_DATA_STORAGE_OBJECT.app_root + FHC_JS_DATA_STORAGE_OBJECT.ci_router + "/" + FHC_JS_DATA_STORAGE_OBJECT.called_path;
 		},
-		getPDFURL: function(uid, buchungsnr) {
+		getPDFURL: function(invoiceEntries) {
+
+			//
+			let buchungsnummern = '';
+
+			//
+			for (let i = 0; i < invoiceEntries.length; i++) buchungsnummern += invoiceEntries[i].buchungsnr + ";";
+
 			return FHC_JS_DATA_STORAGE_OBJECT.app_root +
 				"cis/private/pdfExport.php?xml=konto.rdf.php" +
-				"&xsl=Zahlung&uid='" + uid + "'&buchungsnummern='" + buchungsnr + "'";
+				"&xsl=Zahlung&buchungsnummern=" + buchungsnummern;
 		},
 		formatValueIfNull: function(value) {
 			return value == null ? '-' : value;
 		},
 		getTotal: function(invoice) {
-			let total = 0;
 
-			for (let i = 0; i < invoice.length; i++)
-			{
-				total = invoice[i].betrag;
-			}
+			let total = 0.0;
 
-			return total;
+			//
+			for (let i = 0; i < invoice.length; i++) total += parseFloat(invoice[i].betrag);
+
+			return total.toFixed(2);
 		}
 	},
 	template: `
@@ -180,7 +186,7 @@ const SAPInvoicesApp = Vue.createApp({
 										class="fa-solid fa-file-pdf fa-2xl link-dark"
 										target="_blank"
 										v-if="invoiceEntry.paid"
-										v-bind:href="getPDFURL(invoiceEntry.uid, invoiceEntry.buchungsnr)"
+										v-bind:href="getPDFURL(invoice)"
 									></a>
 								</td>
 							</template>
