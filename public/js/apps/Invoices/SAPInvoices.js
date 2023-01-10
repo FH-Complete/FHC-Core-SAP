@@ -131,7 +131,7 @@ const SAPInvoicesApp = Vue.createApp({
 						<th scope="col">Datum</th>
 						<th scope="col">Fällig am</th>
 						<th scope="col">Gesamtbetrag</th>
-						<th scope="col">Eingezahlt</th>
+						<!-- <th scope="col">Eingezahlt</th> -->
 						<th scope="col">Rechnungsempfänger</th>
 						<th scope="col">Status</th>
 						<th scope="col">Rechnung</th>
@@ -149,7 +149,7 @@ const SAPInvoicesApp = Vue.createApp({
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(getTotal(notSyncedInvoices)) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
+							<!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td> -->
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">Wird erstellt</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
@@ -171,7 +171,7 @@ const SAPInvoicesApp = Vue.createApp({
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.datum) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.faellingAm) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotal(invoice)) }}</td>
-								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotalPartial(invoice)) }}</td>
+								<!-- <td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotalPartial(invoice)) }}</td> -->
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.email) }}</td>
 								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': invoiceEntry.paid, 'bg-warning': !invoiceEntry.paid}">
 									<template v-if="invoiceEntry.status != null && invoiceEntry.status.ReleaseStatusCode == 3 && invoiceEntry.status.ClearingStatusCode == 4">
@@ -218,7 +218,7 @@ const SAPInvoicesApp = Vue.createApp({
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotal(notRelevantInvoices)) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td>
+							<!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td> -->
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 							<td class="align-middle bg-success" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length"><strong>Bezahlt</strong></td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
