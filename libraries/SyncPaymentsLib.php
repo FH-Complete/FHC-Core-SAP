@@ -269,7 +269,7 @@ class SyncPaymentsLib
 			$resultInvoiceObj->studiensemester = $sapSO->studiensemester_kurzbz;
 			$resultInvoiceObj->betrag = $sapSO->betrag * -1;
 			$resultInvoiceObj->partial = $resultInvoiceObj->betrag;
-			$resultInvoiceObj->paid = $sapSO->paid == 0;
+			$resultInvoiceObj->paid = $sapSO->paid != null && $sapSO->paid == 0;
 			$resultInvoiceObj->studiengang_kz = $sapSO->studiengang_kz;
 
 			// If there are invoices from the FHTW
