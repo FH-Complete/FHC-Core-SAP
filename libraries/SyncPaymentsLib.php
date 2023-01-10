@@ -204,7 +204,6 @@ class SyncPaymentsLib
 						{
 							// Add the SAP invoice to the list
 							$sapInvoicesWithSO[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
-							break;
 						}
 					}
 				} // Otherwise check if the sale order id exists
@@ -213,12 +212,10 @@ class SyncPaymentsLib
 					&& isset($customerInvoice->Item->SalesOrderReference->ID->_))
 				{
 					// Add the SAP invoice to the list
-					$sapInvoicesWithSO[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
+					$sapInvoicesWithSO[$customerInvoice->Item->SalesOrderReference->ID->_] = $customerInvoice;
 				}
 			}
 		}
-
-		var_dump_to_error_log($sapInvoicesWithSO);
 
 		//
 		if (isEmptyArray($sapInvoicesWithSO)) return success('Currently there are no invoices related to sales orders');
