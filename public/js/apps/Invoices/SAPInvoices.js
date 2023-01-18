@@ -113,6 +113,18 @@ const SAPInvoicesApp = Vue.createApp({
 
 			return total.toFixed(2);
 		},
+		isPaid: function(invoice) {
+
+			// For each invoice entry
+			for (let i = 0; i < invoice.length; i++)
+			{
+				// If at least one is not paid then return everything as not paid
+				if (invoice[i].paid == false) return false;
+			}
+
+			// Otherwise return everything as paid
+			return true;
+		},
 		getStatus: function(statusObj, paid) {
 
 			let status = "-";
@@ -120,20 +132,24 @@ const SAPInvoicesApp = Vue.createApp({
 			// Better safe than sorry!
 			if (statusObj != null)
 			{
-				// If the invoice is consistent
-				if (statusObj.ConsistencyStatusCode == 3)
+				// 
+				if (statusObj.ClearingStatusCode == 4)
 				{
-					// 
-					if (statusObj.ReleaseStatusCode == 4 || statusObj.ReleaseStatusCode == 5)
+					// If the invoice is consistent
+					if (statusObj.ConsistencyStatusCode == 3)
 					{
-						// If paid
-						if (paid === true)
+						// If the release status is approved
+						if (statusObj.ReleaseStatusCode == 4 || statusObj.ReleaseStatusCode == 5)
 						{
-							status = "Bezahlt";
-						}
-						else
-						{
-							status = "Offen";
+							// If paid
+							if (paid === true)
+							{
+								status = "Bezahlt";
+							}
+							else
+							{
+								status = "Offen";
+							}
 						}
 					}
 				}
@@ -201,8 +217,8 @@ const SAPInvoicesApp = Vue.createApp({
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotal(invoice)) }}</td>
 								<!-- <td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotalPartial(invoice)) }}</td> -->
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.email) }}</td>
-								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': invoiceEntry.paid, 'bg-warning': !invoiceEntry.paid}">
-									<strong>{{ getStatus(invoiceEntry.status, invoiceEntry.paid) }}</strong>
+								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': isPaid(invoice), 'bg-warning': !isPaid(invoice)}">
+									<strong>{{ getStatus(invoiceEntry.status, isPaid(invoice)) }}</strong>
 								</td>
 								<td class="align-middle text-center" v-bind:rowspan="invoice.length">
 									<a
