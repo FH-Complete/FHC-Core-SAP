@@ -132,7 +132,7 @@ Die Transaktion und die Bearbeitung der Zahlung, kann bis zu sechs Werktage daue
 				<div class="row collapse" id="faq-1">
 					<div class="col card card-body border-light">
 						<pre>In diesem Fall ist der Spam-Ordner zu kontrollieren. Falls die Rechnung nicht übermittelt wurde ersuchen wir um Information an <a href="mailto:billing@technikum-wien.at">billing@technikum-wien.at</a>.
-Die Rechnung wird Ihnen erneut zugesendet.</pre>
+Die Rechnung wird Ihnen erneut zugesendet. <u><strong>Erst nach Erhalt der Rechnung ist der Betrag zu überweisen</strong></u></pre>
 					</div>
 				</div>
 
@@ -225,6 +225,49 @@ Die Rechnung wird Ihnen erneut zugesendet.</pre>
 						<pre>Falls eine Rechnung doppelt überwiesen wurde, bitten wir Sie dies an <a href="mailto:billing@technikum-wien.at">billing@technikum-wien.at</a> zu melden. Wir werden Ihnen eine Zahlung refundieren.</pre>
 					</div>
 				</div>
+
+				<br/>
+
+				<!-- FAQ 6 -->
+				<div class="row g-0">
+					<div class="col-1" style="width: 30px;">
+						<a role="button"
+							class="fa-solid fa-plus fa-xl link-dark"
+							style="text-decoration: none;"
+							data-bs-toggle="collapse" href="#faq-6" aria-expanded="false" aria-controls="faq-6"
+						></a>
+					</div>
+					<div class="col-11">
+						Es stehen mehrere Positionen auf der Rechnung – soll für jede Position eine Überweisung durchgeführt werden?
+					</div>
+				</div>
+				<div class="row collapse" id="faq-6">
+					<div class="col card card-body border-light">
+						<pre>Nein, es ist immer der auf der Rechnung ausgewiesene Gesamtbetrag zu überweisen.</pre>
+					</div>
+				</div>
+
+				<br/>
+
+				<!-- FAQ 7 -->
+				<div class="row g-0">
+					<div class="col-1" style="width: 30px;">
+						<a role="button"
+							class="fa-solid fa-plus fa-xl link-dark"
+							style="text-decoration: none;"
+							data-bs-toggle="collapse" href="#faq-7" aria-expanded="false" aria-controls="faq-7"
+						></a>
+					</div>
+					<div class="col-11">
+						Wann kann der Betrag überwiesen werden?
+					</div>
+				</div>
+				<div class="row collapse" id="faq-7">
+					<div class="col card card-body border-light">
+						<pre>Wir möchten Sie darauf hinweisen, dass Überweisungen erst bei Erhalt der Rechnung durchzuführen sind. Bitte um Angabe der Rechnungsnummer als Zahlungsreferenz.</pre>
+					</div>
+				</div>
+
 			</div>
 		</div>
 	</div>
