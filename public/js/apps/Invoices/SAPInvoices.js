@@ -210,6 +210,7 @@ const SAPInvoicesApp = Vue.createApp({
 					</template>
 
 					<!-- Not relevant invoices -->
+					<!--
 					<template v-for="(invoice, invoiceIndex) in notRelevantInvoices">
 						<tr>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">Nicht relevant</td>
@@ -225,6 +226,7 @@ const SAPInvoicesApp = Vue.createApp({
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 						</tr>
 					</template>
+					-->
 
 				</tbody>
 			</table>
