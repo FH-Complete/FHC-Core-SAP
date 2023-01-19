@@ -139,7 +139,9 @@ const SAPInvoicesApp = Vue.createApp({
 					if (statusObj.ConsistencyStatusCode == 3)
 					{
 						// If the release status is approved
-						if (statusObj.ReleaseStatusCode == 4 || statusObj.ReleaseStatusCode == 5)
+						if (statusObj.ReleaseStatusCode == 3
+							|| statusObj.ReleaseStatusCode == 4
+							|| statusObj.ReleaseStatusCode == 5)
 						{
 							// If paid
 							if (paid === true)
