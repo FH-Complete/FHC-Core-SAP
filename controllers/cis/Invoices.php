@@ -65,7 +65,7 @@ class Invoices extends FHC_Controller
 		$invoices = $this->syncpaymentslib->listInvoices($person_id);
 
 		// If invoices have been found
-		if (hasData($invoices))
+		if (hasData($invoices) && isset(getData($invoices)->{SyncPaymentsLib::INVOICES_EXISTS_SAP}))
 		{
 			// Stores the result into the user session
 			setSessionElement(

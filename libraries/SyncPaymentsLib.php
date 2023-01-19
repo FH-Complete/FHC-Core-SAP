@@ -57,6 +57,9 @@ class SyncPaymentsLib
 	//
 	const GMBH_LEHRGAENGE_LIST = array(-18, -30);
 
+	//
+	const GUTSCHRIFT_CODE = "CCM";
+
 	private $_ci; // Code igniter instance
 	private $_isInvoiceClearedCache; // Cache Invoice Status Results
 	private $_getInvoiceIDFromSalesOrderCache; // Cache Sales Order results
@@ -189,31 +192,35 @@ class SyncPaymentsLib
 		// For each SAP invoice
 		foreach (getData($customerInvoiceResult)->CustomerInvoice as $customerInvoice)
 		{
-			// If The Item property exists
-			if (isset($customerInvoice->Item))
+			// If the invoice is not a "Gutschrift" => self::GUTSCHRIFT_CODE
+			if (isset($customerInvoice->ProcessingTypeCode) && $customerInvoice->ProcessingTypeCode != self::GUTSCHRIFT_CODE)
 			{
-				// If the item property is an array
-				if (!isEmptyArray($customerInvoice->Item))
+				// If The Item property exists
+				if (isset($customerInvoice->Item))
 				{
-					// For each sale order
-					foreach ($customerInvoice->Item as $ciItem)
+					// If the item property is an array
+					if (!isEmptyArray($customerInvoice->Item))
 					{
-						// Check if the sale order id exists
-						if (isset($ciItem->SalesOrderReference)
-							&& isset($ciItem->SalesOrderReference->ID)
-							&& isset($ciItem->SalesOrderReference->ID->_))
+						// For each sale order
+						foreach ($customerInvoice->Item as $ciItem)
 						{
-							// Add the SAP invoice to the list
-							$sapInvoicesWithSO[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
+							// Check if the sale order id exists
+							if (isset($ciItem->SalesOrderReference)
+								&& isset($ciItem->SalesOrderReference->ID)
+								&& isset($ciItem->SalesOrderReference->ID->_))
+							{
+								// Add the SAP invoice to the list
+								$sapInvoicesWithSO[$ciItem->SalesOrderReference->ID->_] = $customerInvoice;
+							}
 						}
+					} // Otherwise check if the sale order id exists
+					elseif (isset($customerInvoice->Item->SalesOrderReference)
+						&& isset($customerInvoice->Item->SalesOrderReference->ID)
+						&& isset($customerInvoice->Item->SalesOrderReference->ID->_))
+					{
+						// Add the SAP invoice to the list
+						$sapInvoicesWithSO[$customerInvoice->Item->SalesOrderReference->ID->_] = $customerInvoice;
 					}
-				} // Otherwise check if the sale order id exists
-				elseif (isset($customerInvoice->Item->SalesOrderReference)
-					&& isset($customerInvoice->Item->SalesOrderReference->ID)
-					&& isset($customerInvoice->Item->SalesOrderReference->ID->_))
-				{
-					// Add the SAP invoice to the list
-					$sapInvoicesWithSO[$customerInvoice->Item->SalesOrderReference->ID->_] = $customerInvoice;
 				}
 			}
 		}
@@ -268,8 +275,8 @@ class SyncPaymentsLib
 			$resultInvoiceObj->bezeichnung = $sapSO->buchungstext;
 			$resultInvoiceObj->studiensemester = $sapSO->studiensemester_kurzbz;
 			$resultInvoiceObj->betrag = $sapSO->betrag * -1;
-			$resultInvoiceObj->partial = $resultInvoiceObj->betrag;
 			$resultInvoiceObj->paid = $sapSO->paid != null && $sapSO->paid == 0;
+			$resultInvoiceObj->partial = $resultInvoiceObj->paid ? $resultInvoiceObj->betrag : 0;
 			$resultInvoiceObj->studiengang_kz = $sapSO->studiengang_kz;
 
 			// If there are invoices from the FHTW

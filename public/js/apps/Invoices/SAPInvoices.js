@@ -112,6 +112,50 @@ const SAPInvoicesApp = Vue.createApp({
 			for (let i = 0; i < invoice.length; i++) total += parseFloat(invoice[i].partial);
 
 			return total.toFixed(2);
+		},
+		isPaid: function(invoice) {
+
+			// For each invoice entry
+			for (let i = 0; i < invoice.length; i++)
+			{
+				// If at least one is not paid then return everything as not paid
+				if (invoice[i].paid == false) return false;
+			}
+
+			// Otherwise return everything as paid
+			return true;
+		},
+		getStatus: function(statusObj, paid) {
+
+			let status = "-";
+
+			// Better safe than sorry!
+			if (statusObj != null)
+			{
+				// 
+				if (statusObj.ClearingStatusCode == 4)
+				{
+					// If the invoice is consistent
+					if (statusObj.ConsistencyStatusCode == 3)
+					{
+						// If the release status is approved
+						if (statusObj.ReleaseStatusCode == 4 || statusObj.ReleaseStatusCode == 5)
+						{
+							// If paid
+							if (paid === true)
+							{
+								status = "Bezahlt";
+							}
+							else
+							{
+								status = "Offen";
+							}
+						}
+					}
+				}
+			}
+
+			return status;
 		}
 	},
 	template: `
@@ -173,18 +217,8 @@ const SAPInvoicesApp = Vue.createApp({
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotal(invoice)) }}</td>
 								<!-- <td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(getTotalPartial(invoice)) }}</td> -->
 								<td class="align-middle" v-bind:rowspan="invoice.length">{{ formatValueIfNull(invoiceEntry.email) }}</td>
-								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': invoiceEntry.paid, 'bg-warning': !invoiceEntry.paid}">
-									<template v-if="invoiceEntry.status != null && invoiceEntry.status.ReleaseStatusCode == 3 && invoiceEntry.status.ClearingStatusCode == 4">
-										<template v-if="invoiceEntry.paid">
-											<strong>Bezahlt</strong>
-										</template>
-										<template v-else>
-											<strong>Offen</strong>
-										</template>
-									</template>
-									<template v-else>
-										Undefined
-									</template>
+								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': isPaid(invoice), 'bg-warning': !isPaid(invoice)}">
+									<strong>{{ getStatus(invoiceEntry.status, isPaid(invoice)) }}</strong>
 								</td>
 								<td class="align-middle text-center" v-bind:rowspan="invoice.length">
 									<a
@@ -210,6 +244,7 @@ const SAPInvoicesApp = Vue.createApp({
 					</template>
 
 					<!-- Not relevant invoices -->
+					<!--
 					<template v-for="(invoice, invoiceIndex) in notRelevantInvoices">
 						<tr>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">Nicht relevant</td>
@@ -218,13 +253,14 @@ const SAPInvoicesApp = Vue.createApp({
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotal(notRelevantInvoices)) }}</td>
-							<!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td> -->
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 							<td class="align-middle bg-success" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length"><strong>Bezahlt</strong></td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 						</tr>
 					</template>
+					-->
 
 				</tbody>
 			</table>
