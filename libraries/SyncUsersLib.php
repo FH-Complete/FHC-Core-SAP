@@ -525,9 +525,9 @@ class SyncUsersLib
 
 				// If bank data are present for the current user then they are added to $data
 				// NOTE: here are logged warnings into the database
-				$this->_setUserBankData(
-					$data, $userData->person_id, $userData->name, $userData->surname, $userData->iban, $userData->swift
-				);
+				//$this->_setUserBankData(
+				//	$data, $userData->person_id, $userData->name, $userData->surname, $userData->iban, $userData->swift
+				//);
 
 				// Get the correct address info
 				$data['Customer']['AddressInformation']['Address']['PostalAddress'] = $this->_getAddressInformations($userData);
