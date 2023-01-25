@@ -21,6 +21,9 @@ class JQMSchedulerLib
 
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
+	
+	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
+	const BEFORE_START = 'sap_sync_employees_x_days_before_start';
 
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
@@ -42,6 +45,8 @@ class JQMSchedulerLib
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 		// Load payments configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
+		// Load employees configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Employees');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -432,11 +437,25 @@ class JQMSchedulerLib
 			JOIN public.tbl_benutzer b USING(person_id)
 			JOIN public.tbl_mitarbeiter m ON (m.mitarbeiter_uid = b.uid)
 			LEFT JOIN sync.tbl_sap_mitarbeiter sm ON (m.mitarbeiter_uid = sm.mitarbeiter_uid)
+			JOIN (
+				SELECT DISTINCT ON (mitarbeiter_uid) *
+				FROM bis.tbl_bisverwendung bis
+				WHERE (
+					(bis.ende >= NOW() OR bis.ende IS NULL)
+					AND
+					(bis.beginn::DATE <= (NOW() + INTERVAL ?\' Days\')::DATE)
+			    )
+			    AND bis.ba1code IN ?
+			    ORDER BY mitarbeiter_uid, beginn
+			) bis ON bis.mitarbeiter_uid = m.mitarbeiter_uid
 			WHERE m.fixangestellt = TRUE
 			AND sm.mitarbeiter_uid IS NULL
 			AND b.aktiv
 			AND personalnummer > 0
-		');
+		', array(
+			$this->_ci->config->item(self::BEFORE_START),
+			$this->_ci->config->item(self::FHC_CONTRACT_TYPES)
+		));
 
 		// If error occurred while retrieving new users from database then return the error
 		if (isError($newUsersResult)) return $newUsersResult;
