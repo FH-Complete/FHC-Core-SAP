@@ -236,8 +236,11 @@ class SyncPaymentsLib
 				k.betrag,
 				sso.sap_sales_order_id,
 				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid,
-				k.studiengang_kz
+				k.studiengang_kz,
+				s.student_uid
 			  FROM public.tbl_konto k
+			  JOIN public.tbl_prestudent ps USING(studiengang_kz, person_id)
+			  JOIN public.tbl_student s USING(prestudent_id)
 		     LEFT JOIN sync.tbl_sap_salesorder sso USING(buchungsnr)
 			 WHERE k.person_id = ?
 			   AND k.buchungsnr_verweis IS NULL
@@ -271,6 +274,7 @@ class SyncPaymentsLib
 			$resultInvoiceObj = new stdClass();
 
 			// DB invoice data
+			$resultInvoiceObj->uid = $sapSO->student_uid;
 			$resultInvoiceObj->buchungsnr = $sapSO->buchungsnr;
 			$resultInvoiceObj->bezeichnung = $sapSO->buchungstext;
 			$resultInvoiceObj->studiensemester = $sapSO->studiensemester_kurzbz;
