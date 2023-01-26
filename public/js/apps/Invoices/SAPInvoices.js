@@ -82,15 +82,15 @@ const SAPInvoicesApp = Vue.createApp({
 		},
 		getPDFURL: function(invoiceEntries) {
 
-			//
-			let buchungsnummern = '';
+			let buchungsnummern = ''; //
 
 			//
 			for (let i = 0; i < invoiceEntries.length; i++) buchungsnummern += invoiceEntries[i].buchungsnr + ";";
 
 			return FHC_JS_DATA_STORAGE_OBJECT.app_root +
 				"cis/private/pdfExport.php?xml=konto.rdf.php" +
-				"&xsl=Zahlung&buchungsnummern=" + buchungsnummern;
+				"&xsl=Zahlung&buchungsnummern=" + buchungsnummern +
+				"&uid=" + invoiceEntries[0].uid;
 		},
 		formatValueIfNull: function(value) {
 			return value == null ? '-' : value;
