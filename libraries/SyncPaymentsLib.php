@@ -235,7 +235,7 @@ class SyncPaymentsLib
 				k.studiensemester_kurzbz,
 				k.betrag,
 				sso.sap_sales_order_id,
-				(SELECT kk.betrag + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid,
+				(SELECT SUM(kk.betrag) + k.betrag FROM public.tbl_konto kk WHERE kk.buchungsnr_verweis = k.buchungsnr) AS paid,
 				k.studiengang_kz
 			  FROM public.tbl_konto k
 		     LEFT JOIN sync.tbl_sap_salesorder sso USING(buchungsnr)
