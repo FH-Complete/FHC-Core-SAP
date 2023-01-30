@@ -89,7 +89,7 @@ class SyncEmployeesLib
 	public function importEmployeeIDs()
 	{
 		$dbModel = new DB_Model();
-		
+
 		// Get all employees form database
 		$employeeResult = $dbModel->execReadOnlyQuery('
 			SELECT m.mitarbeiter_uid AS uid
@@ -101,7 +101,7 @@ class SyncEmployeesLib
 			   AND m.personalnummer > 0
 			ORDER BY m.mitarbeiter_uid
 		');
-		
+
 		// If an error occurred then return it
 		if (isError($employeeResult)) return $employeeResult;
 
@@ -116,7 +116,7 @@ class SyncEmployeesLib
 
 		// If there are no employees on SAP then return an error
 		if (!hasData($sapEmployeeResult)) return error('Was not possible to retrieve employees from SAP');
-		
+
 		// Log some statistics
 		$this->_ci->LogLibSAP->logInfoDB('Employees to import: '.count(getData($employeeResult)));
 		$this->_ci->LogLibSAP->logInfoDB('Employees retrieved from SAP: '.count(getData($sapEmployeeResult)));
@@ -155,7 +155,7 @@ class SyncEmployeesLib
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public function create($emps, $job = true)
 	{
@@ -712,7 +712,7 @@ class SyncEmployeesLib
 					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
 
 					if (!hasData($functionResult))
-						return error("Fehler beim laden der Benutzerfunktionen");
+						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
 
 					$functionResult = getData($functionResult);
 
@@ -895,7 +895,7 @@ class SyncEmployeesLib
 					$oldFunctionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $oldBis->beginn, $oldBis->ende);
 
 					if (!hasData($oldFunctionResult))
-						return error("Fehler beim laden der Benutzerfunktionen");
+						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
 
 					$oldFunction = array_reverse(getData($oldFunctionResult))[0];
 					$oldOeResult = $dbModel->execReadOnlyQuery('
@@ -907,7 +907,7 @@ class SyncEmployeesLib
 					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
 
 					if (!hasData($functionResult))
-						return error("Fehler beim laden der Benutzerfunktionen");
+						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
 
 					$functionResult = getData($functionResult);
 					/*Gehen die Benutzerfunktionen der aktuellen Bisverwendung durch*/
@@ -1395,28 +1395,28 @@ class SyncEmployeesLib
 						return error('No Kstzuordnung available for the given user');
 				}
 			}
-			
+
 			$this->_ci->load->model('ressource/mitarbeiter_model', 'MitarbeiterModel');
 			$mitarbeiter = $this->_ci->MitarbeiterModel->loadWhere(array('mitarbeiter_uid' => $empPersonalData->uid));
-			
+
 			if (isError($mitarbeiter))
 				return $mitarbeiter;
-			
+
 			if (hasData($mitarbeiter))
 			{
 				$mitarbeiter = getData($mitarbeiter)[0];
 				$this->_ci->load->model('organisation/standort_model', 'StandortModel');
-				
+
 				$this->_ci->StandortModel->addJoin('public.tbl_kontakt', 'standort_id');
 				$vorwahl = $this->_ci->StandortModel->loadWhere(array(
 					'public.tbl_kontakt.standort_id' => $mitarbeiter->standort_id,
 					'public.tbl_kontakt.kontakttyp' => 'telefon'
 					)
 				);
-				
+
 				if (isError($vorwahl))
 					return $vorwahl;
-				
+
 				if (hasData($vorwahl) && $mitarbeiter->telefonklappe !== null)
 				{
 					$empAllData->nummer = getData($vorwahl)[0]->kontakt . ' ' . $mitarbeiter->telefonklappe;
@@ -1537,7 +1537,7 @@ class SyncEmployeesLib
 				)
 			)
 		);
-		
+
 		if (isset($empData->nummer))
 		{
 			$telephone = array(
@@ -1802,4 +1802,3 @@ class SyncEmployeesLib
 		return false;
 	}
 }
-
