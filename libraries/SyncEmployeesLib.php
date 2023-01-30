@@ -615,7 +615,8 @@ class SyncEmployeesLib
 								}
 
 								/*wenn die OE nicht in der Sync Tabelle eingetragen ist, wird abgebrochen*/
-								return error("Eine Organisation ist im SAPByD nicht richtig hinterlegt");
+								$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Tabelle nicht vorhanden '. $position->OrganisationalCenterDetails->OrganisationalCenterID);
+								continue 5;
 							}
 						}
 					}
@@ -629,7 +630,10 @@ class SyncEmployeesLib
 			$bisResult = $this->_ci->BisverwendungModel->getVerwendungen($empData->uid, $firstDateSap);
 
 			if (!hasData($bisResult))
-				return error("Keine bis Verwendung vorhanden");
+			{
+				$this->_ci->LogLibSAP->logWarningDB('Keine BIS-Verwendung vorhanden: '. $empData->person_id);
+				continue;
+			}
 
 			$bisResult = getData($bisResult);
 
@@ -672,7 +676,7 @@ class SyncEmployeesLib
 							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
 							$sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate = $leavingDate;
 							if (!$updated)
-								break;
+								continue 2;
 						}
 					}
 					continue;
@@ -697,7 +701,7 @@ class SyncEmployeesLib
 							$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
 
 							if (!$updated)
-								break;
+								continue 2;
 						}
 					}
 				}
@@ -714,7 +718,10 @@ class SyncEmployeesLib
 					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
 
 					if (!hasData($functionResult))
-						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Fehler beim Laden der Benutzerfunktionen: ' . $empData->uid);
+						continue 2;
+					}
 
 					$functionResult = getData($functionResult);
 
@@ -728,7 +735,11 @@ class SyncEmployeesLib
 								', array($currentFunction->oe_kurzbz));
 
 						if (!hasData($oeResult))
-							return error("Keine Organisation in SAP gefunden");
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Tabelle nicht vorhanden '. $currentFunction->oe_kurzbz);
+							continue 3;
+						}
+						
 
 						$currentOE = getData($oeResult)[0]->oe_kurzbz_sap;
 
@@ -769,7 +780,7 @@ class SyncEmployeesLib
 								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 
 								if (!$updated)
-									break 2;
+									continue 3;
 							}
 							else if ((isset($sapOE) && $currentOE !== $sapOE) ||
 									(isset($sapEmpType['functions'][$currentBis->beginn]) &&
@@ -779,7 +790,7 @@ class SyncEmployeesLib
 								$updated = $this->transferEmployee($sapID, $currentBis->beginn, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 
 								if (!$updated)
-									break 2;
+									continue 3;
 							}
 
 						}
@@ -808,8 +819,8 @@ class SyncEmployeesLib
 							}
 							else
 							{
-								$this->_ci->LogLibSAP->logWarningDB('No SAP EndDate: '. $empData->person_id);
-								break 2;
+								$this->_ci->LogLibSAP->logWarningDB('No SAP EndDate: '. $empData->uid);
+								continue 3;
 							}
 
 							$oldFASEndDate = null;
@@ -824,14 +835,14 @@ class SyncEmployeesLib
 								$updated = $this->transferEmployee($sapID, $currentFunction->datum_von, $currentBis->vertragsstunden, $currentOE, $empData->person_id);
 								$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 								if (!$updated)
-									break 2;
+									continue 3;
 							}
 							else if($currentBis->beginn > $currentFunction->datum_von && $oldSAPEndDate === '9999-12-31')
 							{
 								$updated = $this->transferEmployee($sapID, $currentBis->beginn, $currentBis->vertragsstunden, $currentOE, $empData->person_id, true);
 								$sapEmpType['functions'][$currentBis->beginn] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 								if (!$updated)
-									break 2;
+									continue 3;
 							}
 							else
 							{
@@ -839,12 +850,12 @@ class SyncEmployeesLib
 								{
 									$updated = $this->addLeavingDate($sapID, $oldFASEndDate, $empData->person_id);
 									if (!$updated)
-										break 2;
+										continue 3;
 								}
 								$updated = $this->rehireEmployee($sapID, $currentFunction->datum_von, $typeCode, $currentBis->vertragsstunden, $currentOE, $empData->person_id, $rehireLeaving);
 								$sapEmpType['functions'][$currentFunction->datum_von] = (object) ['ValidityPeriod' => (object) ['EndDate' => $newEndDate]];
 								if (!$updated)
-									break 2;
+									continue 3;
 							}
 						}
 					}
@@ -880,8 +891,8 @@ class SyncEmployeesLib
 					}
 					else
 					{
-						$this->_ci->LogLibSAP->logWarningDB('Bisverwendung has no Enddate for the given user: '. $empData->person_id);
-						break;
+						$this->_ci->LogLibSAP->logWarningDB('Bisverwendung has no Enddate for the given user: '. $empData->uid);
+						continue 2;
 					}
 
 					if ($oldSAPEndDate !== $newEndDate)
@@ -890,14 +901,17 @@ class SyncEmployeesLib
 						$sapEmpType['functions'][$lastSAPFunctionDate]->ValidityPeriod->EndDate = $newEndDate;
 
 						if (!$updated)
-							break 2;
+							continue 2;
 					}
 
 					/*Holen uns die letzte Benutzerfunktion von der letzten Bisverwendung um uns dann die letzte OE zu holen*/
 					$oldFunctionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $oldBis->beginn, $oldBis->ende);
 
 					if (!hasData($oldFunctionResult))
-						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Fehler beim Laden der Benutzerfunktionen: '. $empData->uid);
+						continue 2;
+					}
 
 					$oldFunction = array_reverse(getData($oldFunctionResult))[0];
 					$oldOeResult = $dbModel->execReadOnlyQuery('
@@ -909,7 +923,10 @@ class SyncEmployeesLib
 					$functionResult = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empData->uid, 'kstzuordnung', $currentBis->beginn, $currentBis->ende);
 
 					if (!hasData($functionResult))
-						return error("Fehler beim Laden der Benutzerfunktionen: ".$empData->uid);
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Fehler beim Laden der Benutzerfunktionen: '. $empData->uid);
+						continue 2;
+					}
 
 					$functionResult = getData($functionResult);
 					/*Gehen die Benutzerfunktionen der aktuellen Bisverwendung durch*/
@@ -919,7 +936,10 @@ class SyncEmployeesLib
 							continue;
 
 						if (!hasData($oldOeResult))
-							return error("Keine Organisation in SAP gefunden");
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Tabelle nicht vorhanden '. $currentFunction->oe_kurzbz);
+							continue 3;
+						}
 
 						/*Holen uns die aktuelle OE Zuordnung*/
 						$oeResult = $dbModel->execReadOnlyQuery('
@@ -929,7 +949,10 @@ class SyncEmployeesLib
 								', array($currentFunction->oe_kurzbz));
 
 						if (!hasData($oeResult))
-							return error("Keine Organisation in SAP gefunden");
+						{
+							$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Tabelle nicht vorhanden '. $currentFunction->oe_kurzbz);
+							continue 3;
+						}
 
 						$currentOE = getData($oeResult)[0]->oe_kurzbz_sap;
 
@@ -960,12 +983,12 @@ class SyncEmployeesLib
 						}
 
 						if (!$updated)
-							break 2;
+							continue 3;
 					}
 				}
 			}
 
-			if ($updated)
+			if ($updated || is_null($updated))
 			{
 				$update = $this->_ci->SAPMitarbeiterModel->update(
 					array(
@@ -979,14 +1002,9 @@ class SyncEmployeesLib
 				// If database error occurred then return it
 				if (isError($update)) return $update;
 			}
-			else if ($updated === false)
-			{
-				$error = true;
-				continue;
-			}
 		}
 
-		if ($job === false && $error)
+		if ($job === false && isset($updated) && $updated === false)
 			return error('Please check the logs');
 
 		return success('Users data updated successfully');
