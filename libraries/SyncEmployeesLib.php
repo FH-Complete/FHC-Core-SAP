@@ -553,11 +553,13 @@ class SyncEmployeesLib
 			$sapEmpData = getData($sapEmpData);
 
 			if ($sapEmpData->ProcessingConditions->ReturnedQueryHitsNumberValue === 0)
-				return error('Emp not found in SAP');
+				return error('Emp not found in SAP: ' . $empData->uid);
 
 			$sapEmpData = $sapEmpData->EmployeeData->EmploymentData;
 
 			$sapEmpData = $this->checkIfObject($sapEmpData);
+
+			$startDates = array();
 
 			foreach ($sapEmpData as $sapData)
 			{
