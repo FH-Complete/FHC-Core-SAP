@@ -560,7 +560,7 @@ class SyncEmployeesLib
 			$sapEmpData = $this->checkIfObject($sapEmpData);
 
 			$startDates = array();
-
+			$sapEmpType = array();
 			foreach ($sapEmpData as $sapData)
 			{
 				$workAgreements =  $this->checkIfObject($sapData->WorkAgreementData);
@@ -622,7 +622,6 @@ class SyncEmployeesLib
 					}
 				}
 			}
-
 			/*holen uns das erste eingetragene Datum aus SAPByD
 			damit wir uns die Bisverwendungen ab dem Zeitpunkt holen*/
 			ksort($startDates);
@@ -792,7 +791,6 @@ class SyncEmployeesLib
 								if (!$updated)
 									continue 3;
 							}
-
 						}
 						else
 						{
