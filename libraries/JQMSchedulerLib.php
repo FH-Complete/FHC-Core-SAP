@@ -12,12 +12,15 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_USERS = 'SAPUsersCreate';
 	const JOB_TYPE_SAP_UPDATE_USERS = 'SAPUsersUpdate';
 	const JOB_TYPE_SAP_NEW_SERVICES = 'SAPServicesCreate';
+	const JOB_TYPE_SAP_UPDATE_SERVICES = 'SAPServicesUpdate';
 	const JOB_TYPE_SAP_NEW_PAYMENTS = 'SAPPaymentCreate';
 	const JOB_TYPE_SAP_NEW_EMPLOYEES = 'SAPEmployeesCreate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
+
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
+	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
 	// Maximum amount of users to be placed in a single job
 	const UPDATE_LENGTH = 200;
@@ -37,6 +40,8 @@ class JQMSchedulerLib
 
 		// Load users configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
+		// Load payments configuration
+		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -277,6 +282,34 @@ class JQMSchedulerLib
 	}
 
 	/**
+	 * Gets all the active employees
+	 */
+	public function updateServices()
+	{
+		$jobInput = null;
+
+		$dbModel = new DB_Model();
+
+		// Gets all the employees
+		$updateUsersResult = $dbModel->execReadOnlyQuery('
+			SELECT vwm.person_id
+			  FROM campus.vw_mitarbeiter vwm
+			  JOIN public.tbl_benutzerfunktion bf USING (uid)
+			 WHERE vwm.aktiv = TRUE
+			   AND bf.funktion_kurzbz = \'oezuordnung\'
+			   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
+			   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
+		      ORDER BY vwm.person_id DESC
+		');
+
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($updateUsersResult)) return $updateUsersResult;
+
+		// Return a success that contains all the arrays merged together
+		return success(getData($updateUsersResult));
+	}
+
+	/**
 	 * Looks for new payments that have been created in FHC and stores their person id into a payment job input
 	 */
 	public function newPayments()
@@ -369,14 +402,17 @@ class JQMSchedulerLib
 			  FROM public.tbl_konto ko
 			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE ko.betrag > 0
-			   AND ko.buchungstyp_kurzbz = \'ZuschussIO\'
+			   AND ko.buchungstyp_kurzbz IN ?
 			   AND ko.buchungsnr NOT IN (
 				SELECT kos.buchungsnr_verweis
 				  FROM public.tbl_konto kos
 				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
 			)
 		      GROUP BY ko.person_id
-		');
+		',
+		array(
+			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+		));
 
 		return $creditMemoResult;
 	}

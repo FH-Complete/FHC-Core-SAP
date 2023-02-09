@@ -27,6 +27,38 @@ class ManagePayments extends JQW_Controller
 	/**
 	 *
 	 */
+	public function listInvoicesByPersonId($person_id)
+	{
+		var_dump($this->syncpaymentslib->listInvoicesByPersonId($person_id));
+	}
+
+	/**
+	 *
+	 */
+	public function listInvoices($person_id)
+	{
+		var_dump($this->syncpaymentslib->listInvoices($person_id));
+	}
+
+	/**
+	 *
+	 */
+	public function getDocumentUUID($invoiceUUID)
+	{
+		var_dump($this->syncpaymentslib->getDocumentUUID($invoiceUUID));
+	}
+
+	/**
+	 *
+	 */
+	public function getPDF($documentUUID)
+	{
+		var_dump($this->syncpaymentslib->getPDF($documentUUID));
+	}
+
+	/**
+	 *
+	 */
 	public function getPaymentById($id)
 	{
 		var_dump($this->syncpaymentslib->getPaymentById($id));
