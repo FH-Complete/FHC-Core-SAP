@@ -44,6 +44,12 @@ class SyncPaymentsLib
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
+	//
+	const ANY = 'Any';
+	const ACCOUNTING_CODING_BLOCK_TYPE_CODE = 'payments_accounting_coding_block_type_code';
+	const GENERAL_LEDGER_ACCOUNT_ALIAS_CODE = 'payments_general_ledger_account_alias_code';
+	const LEISTUNGSSTIPENDIUM = 'Leistungsstipendium';
+
 	// 
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
 	const INVOICES_TO_BE_SYNCED = 'INVOICES_TO_BE_SYNCED';
@@ -600,6 +606,11 @@ class SyncPaymentsLib
 				// By default get the sales unit party id from the configs
 				$salesUnitPartyID = $this->_ci->config->item(self::INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID);
 
+				// Set by default the AccountingCodingBlockTypeCode with the one for the leistungstipendium
+				$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[self::ANY];
+				// Set by default the GeneralLedgerAccountAliasCode with the one for the leistungstipendium
+				$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[self::ANY];
+
 				// If the buchungstyp_kurzbz is _not_ for an incoming/outgoing grant
 				// then get the sales unit party id from database
 				if ($singlePayment->buchungstyp_kurzbz != $this->_ci->config->item(self::INCOMING_OUTGOING_GRANT))
@@ -620,6 +631,15 @@ class SyncPaymentsLib
 
 					// Here the salesUnitPartyID!
 					$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
+
+					// Change the AccountingCodingBlockTypeCode with the one for the incoming/outgoing
+					$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[
+						$this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)
+					];
+					// Change the GeneralLedgerAccountAliasCode with the one for the incoming/outgoing
+					$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[
+						$this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)
+					];
 				}
 
 				// Builds the data structure for the SOAP call
@@ -633,7 +653,7 @@ class SyncPaymentsLib
 						'DeliveryTerms' => array(
 							'CompleteDeliveryRequestedIndicator' => 1
 						),
-						'BaseBusinessTransactionDocumentID' => 'FHC-OUT-'.$singlePayment->buchungsnr,
+						'BaseBusinessTransactionDocumentID' => 'FHC-OUT-3-'.$singlePayment->buchungsnr,
 						'SalesAndServiceBusinessArea' => array(
 							'DistributionChannelCode' => '01'
 						),
@@ -649,10 +669,6 @@ class SyncPaymentsLib
 						),
 						'Item' => array(
 							'Description' => mb_substr($singlePayment->buchungstext, 0, 40),
-							'Product' => array(
-								'InternalID' => $service_id,
-								'TypeCode' => '2' // = Service
-							),
 							'ReceivablesPropertyMovementDirectionCode' => '1', // = Credit Memo Item
 							'CashDiscountDeductibleIndicator' => 'false', // = ??
 							'BaseBusinessTransactionDocumentItemID' => '10', // = Positions ID
@@ -666,20 +682,19 @@ class SyncPaymentsLib
 									)
 								)
 							),
-							'Quantity' => '1',
-							'QuantityTypeCode' => 'EA',/*
+							'Quantity' => array(
+								'_' => 1,
+								'TypeCode' => 'EA',
+								'unitCode' => 'EA'
+							),
+							'QuantityTypeCode' => 'EA',
 							'AccountingCodingBlockAssignment' => array(
 								'AccountingCodingBlock' => array(
-									'ProjectReference' => array(
-										'ProjectID' => 'COURSES-ESW-WS2020'
-									)
-								),
-								'PartnerAccountingCodingBlock' => array(
-									'ProjectReference' => array(
-										'ProjectID' => 'COURSES-ESW-WS2020'
-									)
+									'AccountingCodingBlockTypeCode' => $accountingCodingBlockTypeCode,
+									'GeneralLedgerAccountAliasCode' => $generalLedgerAccountAliasCode
 								)
-							)*/
+							),
+							'Z_Positionstext' => $singlePayment->buchungstext
 						)
 					)
 				);
