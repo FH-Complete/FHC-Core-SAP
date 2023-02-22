@@ -653,7 +653,7 @@ class SyncPaymentsLib
 						'DeliveryTerms' => array(
 							'CompleteDeliveryRequestedIndicator' => 1
 						),
-						'BaseBusinessTransactionDocumentID' => 'FHC-OUT-3-'.$singlePayment->buchungsnr,
+						'BaseBusinessTransactionDocumentID' => 'FHC-OUT-'.$singlePayment->buchungsnr,
 						'SalesAndServiceBusinessArea' => array(
 							'DistributionChannelCode' => '01'
 						),
