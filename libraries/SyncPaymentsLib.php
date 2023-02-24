@@ -3,7 +3,7 @@
 /**
  * Copyright (C) 2023 fhcomplete.org
  *
- * This program is free software: you can redistribute it and/or modify   
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -50,7 +50,7 @@ class SyncPaymentsLib
 	const GENERAL_LEDGER_ACCOUNT_ALIAS_CODE = 'payments_general_ledger_account_alias_code';
 	const LEISTUNGSSTIPENDIUM = 'Leistungsstipendium';
 
-	// 
+	//
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
 	const INVOICES_TO_BE_SYNCED = 'INVOICES_TO_BE_SYNCED';
 	const INVOICES_NOT_RELEVANT = 'INVOICES_NOT_RELEVANT';
@@ -606,10 +606,16 @@ class SyncPaymentsLib
 				// By default get the sales unit party id from the configs
 				$salesUnitPartyID = $this->_ci->config->item(self::INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID);
 
-				// Set by default the AccountingCodingBlockTypeCode with the one for the leistungstipendium
-				$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[self::ANY];
-				// Set by default the GeneralLedgerAccountAliasCode with the one for the leistungstipendium
-				$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[self::ANY];
+				// Erloeskontierung ermitteln abhaengig von Buchungstyp
+				if (isset($this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[$singlePayment->buchungstyp_kurzbz]))
+					$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[$singlePayment->buchungstyp_kurzbz];
+				else
+					$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[self::ANY];
+
+				if (isset($this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[$singlePayment->buchungstyp_kurzbz]))
+					$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[$singlePayment->buchungstyp_kurzbz];
+				else
+					$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[self::ANY];
 
 				// If the buchungstyp_kurzbz is _not_ for an incoming/outgoing grant
 				// then get the sales unit party id from database
@@ -632,14 +638,6 @@ class SyncPaymentsLib
 					// Here the salesUnitPartyID!
 					$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
 
-					// Change the AccountingCodingBlockTypeCode with the one for the incoming/outgoing
-					$accountingCodingBlockTypeCode = $this->_ci->config->item(self::ACCOUNTING_CODING_BLOCK_TYPE_CODE)[
-						$this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)
-					];
-					// Change the GeneralLedgerAccountAliasCode with the one for the incoming/outgoing
-					$generalLedgerAccountAliasCode = $this->_ci->config->item(self::GENERAL_LEDGER_ACCOUNT_ALIAS_CODE)[
-						$this->_ci->config->item(self::INCOMING_OUTGOING_GRANT)
-					];
 				}
 
 				// Builds the data structure for the SOAP call
@@ -1470,4 +1468,3 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
-
