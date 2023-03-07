@@ -159,7 +159,7 @@ class Projects_model extends ODATAClientModel
 				// Parameters
 				'ProjectID' => $projectId,
 				'TypeCode' => $type,
-				'ResponsibleCostCentreID' => $unitResponsible,
+			//	'ResponsibleCostCentreID' => $unitResponsible,
 				'ResponsibleEmployeeID'  => $personResponsible,
 				'PlannedStartDateTime' => toDate($startDate),
 				'PlannedEndDateTime' => toDate($endDate),
