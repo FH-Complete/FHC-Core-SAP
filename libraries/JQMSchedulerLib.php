@@ -49,8 +49,8 @@ class JQMSchedulerLib
 
 		// Load payments configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
-		// Load employees configuration
 
+		// Load employees configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Employees');
 	}
 
@@ -128,6 +128,17 @@ class JQMSchedulerLib
 								tbl_prestudent.person_id = ps.person_id
 								AND studiengang_kz = ps.studiengang_kz
 								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
+						) OR EXISTS (
+							-- Interessent with at least one payment and same degree program
+							SELECT
+								1
+							FROM
+								public.tbl_prestudent
+							JOIN	public.tbl_konto k USING(person_id)
+							WHERE
+								tbl_prestudent.person_id = ps.person_id
+								AND public.tbl_prestudent.studiengang_kz = ps.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
 						)
 					)
 			      GROUP BY ps.person_id
@@ -335,9 +346,12 @@ class JQMSchedulerLib
 			FROM
 				public.tbl_konto bk
 			WHERE
-				betrag < 0
+				bk.betrag < 0
 				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
 				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+				AND bk.buchungsnr_verweis IS NULL
+				AND bk.buchungsdatum <= now()
+				AND bk.buchungsdatum >= ?
 				AND
 				(
 					EXISTS(
@@ -389,11 +403,20 @@ class JQMSchedulerLib
 							AND studiengang_kz = bk.studiengang_kz
 							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 					)
+					OR
+					EXISTS(
+						-- No benutzer and at least a payment of type StudiengebuehrAnzahlung (drittstaaten) and same degree program
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND studiengang_kz = bk.studiengang_kz
+							AND bk.buchungstyp_kurzbz = \'StudiengebuehrAnzahlung\'
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
+					)
 				)
-
-				AND buchungsnr_verweis IS NULL
-				AND buchungsdatum <= now()
-				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
 
 		return $newPaymentsResult;
@@ -549,7 +572,11 @@ class JQMSchedulerLib
 			WHERE (bv.updateamum > sm.last_update_workagreement
 				OR sm.last_update_workagreement IS NULL
 				OR bf.updateamum > sm.last_update_workagreement
-				OR (current_date = (SELECT sbv.ende::date + 1 FROM bis.tbl_bisverwendung sbv WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid ORDER by sbv.ende DESC LIMIT 1)))
+				OR (current_date = (
+					SELECT sbv.ende::date + 1
+					  FROM bis.tbl_bisverwendung sbv
+					 WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid
+				      ORDER BY sbv.ende DESC LIMIT 1)))
 				AND bv.mitarbeiter_uid NOT IN ?
 			GROUP BY bv.mitarbeiter_uid
 		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
@@ -562,3 +589,4 @@ class JQMSchedulerLib
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
 	}
 }
+
