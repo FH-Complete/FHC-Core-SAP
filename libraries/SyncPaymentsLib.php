@@ -834,6 +834,7 @@ class SyncPaymentsLib
 		{
 			$data = array();
 			$UserPartyID = '';
+			$lastSAPOe = '';
 			$last_stg = '';
 			$buchungsnr_arr = array();
 
@@ -861,7 +862,8 @@ class SyncPaymentsLib
 				$paymentData = getData($result_openpayments);
 				foreach ($paymentData as $singlePayment)
 				{
-					if ($last_stg != $singlePayment->studiengang_kz)
+					// 
+					if ($lastSAPOe != $singlePayment->oe_kurzbz_sap)
 					{
 						if ($last_stg != '')
 						{
@@ -874,6 +876,7 @@ class SyncPaymentsLib
 							$this->_createSalesOrder($data, $buchungsnr_arr, $release);
 						}
 
+						$lastSAPOe = $singlePayment->oe_kurzbz_sap;
 						$last_stg = $singlePayment->studiengang_kz;
 						$buchungsnr_arr = array();
 						$task_id = '';
@@ -895,10 +898,9 @@ class SyncPaymentsLib
 							}
 						}
 
+						// GMBH or Special Courses
 						if ($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
 						{
-							// GMBH or Special Courses
-
 							// Get ProjectID if it is a Lehrgang or Special Course
 							$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
 							if (!isError($TaskResult) && hasData($TaskResult))
@@ -929,16 +931,23 @@ class SyncPaymentsLib
 							 	$salesUnitPartyID = $this->_ci->config->item('payments_sales_unit_custom');
 							}
 						}
-						else
+						else // FH payments
 						{
-							// FH
-							$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
-							if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
-								$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
-							else
+							// Standard payment cost center
+							if (!isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 							{
-								$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
-								continue;
+								$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
+								if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
+									$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
+								else
+								{
+									$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
+									continue;
+								}
+							}
+							else // alternative payment cost center
+							{
+								$salesUnitPartyID = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz];
 							}
 
 							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
@@ -979,6 +988,7 @@ class SyncPaymentsLib
 						);
 					}
 
+					// 
 					if ($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 					{
 						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
@@ -1240,11 +1250,13 @@ class SyncPaymentsLib
 				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
 				bk.buchungstext, bk.buchungstyp_kurzbz,
 				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
-				tbl_studiensemester.start as studiensemester_start
+				tbl_studiensemester.start as studiensemester_start,
+				so.oe_kurzbz_sap
 			FROM
 				public.tbl_konto bk
-				JOIN public.tbl_studiengang USING(studiengang_kz)
+				JOIN public.tbl_studiengang sg USING(studiengang_kz)
 				JOIN public.tbl_studiensemester USING(studiensemester_kurzbz)
+				JOIN sync.tbl_sap_organisationsstruktur so ON(so.oe_kurzbz = sg.oe_kurzbz)
 			WHERE
 				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
 				AND betrag < 0
@@ -1255,7 +1267,7 @@ class SyncPaymentsLib
 				AND buchungsdatum <= now()
 				AND tbl_studiensemester.start <= ?
 			ORDER BY
-				studiengang_kz, studiensemester_start
+				oe_kurzbz_sap, studiengang_kz, studiensemester_start
 		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
 
 		return $dbPaymentData;
