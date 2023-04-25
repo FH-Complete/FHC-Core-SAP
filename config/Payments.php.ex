@@ -28,6 +28,7 @@ $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
 // International office sales unit party id (aka organization unit id)
 $config['payments_international_office_sales_unit_party_id'] = '100097';
 
+// Credit memo types read from database
 $config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungstipendium');
 
 // Credit memo types read from database
