@@ -1247,25 +1247,29 @@ class SyncPaymentsLib
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
-				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
+				bk.buchungsnr,
+				bk.studiengang_kz,
+				bk.studiensemester_kurzbz,
+				bk.betrag,
+				bk.buchungsdatum,
 				bk.buchungstext, bk.buchungstyp_kurzbz,
-				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
-				tbl_studiensemester.start as studiensemester_start,
+				UPPER(sg.typ || sg.kurzbz) as studiengang_kurzbz,
+				ss.start as studiensemester_start,
 				so.oe_kurzbz_sap
 			FROM
 				public.tbl_konto bk
 				JOIN public.tbl_studiengang sg USING(studiengang_kz)
-				JOIN public.tbl_studiensemester USING(studiensemester_kurzbz)
+				JOIN public.tbl_studiensemester ss USING(studiensemester_kurzbz)
 				JOIN sync.tbl_sap_organisationsstruktur so ON(so.oe_kurzbz = sg.oe_kurzbz)
 			WHERE
-				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
-				AND betrag < 0
-				AND 0 != betrag + COALESCE((SELECT sum(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr),0)
-				AND buchungsnr_verweis IS NULL
-				AND person_id = ?
-				AND buchungsdatum >= ?
-				AND buchungsdatum <= now()
-				AND tbl_studiensemester.start <= ?
+				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
+				AND bk.betrag < 0
+				AND 0 != bk.betrag + COALESCE((SELECT SUM(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr), 0)
+				AND bk.buchungsnr_verweis IS NULL
+				AND bk.person_id = ?
+				AND bk.buchungsdatum >= ?
+				AND bk.buchungsdatum <= NOW()
+				AND ss.start <= ?
 			ORDER BY
 				oe_kurzbz_sap, studiengang_kz, studiensemester_start
 		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
