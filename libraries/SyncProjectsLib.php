@@ -3000,7 +3000,7 @@ class SyncProjectsLib
 		$customResult = $dbModel->execReadOnlyQuery('
 			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
 				UPPER(s0.typ || s0.kurzbz) AS name,
-				200000 AS unit_responsible,
+				\'200000\' AS unit_responsible,
 				s0.studiengang_kz
 			  FROM public.tbl_studiengang s0
 			 WHERE s0.studiengang_kz IN ?
