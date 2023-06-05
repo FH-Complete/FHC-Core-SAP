@@ -34,7 +34,7 @@
 					<div class="col-lg-6">
 						<input class="form-control" type="text" id="empId" placeholder="Mitarbeiter" />
 					</div>
-					<div class="col-lg-6">
+					<div class="col-lg-4">
 						<button id="sync" class="btn btn-default">Syncen</button>
 					</div>
 				</div>
