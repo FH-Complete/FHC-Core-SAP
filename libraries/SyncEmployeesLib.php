@@ -659,12 +659,12 @@ class SyncEmployeesLib
 				{
 					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'funktion' || $bestandteil->vertragsbestandteiltyp_kurzbz === 'karenz')
 					{
-						$this->_getStunden($bestandteil, $bestandteile, $empData);
+						$this->_getStunden($bestandteil, $bestandteile);
 					}
 					
 					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'stunden' || $bestandteil->vertragsbestandteiltyp_kurzbz === 'karenz')
 					{
-						$this->_getKostenstelle($bestandteil, $bestandteile, $empData);
+						$this->_getKostenstelle($bestandteil, $bestandteile);
 					}
 					
 					if (is_null($bestandteil->wochenstunden) || is_null($bestandteil->oe_kurzbz) || is_null($bestandteil->von))
@@ -745,8 +745,8 @@ class SyncEmployeesLib
 					$bestandteil->oe_kurzbz_sap = null;
 					$bestandteil->dv_oe_kurzbz = $filtered->dv_oe_kurzbz;
 
-					$this->_getStunden($bestandteil, $all_bestandteile, $empData);
-					$this->_getKostenstelle($bestandteil, $all_bestandteile, $empData, true);
+					$this->_getStunden($bestandteil, $all_bestandteile);
+					$this->_getKostenstelle($bestandteil, $all_bestandteile);
 					$this->_getKostenstelleSap($bestandteil, $empData);
 
 					$allDVEmpData[$bestandteil->von] = $bestandteil;
@@ -794,7 +794,7 @@ class SyncEmployeesLib
 					
 					if ($sapEndDate !== '9999-12-31')
 					{
-						if ($dbDVEmpData->von > $sapEmpData)
+						if ($dbDVEmpData->von > $sapEndDate)
 						{
 							$updated = $this->rehireEmployee($sapID, $dbDVEmpData->von, self::SAP_TYPE_PERMANENT, $dbDVEmpData->wochenstunden, $dbDVEmpData->oe_kurzbz_sap, $empData->person_id);
 							
@@ -883,7 +883,7 @@ class SyncEmployeesLib
 		}
 	}
 	
-	private function _getStunden(&$bestandteil, $bestandteile, $empData)
+	private function _getStunden(&$bestandteil, $bestandteile)
 	{
 		
 		$result = array_flip(array_keys(array_column($bestandteile, 'vertragsbestandteiltyp_kurzbz'), 'stunden'));
@@ -904,7 +904,7 @@ class SyncEmployeesLib
 		
 	}
 	
-	private function _getKostenstelle(&$bestandteil, $bestandteile, $empData, $test = false)
+	private function _getKostenstelle(&$bestandteil, $bestandteile)
 	{
 		$result = array_flip(array_keys(array_column($bestandteile, 'vertragsbestandteiltyp_kurzbz'), 'funktion'));
 		$kst_bestandteile = array_intersect_key($bestandteile, $result);
@@ -1351,9 +1351,9 @@ class SyncEmployeesLib
 						AND (tbl_dienstverhaeltnis.von <= NOW() OR tbl_dienstverhaeltnis.von IS NULL)
 						AND (tbl_dienstverhaeltnis.bis >= NOW() OR tbl_dienstverhaeltnis.bis IS NULL)
 						AND vertragsart_kurzbz IN ?
-					ORDER BY tbl_dienstverhaeltnis.bis DESC NULLS FIRST, tbl_dienstverhaeltnis.von DESC NULLS LAST
+					ORDER BY tbl_dienstverhaeltnis.von
 					LIMIT 1
-					', array($empAllData->uid, array('echterdv')));
+					', array($empAllData->uid, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
 				
 				if (isError($dienstverhaeltnis)) return $dienstverhaeltnis;
 				
@@ -1368,32 +1368,109 @@ class SyncEmployeesLib
 				
 				$dienstverhaeltnis = getData($dienstverhaeltnis)[0];
 				
-				$function = $this->_ci->BenutzerfunktionModel->getBenutzerFunktionByUid($empAllData->uid, 'kstzuordnung', $dienstverhaeltnis->von, $dienstverhaeltnis->bis);
+				$funktionQry = "SELECT tbl_benutzerfunktion.oe_kurzbz,
+       									tbl_dienstverhaeltnis.oe_kurzbz as dv_oe_kurzbz,
+       									tbl_vertragsbestandteil.von,
+       									tbl_vertragsbestandteil.bis
+						FROM hr.tbl_dienstverhaeltnis
+						JOIN hr.tbl_vertragsbestandteil USING(dienstverhaeltnis_id)
+						JOIN hr.tbl_vertragsbestandteil_funktion USING(vertragsbestandteil_id)
+						JOIN public.tbl_benutzerfunktion USING(benutzerfunktion_id)
+						WHERE dienstverhaeltnis_id = ? AND funktion_kurzbz = ?";
 				
-				if (isError($function)) return $function;
+				$funktionParams = array($dienstverhaeltnis->id, 'kstzuordnung');
 				
-				if (!hasData($function))
+				if (!is_null($dienstverhaeltnis->von))
 				{
-					$this->_ci->LogLibSAP->logWarningDB('Fehler beim Laden der Benutzerfunktionen: ' . $empAllData->person_id . ' von: ' . $dienstverhaeltnis->von . 'bis: ' . $dienstverhaeltnis->bis);
+					$funktionQry .=' AND (tbl_vertragsbestandteil.bis IS NULL OR tbl_vertragsbestandteil.bis >= ?)';
+					$funktionParams[] = $dienstverhaeltnis->von;
+				}
+				
+				if (!is_null($dienstverhaeltnis->bis))
+				{
+					$funktionQry .=' AND (tbl_vertragsbestandteil.von IS NULL OR tbl_vertragsbestandteil.von <= ?)';
+					$funktionParams[] = $dienstverhaeltnis->bis;
+				}
+				
+				$funktionQry .= "ORDER BY tbl_vertragsbestandteil.von LIMIT 1;";
+				
+				$funktion = $dbModel->execReadOnlyQuery($funktionQry, $funktionParams);
+
+				if (isError($funktion)) return $funktion;
+				
+				if (!hasData($funktion))
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Kein Funktion Bestandteil vorhanden: ' . $empAllData->person_id . ' DV ID: ' . $dienstverhaeltnis->id);
 					if (!is_cli())
 						return error(self::ERROR_MSG);
 					else
 						continue;
 				}
+				
+				$funktion = getData($funktion)[0];
 
-				$function = getData($function)[0];
+				$stundenQry = "SELECT *
+						FROM hr.tbl_dienstverhaeltnis
+						JOIN hr.tbl_vertragsbestandteil USING(dienstverhaeltnis_id)
+						JOIN hr.tbl_vertragsbestandteil_stunden USING(vertragsbestandteil_id)
+						WHERE dienstverhaeltnis_id = ?";
+
+				$stundenParams = array($dienstverhaeltnis->id);
+
+				if (!is_null($funktion->von))
+				{
+					$stundenQry .=' AND (tbl_vertragsbestandteil.bis IS NULL OR tbl_vertragsbestandteil.bis >= ?)';
+					$stundenParams[] = $funktion->von;
+				}
+				
+				if (!is_null($funktion->bis))
+				{
+					$stundenQry .=' AND (tbl_vertragsbestandteil.von IS NULL OR tbl_vertragsbestandteil.von <= ?)';
+					$stundenParams[] = $funktion->bis;
+				}
+				
+				$stundenQry .= " ORDER BY tbl_vertragsbestandteil.von LIMIT 1";
+				
+				$stundenBestandteile = $dbModel->execReadOnlyQuery($stundenQry, $stundenParams);
+				
+				if (isError($stundenBestandteile)) return $stundenBestandteile;
+				
+				if (!hasData($stundenBestandteile))
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Kein Stunden Bestandteil vorhanden: ' . $empAllData->person_id . ' DV ID: ' . $dienstverhaeltnis->id);
+					if (!is_cli())
+						return error(self::ERROR_MSG);
+					else
+						continue;
+				}
+				$stundenBestandteile = getData($stundenBestandteile)[0];
+				
+				$empAllData->decimalValue = $stundenBestandteile->wochenstunden;
+				$empAllData->startDate = $funktion->von;
 
 				$oeResult = $dbModel->execReadOnlyQuery('
 									SELECT *
 									FROM sync.tbl_sap_organisationsstruktur
 									WHERE oe_kurzbz = ?
-								', array($function->oe_kurzbz));
+								', array($funktion->oe_kurzbz));
 				
 				if (isError($oeResult)) return $oeResult;
 				
 				if (!hasData($oeResult))
 				{
-					$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Tabelle nicht vorhanden ' . $function->oe_kurzbz);
+					$this->_ci->LogLibSAP->logWarningDB('Die Organisation ist in der Sync Tabelle nicht vorhanden ' . $funktion->oe_kurzbz);
+					if (!is_cli())
+						return error(self::ERROR_MSG);
+					else
+						continue;
+				}
+				
+				$oe_kurzbz_root = $this->_ci->MessageTokenModel->getOERoot($funktion->oe_kurzbz);
+				$oe_kurzbz_root = getData($oe_kurzbz_root)[0]->oe_kurzbz;
+				
+				if ($funktion->dv_oe_kurzbz !== $oe_kurzbz_root)
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Die Funktion OE entspricht nicht der DV OE person:'. $empAllData->person_id);
 					if (!is_cli())
 						return error(self::ERROR_MSG);
 					else
@@ -1402,40 +1479,6 @@ class SyncEmployeesLib
 				
 				$oe_kurzbz_sap = getData($oeResult)[0]->oe_kurzbz_sap;
 				$empAllData->oe_kurzbz_sap = $oe_kurzbz_sap;
-				
-				$qry = "SELECT von, bis, wochenstunden
-						FROM hr.tbl_vertragsbestandteil
-							JOIN hr.tbl_vertragsbestandteil_stunden USING (vertragsbestandteil_id)
-						WHERE dienstverhaeltnis_id = ?
-							AND (bis >= ? OR bis IS NULL)";
-				
-				$params = [$dienstverhaeltnis->id, $function->datum_von];
-				
-				if (!is_null($function->datum_bis))
-				{
-					$qry .= " AND (von <= ? OR von IS NULL)";
-					$params[] = $function->datum_bis;
-				}
-				
-				$qry .= " ORDER BY von, bis";
-				
-				$stundenBestandteile = $dbModel->execReadOnlyQuery($qry, $params);
-				
-				if (isError($stundenBestandteile)) return $stundenBestandteile;
-				
-				if (!hasData($stundenBestandteile))
-				{
-					$this->_ci->LogLibSAP->logWarningDB('Kein Stunden Bestandteil vorhanden: ' . $empAllData->person_id);
-					if (!is_cli())
-						return error(self::ERROR_MSG);
-					else
-						continue;
-				}
-				$stundenBestandteile = getData($stundenBestandteile)[0];
-				
-				$empAllData->startDate = $function->datum_von;
-				$empAllData->decimalValue = $stundenBestandteile->wochenstunden;
-				
 			}
 			
 			$this->_ci->load->model('ressource/mitarbeiter_model', 'MitarbeiterModel');
