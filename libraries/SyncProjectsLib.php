@@ -411,7 +411,7 @@ class SyncProjectsLib
 
 				// Convert the end date from SAP date to timestamp
 				$endDate = $project->PlannedEndDateTime;
-				if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
+				if ($endDate != null) $endDate = date('Y-m-d H:i:s', strtotime('-1second', toTimestamp($endDate)));
 
 				$projects_timesheet_id = null;
 
@@ -527,7 +527,7 @@ class SyncProjectsLib
 
 						// Convert the end date from SAP date to timestamp
 						$endDate = $projectTask->EndDateTime;
-						if ($endDate != null) $endDate = date('Y-m-d H:i:s', toTimestamp($endDate));
+						if ($endDate != null) $endDate = date('Y-m-d H:i:s', strtotime('-1second', toTimestamp($endDate)));
 
 						// If already present then update
 						if (hasData($sapProjectsTaskTimesheetsResult))
