@@ -3236,7 +3236,7 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
-							$addEmployeeToTaskResult->retval = 'Add employee to a task: '.$addEmployeeToTaskResult->retval;
+							$addEmployeeToTaskResult->retval = 'Add employee to a task: sapeeid:'.$sapEeid.' serviceid: '.$sapServiceId.' '.$addEmployeeToTaskResult->retval;
 							return $addEmployeeToTaskResult; // return the error
 						}
 						else // if non blocking error then log it
