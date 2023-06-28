@@ -12,3 +12,6 @@ $config['sap_employees_blacklist'] = array('');
 
 // the employees have to be synced X days before they start
 $config['sap_sync_employees_x_days_before_start'] = '14';
+
+// Nach wie viel X Tagen soll das Enddatum gesetzt werden
+$config['sap_sync_employees_x_days_after_end'] = '30';

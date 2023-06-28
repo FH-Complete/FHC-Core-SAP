@@ -32,6 +32,7 @@ class SyncEmployeesLib
 	const JOB_ID = 'ECINT_DUMMY_JOB';
 	const JOB_ID_2 = 'ECINT_DUMMY_JOB_2';
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
+	const AFTER_END = 'sap_sync_employees_x_days_after_end';
 	
 	const ERROR_MSG = 'Please check the logs';
 
@@ -194,13 +195,7 @@ class SyncEmployeesLib
 						'GivenName' => $empData->name,
 						'FamilyName' => $empData->surname,
 						'GenderCode' => $empData->gender,
-						'BirthDate' => $empData->bday,
-						'PrivateAddress' => array(
-							'CountryCode' => $empData->country,
-							'CityName' => $empData->city,
-							'StreetPostalCode' => $empData->zip,
-							'StreetName' => $empData->street
-						)
+						'BirthDate' => $empData->bday
 					),
 					'Employment' => array(
 						'CountryCode' => 'AT'
@@ -218,6 +213,18 @@ class SyncEmployeesLib
 
 				)
 			);
+
+			if (isset($empData->country))
+			{
+				$address = array(
+					'CountryCode' => $empData->country,
+					'CityName' => $empData->city,
+					'StreetPostalCode' => $empData->zip,
+					'StreetName' => $empData->street
+				);
+
+				$data['PersonnelHiring']['Employee']['PrivateAddress'] = $address;
+			}
 
 			// Then create it!
 			$manageEmployeeResult = $this->_ci->ManagePersonnelHiringInModel->MaintainBundle($data);
@@ -252,7 +259,9 @@ class SyncEmployeesLib
 				$insert = $this->_ci->SAPMitarbeiterModel->insert(
 					array(
 						'mitarbeiter_uid' => $empData->uid,
-						'sap_eeid' => $employeeID
+						'sap_eeid' => $employeeID,
+						'last_update' => 'NOW()',
+						'last_update_workagreement' => 'NOW()'
 					)
 				);
 
@@ -369,23 +378,6 @@ class SyncEmployeesLib
 								'EndDate' => '9999-12-31'
 							)
 						),
-						'AddressInformation' => array(
-							'actionCode' => '04',
-							'ValidityPeriod' => array(
-								'StartDate' => '0001-01-01',
-								'EndDate' => '9999-12-31'
-							),
-							'Address' => array(
-								'actionCode' => '04',
-								'PostalAddress' => array(
-									'actionCode' => '04',
-									'CountryCode' => $empData->country,
-									'CityName' => $empData->city,
-									'StreetPostalCode' => $empData->zip,
-									'StreetName' => $empData->street
-								),
-							),
-						),
 						'WorkplaceAddressInformation' => array(
 							'actionCode' => '04',
 							'Address' => array(
@@ -399,6 +391,28 @@ class SyncEmployeesLib
 						),
 					)
 				);
+
+				if (isset($empData->country))
+				{
+					$address = array(
+						'actionCode' => '04',
+						'ValidityPeriod' => array(
+							'StartDate' => '0001-01-01',
+							'EndDate' => '9999-12-31'
+						),
+						'Address' => array(
+							'actionCode' => '04',
+							'PostalAddress' => array(
+								'actionCode' => '04',
+								'CountryCode' => $empData->country,
+								'CityName' => $empData->city,
+								'StreetPostalCode' => $empData->zip,
+								'StreetName' => $empData->street
+							),
+						),
+					);
+					$employeeData['EmployeeData']['AddressInformation'] = $address;
+				}
 
 				if (isset($empData->nummer))
 				{
@@ -541,7 +555,6 @@ class SyncEmployeesLib
 				FROM sync.tbl_sap_mitarbeiter s
 				WHERE s.mitarbeiter_uid = ?
 			', array($empData->uid));
-
 			if (isError($sapResult)) return $sapResult;
 			if (!hasData($sapResult)) continue;
 
@@ -657,12 +670,12 @@ class SyncEmployeesLib
 				
 				foreach ($bestandteile as $bestandteil)
 				{
-					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'funktion' || $bestandteil->vertragsbestandteiltyp_kurzbz === 'karenz')
+					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'funktion')
 					{
 						$this->_getStunden($bestandteil, $bestandteile);
 					}
 					
-					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'stunden' || $bestandteil->vertragsbestandteiltyp_kurzbz === 'karenz')
+					if ($bestandteil->vertragsbestandteiltyp_kurzbz === 'stunden')
 					{
 						$this->_getKostenstelle($bestandteil, $bestandteile);
 					}
@@ -836,8 +849,7 @@ class SyncEmployeesLib
 			if (!in_array(null, $dienstverhaeltnisse_ende))
 			{
 				$dvEnde = new DateTime($dienstverhaeltnisse_ende[0]);
-				$dvEnde->modify('+1 month');
-
+				$dvEnde->modify('+'. $this->_ci->config->item(self::AFTER_END) .' days');
 				$today = Date('Y-m-d');
 
 				if ($today >= $dvEnde->format('Y-m-d'))
@@ -980,7 +992,7 @@ class SyncEmployeesLib
 					)
 				ORDER BY tbl_vertragsbestandteil.von";
 		
-		$params = [$dienstverhaeltnis->id, array('stunden', 'karenz'), 'funktion', 'kstzuordnung'];
+		$params = [$dienstverhaeltnis->id, array('stunden'), 'funktion', 'kstzuordnung'];
 		
 		$bestandteile = $dbModel->execReadOnlyQuery($qry, $params);
 		
