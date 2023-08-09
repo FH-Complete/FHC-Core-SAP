@@ -743,7 +743,7 @@ class SyncUsersLib
 		// Loops through the given users and depending on the value of the parameter initialFoundValue
 		// removes created (initialFoundValue == false) or not created (initialFoundValue == true) users
 		// from the users parameter
-		for ($i = 0; $i < count($users); $i++)
+		for ($i = 0; $i < numberOfElements($users); $i++)
 		{
 			$found = $initialFoundValue; // initial value is the same as initialFoundValue
 
@@ -1248,7 +1248,7 @@ class SyncUsersLib
 			else // if there are data
 			{
 				// and more then one then log a warning in the database
-				if (count(getData($sapBankData)) > 1)
+				if (numberOfElements(getData($sapBankData)) > 1)
 				{
 					$this->_ci->LogLibSAP->logWarningDB(
 						'Too many BankInternalID for user: '.$person_id.
@@ -1286,7 +1286,7 @@ class SyncUsersLib
 			else // if there are data
 			{
 				// and more then one then log a warning in the database
-				if (count(getData($sapBankData)) > 1)
+				if (numberOfElements(getData($sapBankData)) > 1)
 				{
 					$this->_ci->LogLibSAP->logWarningDB(
 						'Too many BankInternalID for user: '.$person_id.

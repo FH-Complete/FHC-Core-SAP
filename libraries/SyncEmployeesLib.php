@@ -118,8 +118,8 @@ class SyncEmployeesLib
 		if (!hasData($sapEmployeeResult)) return error('Was not possible to retrieve employees from SAP');
 
 		// Log some statistics
-		$this->_ci->LogLibSAP->logInfoDB('Employees to import: '.count(getData($employeeResult)));
-		$this->_ci->LogLibSAP->logInfoDB('Employees retrieved from SAP: '.count(getData($sapEmployeeResult)));
+		$this->_ci->LogLibSAP->logInfoDB('Employees to import: '.numberOfElements(getData($employeeResult)));
+		$this->_ci->LogLibSAP->logInfoDB('Employees retrieved from SAP: '.numberOfElements(getData($sapEmployeeResult)));
 
 		$importedCounter = 0; // imported employees counter
 
@@ -1184,7 +1184,7 @@ class SyncEmployeesLib
 		// Loops through the given users and depending on the value of the parameter initialFoundValue
 		// removes created (initialFoundValue == false) or not created (initialFoundValue == true) users
 		// from the users parameter
-		for ($i = 0; $i < count($emps); $i++)
+		for ($i = 0; $i < numberOfElements($emps); $i++)
 		{
 			$found = $initialFoundValue; // initial value is the same as initialFoundValue
 

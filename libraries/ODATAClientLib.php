@@ -393,7 +393,7 @@ class ODATAClientLib
 		}
 
 		// If was not possible to retrieve all the data then return null
-		if (count($header) != 2) return null;
+		if (numberOfElements($header) != 2) return null;
 
 		return $header;
 	}

@@ -37,7 +37,7 @@ function mergeUsersPersonIdArray($jobs, $jobsAmount = 99999)
 	$mergedUsersArray = array();
 
 	// If no jobs then return an empty array
-	if (count($jobs) == 0) return $mergedUsersArray;
+	if (numberOfElements($jobs) == 0) return $mergedUsersArray;
 
 	// For each job
 	foreach ($jobs as $job)
@@ -72,7 +72,7 @@ function mergeUidArray($jobs, $jobsAmount = 99999)
 	$mergedUsersArray = array();
 
 	// If no jobs then return an empty array
-	if (count($jobs) == 0) return $mergedUsersArray;
+	if (numberOfElements($jobs) == 0) return $mergedUsersArray;
 
 	// For each job
 	foreach ($jobs as $job)
@@ -180,7 +180,7 @@ function mergePurchaseOrdersIdArray($jobs)
 	$mergedPOsArray = array();
 
 	// If no jobs then return an empty array
-	if (count($jobs) == 0) return $mergedPOsArray;
+	if (numberOfElements($jobs) == 0) return $mergedPOsArray;
 
 	// For each job
 	foreach ($jobs as $job)

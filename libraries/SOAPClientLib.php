@@ -196,7 +196,7 @@ class SOAPClientLib
 		{
 			$this->_hasData = true; // set property _hasData to true
 			// If no data are present
-			if (count((array)$response) == 0) $this->_hasData = false; // set property _hasData to false
+			if (numberOfElements((array)$response) == 0) $this->_hasData = false; // set property _hasData to false
 		
 			$checkResponse = $response; // returns a success
 		}

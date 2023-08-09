@@ -1044,7 +1044,7 @@ class SyncPaymentsLib
 				}
 			}
 
-			if (count($data) > 0)
+			if (numberOfElements($data) > 0)
 			{
 				if ($last_stg < 0)
 					$release = false;

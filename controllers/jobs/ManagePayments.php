@@ -256,7 +256,7 @@ class ManagePayments extends JQW_Controller
 	{
 		$mergedUsersArray = array();
 
-		if (count($jobs) == 0) return $mergedUsersArray;
+		if (numberOfElements($jobs) == 0) return $mergedUsersArray;
 
 		foreach ($jobs as $job)
 		{
