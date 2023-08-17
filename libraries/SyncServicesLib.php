@@ -539,11 +539,12 @@ class SyncServicesLib
 					 LIMIT 1
 				) AS organization_unit,
 				(
-					SELECT s.sap_kalkulatorischer_stundensatz
-					  FROM sync.tbl_sap_stundensatz s
-					 WHERE s.mitarbeiter_uid = m.mitarbeiter_uid
-				      ORDER BY s.insertamum DESC
-					 LIMIT 1
+					SELECT s.stundensatz
+					FROM hr.tbl_stundensatz s
+					WHERE s.uid = m.mitarbeiter_uid
+						AND stundensatztyp = \'kalkulatorisch\'
+					ORDER BY s.gueltig_von DESC
+					LIMIT 1
 				) AS stundensatz
 			  FROM public.tbl_person p
 			  JOIN public.tbl_benutzer b USING(person_id)
