@@ -3,7 +3,7 @@
 /**
  * Copyright (C) 2023 fhcomplete.org
  *
- * This program is free software: you can redistribute it and/or modify   
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -44,7 +44,7 @@ class SyncPaymentsLib
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
-	// 
+	//
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
 	const INVOICES_TO_BE_SYNCED = 'INVOICES_TO_BE_SYNCED';
 	const INVOICES_NOT_RELEVANT = 'INVOICES_NOT_RELEVANT';
@@ -190,7 +190,14 @@ class SyncPaymentsLib
 		$sapInvoicesWithSO = array();
 
 		// For each SAP invoice
-		foreach (getData($customerInvoiceResult)->CustomerInvoice as $customerInvoice)
+
+		$data = getData($customerInvoiceResult)->CustomerInvoice;
+		
+		// If there is only one Invoice it is just an object instead of an array of objects
+		if(!is_array($data))
+			$data = array($data);
+
+		foreach ($data as $customerInvoice)
 		{
 			// If the invoice is not a "Gutschrift" => self::GUTSCHRIFT_CODE
 			if (isset($customerInvoice->ProcessingTypeCode) && $customerInvoice->ProcessingTypeCode != self::GUTSCHRIFT_CODE)
@@ -1455,4 +1462,3 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
-
