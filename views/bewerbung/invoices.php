@@ -5,7 +5,10 @@
 		'bootstrap5' => true,
 		'fontawesome6' => true,
 		'vue3' => true,
-		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/BewerbungSAPInvoices.js')
+		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/BewerbungSAPInvoices.js'),
+		'customCSSs' => [
+			'public/extensions/FHC-Core-SAP/css/bewerbung.css',
+		],
 	);
 
 	$this->load->view('templates/FHC-Header', $includesArray);
@@ -99,8 +102,8 @@
 				</div>
 				<div class="row collapse" id="faq-0">
 					<div class="col card card-body border-light">
-						<pre>Der häufigste Grund für diesen Fall ist, dass bei der Überweisung nicht die Rechnungsnummer als Zahlungsreferenz eingegeben wird. Wir bitten Sie höflichst in diesem
-Fall eine Mail an <a href="mailto:billing@technikum-wien.at">billing@technikum-wien.at</a> mit Zahlungsbestätigung zu senden.
+						<pre>Der häufigste Grund für diesen Fall ist, dass bei der Überweisung nicht die Rechnungsnummer als Zahlungsreferenz eingegeben wird.
+Wir bitten Sie höflichst in diesem Fall eine Mail an <a href="mailto:billing@technikum-wien.at">billing@technikum-wien.at</a> mit Zahlungsbestätigung zu senden.
 Die Transaktion und die Bearbeitung der Zahlung, kann bis zu sechs Werktage dauern.</pre>
 					</div>
 				</div>
