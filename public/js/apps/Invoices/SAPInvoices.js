@@ -26,7 +26,7 @@ const SAPInvoicesApp = Vue.createApp({
 			syncedInvoices: null,
 			notSyncedInvoices: null,
 			notRelevantInvoices: null,
-			displayInvoiceLink: false
+			displayInvoiceLink: true
 		};
 	},
 	components: {

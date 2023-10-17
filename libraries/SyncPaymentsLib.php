@@ -3,7 +3,7 @@
 /**
  * Copyright (C) 2023 fhcomplete.org
  *
- * This program is free software: you can redistribute it and/or modify   
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -44,7 +44,7 @@ class SyncPaymentsLib
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
-	// 
+	//
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
 	const INVOICES_TO_BE_SYNCED = 'INVOICES_TO_BE_SYNCED';
 	const INVOICES_NOT_RELEVANT = 'INVOICES_NOT_RELEVANT';
@@ -862,7 +862,7 @@ class SyncPaymentsLib
 				$paymentData = getData($result_openpayments);
 				foreach ($paymentData as $singlePayment)
 				{
-					// 
+					//
 					if ($lastSAPOe != $singlePayment->oe_kurzbz_sap)
 					{
 						if ($last_stg != '')
@@ -899,7 +899,9 @@ class SyncPaymentsLib
 						}
 
 						// GMBH or Special Courses
-						if ($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
+						if (($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
+							&& !in_array($singlePayment->studiengangstyp, array('b','m'))
+							)
 						{
 							// Get ProjectID if it is a Lehrgang or Special Course
 							$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
@@ -988,7 +990,7 @@ class SyncPaymentsLib
 						);
 					}
 
-					// 
+					//
 					if ($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 					{
 						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
@@ -1255,6 +1257,7 @@ class SyncPaymentsLib
 				bk.buchungstext, bk.buchungstyp_kurzbz,
 				UPPER(sg.typ || sg.kurzbz) as studiengang_kurzbz,
 				ss.start as studiensemester_start,
+				tbl_studiengang.typ as studiengangstyp,
 				so.oe_kurzbz_sap
 			FROM
 				public.tbl_konto bk
@@ -1471,4 +1474,3 @@ class SyncPaymentsLib
 		return success($id_arr);
 	}
 }
-
