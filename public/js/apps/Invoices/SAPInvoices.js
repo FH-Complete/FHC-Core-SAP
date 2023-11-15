@@ -17,7 +17,7 @@
 
 import {CoreFetchCmpt} from '../../../../../js/components/Fetch.js';
 import {CoreRESTClient} from '../../../../../js/RESTClient.js';
-import Phrasen from '../../../../../js/mixins/Phrasen.js';
+import Phrasen from '../../../../../js/plugin/Phrasen.js';
 
 
 import {SAPInvoicesAPIs} from './API.js';
@@ -30,7 +30,6 @@ const SAPInvoicesApp = Vue.createApp({
 			notRelevantInvoices: null
 		};
 	},
-	mixins: [Phrasen],
 	components: {
 		CoreFetchCmpt
 	},
@@ -174,17 +173,17 @@ const SAPInvoicesApp = Vue.createApp({
 			<table class="table table-bordered">
 				<thead>
 					<tr>						
-						<th scope="col">{{ p.t('infocenter', 'rechnungsnummer') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'bezeichnung') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'studiensemester') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'datum') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'faelligam') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'gesamtbetrag') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnungsnummer') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'bezeichnung') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'studiensemester') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'datum') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'faelligam') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'gesamtbetrag') }}</th>
 						<!-- <th scope="col">Eingezahlt</th> -->
-						<th scope="col">{{ p.t('infocenter', 'rechnungsempfaenger') }}</th>
-						<th scope="col">{{ p.t('global', 'status') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'rechnung') }}</th>
-						<th scope="col">{{ p.t('infocenter', 'zahlungsbestaetigung') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnungsempfaenger') }}</th>
+						<th scope="col">{{ $p.t('global', 'status') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnung') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'zahlungsbestaetigung') }}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -273,5 +272,5 @@ const SAPInvoicesApp = Vue.createApp({
 	`
 });
 
-SAPInvoicesApp.mount('#divInvoicesTable');
+SAPInvoicesApp.use(Phrasen).mount('#divInvoicesTable');
 
