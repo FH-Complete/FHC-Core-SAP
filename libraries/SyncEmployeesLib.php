@@ -33,6 +33,7 @@ class SyncEmployeesLib
 	const JOB_ID_2 = 'ECINT_DUMMY_JOB_2';
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 	const AFTER_END = 'sap_sync_employees_x_days_after_end';
+	const SYNC_START = 'sap_sync_start_date';
 	
 	const ERROR_MSG = 'Please check the logs';
 
@@ -540,7 +541,7 @@ class SyncEmployeesLib
 		if (!hasData($diffEmps)) return success('No emps to be updated after diff');
 
 		// Holt sich alle Daten des Emps
-		$empsAllData = $this->_getAllEmpsData($diffEmps);
+		$empsAllData = $this->_getAllEmpsDataWorkAgreement($diffEmps);
 
 		if (isError($empsAllData)) return $empsAllData;
 		if (!hasData($empsAllData)) return error('No data available for the given emps');
@@ -636,7 +637,7 @@ class SyncEmployeesLib
 				}
 			}
 			/*holen uns das erste eingetragene Datum aus SAPByD
-			damit wir uns die Bisverwendungen ab dem Zeitpunkt holen*/
+			damit wir uns die DV's ab dem Zeitpunkt holen*/
 			ksort($startDates);
 			$firstDateSap = array_keys($startDates)[0];
 
@@ -680,27 +681,31 @@ class SyncEmployeesLib
 						$this->_getKostenstelle($bestandteil, $bestandteile);
 					}
 					
-					if (is_null($bestandteil->wochenstunden) || is_null($bestandteil->oe_kurzbz) || is_null($bestandteil->von))
+					if ((is_null($bestandteil->wochenstunden) || is_null($bestandteil->oe_kurzbz) || is_null($bestandteil->von)) &&
+						$bestandteil->von >= $this->_ci->config->item(self::SYNC_START)
+						)
 					{
 						if (is_null($bestandteil->wochenstunden))
-							$this->_ci->LogLibSAP->logWarningDB('Keine Wochenstunden vorhanden: '. $empData->person_id);
+							$this->_ci->LogLibSAP->logWarningDB('Keine Wochenstunden vorhanden: '. $empData->person_id . ' Vertragsbestandteil: ' . $bestandteil->vertragsbestandteil_id);
 						else if (is_null($bestandteil->oe_kurzbz))
-							$this->_ci->LogLibSAP->logWarningDB('Keine OE zugeordnet: '. $empData->person_id);
-						
+							$this->_ci->LogLibSAP->logWarningDB('Keine OE zugeordnet: '. $empData->person_id . ' Vertragsbestandteil: ' . $bestandteil->vertragsbestandteil_id);
 						if (!is_cli())
 							return error(self::ERROR_MSG);
 						else
 							continue 3;
 					}
 					
-					$kostenstelle_sap = $this->_getKostenstelleSap($bestandteil, $empData);
-					
-					if ($kostenstelle_sap === false)
+					if ($bestandteil->von >= $this->_ci->config->item(self::SYNC_START))
 					{
-						if (!is_cli())
-							return error(self::ERROR_MSG);
-						else
-							continue 2;
+						$kostenstelle_sap = $this->_getKostenstelleSap($bestandteil, $empData);
+
+						if ($kostenstelle_sap === false)
+						{
+							if (!is_cli())
+								return error(self::ERROR_MSG);
+							else
+								continue 2;
+						}
 					}
 
 					$all_bestandteile[] = $bestandteil;
@@ -709,6 +714,9 @@ class SyncEmployeesLib
 
 			foreach ($all_bestandteile as $key => $bestandteil)
 			{
+				if ($bestandteil->von < $this->_ci->config->item(self::SYNC_START))
+					continue;
+				
 				if (!isset($needSync->funktion))
 				{
 					$needSync->funktion[$bestandteil->von] = $bestandteil;
@@ -730,7 +738,9 @@ class SyncEmployeesLib
 				$allDVEmpData = $needSync->funktion;
 			}
 			
-			$lastEndDate = end($allDVEmpData)->bis;
+			$lastEndDate = null;
+			if (!isEmptyArray($allDVEmpData))
+				$lastEndDate = end($allDVEmpData)->bis;
 
 			if (!is_null($lastEndDate))
 			{
@@ -889,10 +899,12 @@ class SyncEmployeesLib
 				
 				// If database error occurred then return it
 				if (isError($update)) return $update;
-				
-				return success('Users data updated successfully');
+
+				if (!is_cli())
+					return success('Users data updated successfully');
 			}
 		}
+		return success('Users data updated successfully');
 	}
 	
 	private function _getStunden(&$bestandteil, $bestandteile)
@@ -978,7 +990,8 @@ class SyncEmployeesLib
 						vertragsbestandteiltyp_kurzbz,
 						tbl_vertragsbestandteil_stunden.wochenstunden,
 						tbl_benutzerfunktion.oe_kurzbz,
-						tbl_dienstverhaeltnis.oe_kurzbz as dv_oe_kurzbz
+						tbl_dienstverhaeltnis.oe_kurzbz as dv_oe_kurzbz,
+						tbl_vertragsbestandteil.vertragsbestandteil_id
 				FROM hr.tbl_dienstverhaeltnis
 					JOIN hr.tbl_vertragsbestandteil USING(dienstverhaeltnis_id)
 					LEFT JOIN hr.tbl_vertragsbestandteil_stunden ON tbl_vertragsbestandteil.vertragsbestandteil_id = tbl_vertragsbestandteil_stunden.vertragsbestandteil_id
@@ -1019,7 +1032,7 @@ class SyncEmployeesLib
 		}
 	}
 
-	public function sync($empID)
+	public function sync($empID, $onlyStammdaten)
 	{
 		$dbModel = new DB_Model();
 
@@ -1038,10 +1051,10 @@ class SyncEmployeesLib
 		else
 		{
 			$update = $this->update($emp);
-			if (!isError($update))
+			if (!isError($update) && !$onlyStammdaten)
 				return $this->updateEmployeeWorkAgreement($emp);
-			else
-				return $update;
+			return
+				$update;
 		}
 	}
 
@@ -1519,6 +1532,38 @@ class SyncEmployeesLib
 			}
 			
 			$empAllData->email = $empPersonalData->uid . '@technikum-wien.at';
+			// Stores all data for the current employee
+			$empsAllDataArray[] = $empAllData;
+		}
+
+		return success($empsAllDataArray); // everything was fine!
+	}
+	
+	private function _getAllEmpsDataWorkAgreement($emps)
+	{
+		$empsAllDataArray = array(); // returned array
+
+		// Retrieves users personal data from database
+		$dbModel = new DB_Model();
+
+		$dbEmpsPersonalData = $dbModel->execReadOnlyQuery('
+			SELECT DISTINCT p.person_id,
+				b.uid AS uid
+			  FROM public.tbl_person p
+			  JOIN public.tbl_benutzer b USING(person_id)
+			 WHERE b.uid IN ?
+		', array(
+			getData($emps)
+		));
+
+		if (isError($dbEmpsPersonalData)) return $dbEmpsPersonalData;
+		if (!hasData($dbEmpsPersonalData)) return error('The provided person ids are not present in database');
+
+		// Loops through users personal data
+		foreach (getData($dbEmpsPersonalData) as $empPersonalData)
+		{
+			
+			$empAllData = $empPersonalData; // Stores current employee personal data
 			// Stores all data for the current employee
 			$empsAllDataArray[] = $empAllData;
 		}

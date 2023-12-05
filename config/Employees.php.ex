@@ -15,3 +15,6 @@ $config['sap_sync_employees_x_days_before_start'] = '14';
 
 // Nach wie viel X Tagen soll das Enddatum gesetzt werden
 $config['sap_sync_employees_x_days_after_end'] = '30';
+
+// Ab welchen Datum sollen Funktionen und Stunden gesynct werden
+$config['sap_sync_start_date'] = '2022-09-01';
