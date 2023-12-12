@@ -190,7 +190,14 @@ class SyncPaymentsLib
 		$sapInvoicesWithSO = array();
 
 		// For each SAP invoice
-		foreach (getData($customerInvoiceResult)->CustomerInvoice as $customerInvoice)
+
+		$data = getData($customerInvoiceResult)->CustomerInvoice;
+		
+		// If there is only one Invoice it is just an object instead of an array of objects
+		if(!is_array($data))
+			$data = array($data);
+
+		foreach ($data as $customerInvoice)
 		{
 			// If the invoice is not a "Gutschrift" => self::GUTSCHRIFT_CODE
 			if (isset($customerInvoice->ProcessingTypeCode) && $customerInvoice->ProcessingTypeCode != self::GUTSCHRIFT_CODE)

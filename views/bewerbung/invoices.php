@@ -5,7 +5,10 @@
 		'bootstrap5' => true,
 		'fontawesome6' => true,
 		'vue3' => true,
-		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/SAPInvoices.js')
+		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/BewerbungSAPInvoices.js'),
+		'customCSSs' => [
+			'public/extensions/FHC-Core-SAP/css/bewerbung.css',
+		],
 	);
 
 	$this->load->view('templates/FHC-Header', $includesArray);
@@ -14,18 +17,11 @@
 	<div id="main">
 		<div id="content">
 
-			<div>
-				<h2>Meine Zahlungen</h2>
-			</div>
-
-			<br/>
 			<br/>
 
 			<div>
 				<div class="row">
 					<div class="col-8">
-						<h5 class="card-title"><?php echo $this->p->t('bewerbung', 'erklaerungInvoices')?></h5>
-						<br />
 						<?php echo $this->p->t('infocenter', 'rechnungserklaerung'); ?>
 					</div>
 					<div class="col-4">
@@ -35,7 +31,6 @@
 							</div>
 							<div class="card-body border-light">
 								<?php echo $this->p->t('infocenter', 'kontoinfobody'); ?>
-
 								<br/>
 
 								<h6>

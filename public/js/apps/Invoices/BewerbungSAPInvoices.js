@@ -19,7 +19,6 @@ import {CoreFetchCmpt} from '../../../../../js/components/Fetch.js';
 import {CoreRESTClient} from '../../../../../js/RESTClient.js';
 import Phrasen from '../../../../../js/plugin/Phrasen.js';
 
-
 import {SAPInvoicesAPIs} from './API.js';
 
 const SAPInvoicesApp = Vue.createApp({
@@ -27,8 +26,7 @@ const SAPInvoicesApp = Vue.createApp({
 		return {
 			syncedInvoices: null,
 			notSyncedInvoices: null,
-			notRelevantInvoices: null,
-			displayInvoiceLink: true
+			notRelevantInvoices: null
 		};
 	},
 	components: {
@@ -61,7 +59,7 @@ const SAPInvoicesApp = Vue.createApp({
 				this.notRelevantInvoices = payloadData.INVOICES_NOT_RELEVANT;
 			}
 
-			//
+			// 
 			if (payloadData.FHTW_INVOICES_EXISTS)
 			{
 				document.getElementById("ibans").innerHTML += "<br/><strong>Fachhochschule Technikum Wien<br/>IBAN: AT71 1100 0085 7328 7300</strong>";
@@ -70,7 +68,7 @@ const SAPInvoicesApp = Vue.createApp({
 			//
 			if (payloadData.FHTW_INVOICES_EXISTS && payloadData.GMBH_INVOICES_EXISTS) document.getElementById("ibans").innerHTML += "<br/>";
 
-			//
+			// 
 			if (payloadData.GMBH_INVOICES_EXISTS)
 			{
 				document.getElementById("ibans").innerHTML += "<br/><strong>Technikum Wien GmbH<br/>IBAN: AT59 1200 0518 3820 2701</strong>";
@@ -82,18 +80,6 @@ const SAPInvoicesApp = Vue.createApp({
 		},
 		getSapPDFURL: function() {
 			return FHC_JS_DATA_STORAGE_OBJECT.app_root + FHC_JS_DATA_STORAGE_OBJECT.ci_router + "/" + FHC_JS_DATA_STORAGE_OBJECT.called_path;
-		},
-		getPDFURL: function(invoiceEntries) {
-
-			let buchungsnummern = ''; //
-
-			//
-			for (let i = 0; i < invoiceEntries.length; i++) buchungsnummern += invoiceEntries[i].buchungsnr + ";";
-
-			return FHC_JS_DATA_STORAGE_OBJECT.app_root +
-				"cis/private/pdfExport.php?xml=konto.rdf.php" +
-				"&xsl=Zahlung&buchungsnummern=" + buchungsnummern +
-				"&uid=" + invoiceEntries[0].uid;
 		},
 		formatValueIfNull: function(value) {
 			return value == null ? '-' : value;
@@ -135,7 +121,7 @@ const SAPInvoicesApp = Vue.createApp({
 			// Better safe than sorry!
 			if (statusObj != null)
 			{
-				//
+				// 
 				if (statusObj.ClearingStatusCode == 4)
 				{
 					// If the invoice is consistent
@@ -183,9 +169,7 @@ const SAPInvoicesApp = Vue.createApp({
 						<!-- <th scope="col">Eingezahlt</th> -->
 						<th scope="col">{{ $p.t('infocenter', 'rechnungsempfaenger') }}</th>
 						<th scope="col">{{ $p.t('global', 'status') }}</th>
-						<th scope="col"  v-if="displayInvoiceLink">{{ $p.t('infocenter', 'rechnung') }}</th>
-						<th scope="col">{{ $p.t('infocenter', 'zahlungsbestaetigung') }}</th>
-
+						<th scope="col">{{ $p.t('infocenter', 'rechnung') }}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -202,7 +186,6 @@ const SAPInvoicesApp = Vue.createApp({
 							<!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td> -->
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">Wird erstellt</td>
-							<td class="align-middle" v-if="invoiceIndex == 0 && displayInvoiceLink" v-bind:rowspan="notSyncedInvoices.length">-</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
 						</tr>
 					</template>
@@ -226,7 +209,7 @@ const SAPInvoicesApp = Vue.createApp({
 								<td class="align-middle" v-bind:rowspan="invoice.length" v-bind:class="{'bg-success': isPaid(invoice), 'bg-warning': !isPaid(invoice)}">
 									<strong>{{ getStatus(invoiceEntry.status, isPaid(invoice)) }}</strong>
 								</td>
-								<td class="align-middle text-center" v-if="displayInvoiceLink" v-bind:rowspan="invoice.length">
+								<td class="align-middle text-center" v-bind:rowspan="invoice.length">
 									<a
 										class="fa-solid fa-file-pdf fa-2xl link-dark"
 										style="text-decoration: none;"
@@ -235,15 +218,6 @@ const SAPInvoicesApp = Vue.createApp({
 										v-bind:href="getSapPDFURL() + '/getSapInvoicePDF?invoiceUuid=' + invoiceEntry.invoiceUUID"
 									></a>
 									<template v-if="invoiceEntry.invoiceUUID == null">-</template>
-								</td>
-								<td class="align-middle text-center" v-bind:rowspan="invoice.length">
-									<a
-										style="text-decoration: none;"
-										class="fa-solid fa-file-pdf fa-2xl link-dark"
-										target="_blank"
-										v-if="invoiceEntry.paid"
-										v-bind:href="getPDFURL(invoice)"
-									></a>
 								</td>
 							</template>
 						</tr>
@@ -262,7 +236,7 @@ const SAPInvoicesApp = Vue.createApp({
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">{{ formatValueIfNull(getTotalPartial(notRelevantInvoices)) }}</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 							<td class="align-middle bg-success" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length"><strong>Bezahlt</strong></td>
-							<td class="align-middle" v-if="invoiceIndex == 0 && displayInvoiceLink" v-bind:rowspan="notRelevantInvoices.length">-</td>
+							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notRelevantInvoices.length">-</td>
 						</tr>
 					</template>
@@ -275,3 +249,4 @@ const SAPInvoicesApp = Vue.createApp({
 });
 
 SAPInvoicesApp.use(Phrasen).mount('#divInvoicesTable');
+
