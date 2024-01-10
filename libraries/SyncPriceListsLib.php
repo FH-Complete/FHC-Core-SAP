@@ -274,11 +274,12 @@ class SyncPriceListsLib
 					 LIMIT 1
 				) AS organization_unit,
 				(
-					SELECT ss.sap_kalkulatorischer_stundensatz
-					  FROM sync.tbl_sap_stundensatz ss
-					 WHERE ss.mitarbeiter_uid = m.mitarbeiter_uid
-				      ORDER BY ss.insertamum DESC
-					 LIMIT 1
+					SELECT ss.stundensatz
+					FROM hr.tbl_stundensatz ss
+					WHERE ss.uid = m.mitarbeiter_uid
+						AND stundensatztyp = \'kalkulatorisch\'
+					ORDER BY ss.gueltig_von DESC
+					LIMIT 1
 				) AS stundensatz
 			  FROM public.tbl_person p
 			  JOIN sync.tbl_sap_services s USING(person_id)
