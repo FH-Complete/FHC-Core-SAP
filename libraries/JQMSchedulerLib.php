@@ -43,6 +43,7 @@ class JQMSchedulerLib
 
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 	const BEFORE_START = 'sap_sync_employees_x_days_before_start';
+	const AFTER_END = 'sap_sync_employees_x_days_after_end';
 
 	const EMPLOYEE_BLACKLIST = 'sap_employees_blacklist';
 
@@ -486,15 +487,15 @@ class JQMSchedulerLib
 			LEFT JOIN sync.tbl_sap_mitarbeiter sm ON (m.mitarbeiter_uid = sm.mitarbeiter_uid)
 			JOIN (
 				SELECT DISTINCT ON (mitarbeiter_uid) *
-				FROM bis.tbl_bisverwendung bis
+				FROM hr.tbl_dienstverhaeltnis dv
 				WHERE (
-					(bis.ende >= NOW() OR bis.ende IS NULL)
+					(dv.bis >= NOW() OR dv.bis IS NULL)
 					AND
-					(bis.beginn::DATE <= (NOW() + INTERVAL ?\' Days\')::DATE)
-			    )
-			    AND bis.ba1code IN ?
-			    ORDER BY mitarbeiter_uid, beginn
-			) bis ON bis.mitarbeiter_uid = m.mitarbeiter_uid
+					(dv.von::DATE <= (NOW() + INTERVAL ?\' Days\')::DATE)
+				)
+				AND dv.vertragsart_kurzbz IN ?
+			    ORDER BY mitarbeiter_uid, von
+			) dv ON dv.mitarbeiter_uid = m.mitarbeiter_uid
 			WHERE m.fixangestellt = TRUE
 			AND sm.mitarbeiter_uid IS NULL
 			AND b.aktiv
@@ -584,22 +585,38 @@ class JQMSchedulerLib
 		$dbModel = new DB_Model();
 
 		$personResult = $dbModel->execReadOnlyQuery('
-			SELECT bv.mitarbeiter_uid AS uid
-			FROM bis.tbl_bisverwendung bv
-			JOIN public.tbl_benutzerfunktion bf ON (bf.uid = bv.mitarbeiter_uid)
-			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = bv.mitarbeiter_uid)
-			WHERE (bv.updateamum > sm.last_update_workagreement
+			SELECT dv.mitarbeiter_uid AS uid
+			FROM hr.tbl_dienstverhaeltnis dv
+				JOIN hr.tbl_vertragsbestandteil vbst USING (dienstverhaeltnis_id)
+				JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = dv.mitarbeiter_uid)
+			WHERE (dv.updateamum > sm.last_update_workagreement
 				OR sm.last_update_workagreement IS NULL
-				OR bf.updateamum > sm.last_update_workagreement
-				OR (current_date = (
-					SELECT sbv.ende::date + 1
-					  FROM bis.tbl_bisverwendung sbv
-					 WHERE sbv.mitarbeiter_uid = bv.mitarbeiter_uid
-				      ORDER BY sbv.ende DESC LIMIT 1)))
-				AND bv.mitarbeiter_uid NOT IN ?
-			GROUP BY bv.mitarbeiter_uid
-		', array($this->_ci->config->item(self::EMPLOYEE_BLACKLIST)));
-
+				OR vbst.updateamum > sm.last_update_workagreement
+				OR (
+					(
+						current_date > (SELECT (sdv.bis::date + INTERVAL ?\' Days\')
+										FROM hr.tbl_dienstverhaeltnis sdv
+										WHERE sdv.mitarbeiter_uid = dv.mitarbeiter_uid
+										ORDER by sdv.bis DESC
+										LIMIT 1)
+					)
+					AND
+					(
+						 sm.last_update_workagreement < (SELECT (sdv.bis::date + INTERVAL ?\' Days\')
+														FROM hr.tbl_dienstverhaeltnis sdv
+														WHERE sdv.mitarbeiter_uid = dv.mitarbeiter_uid
+														ORDER by sdv.bis DESC
+														LIMIT 1)
+					)
+				)
+			)
+			AND dv.mitarbeiter_uid NOT IN ?
+			GROUP BY dv.mitarbeiter_uid
+		', array($this->_ci->config->item(self::AFTER_END),
+				$this->_ci->config->item(self::AFTER_END),
+				$this->_ci->config->item(self::EMPLOYEE_BLACKLIST)
+			)
+		);
 
 		if (isError($personResult)) return $personResult;
 

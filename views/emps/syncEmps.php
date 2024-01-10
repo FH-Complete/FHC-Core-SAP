@@ -22,23 +22,30 @@
 	<div id="page-wrapper">
 		<div class="container-fluid">
 			<div class="row">
-				<div class="col-lg-6">
+				<div class="col-lg-8">
 					<h3 class="page-header">Mitarbeiter synchen</h3>
 				</div>
-				<div class="col-lg-6">
+				<div class="col-lg-4">
 					<h3 class="page-header">Mitarbeiter CSV-Export</h3>
 				</div>
 			</div>
 			<div class="row">
-				<div class="form-group col-lg-6">
-					<div class="col-lg-6">
+				<div class="form-group col-lg-8">
+					<div class="col-lg-4">
 						<input class="form-control" type="text" id="empId" placeholder="Mitarbeiter" />
 					</div>
-					<div class="col-lg-6">
+					<div class="col-lg-2">
+						<div class="checkbox">
+							<label>
+								<input type="checkbox" id="stammdaten"> Nur Stammdaten
+							</label>
+						</div>
+					</div>
+					<div class="col-lg-2">
 						<button id="sync" class="btn btn-default">Syncen</button>
 					</div>
 				</div>
-				<div class="col-lg-6">
+				<div class="col-lg-4">
 					<form method="GET" action="<?php echo site_url('extensions/FHC-Core-SAP/emps/SyncEmps/getCSVEmployees'); ?>" target="_blank">
 						<div class="col-lg-6">
 							<button type="submit" class="btn btn-default">Download</button>
