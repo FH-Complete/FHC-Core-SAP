@@ -1,6 +1,25 @@
 <?php
 
+/**
+ * Copyright (C) 2023 fhcomplete.org
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 if (!defined('BASEPATH')) exit('No direct script access allowed');
+
+use \DB_Model as DB_Model;
 
 /**
  * Library that contains the logic to generate new jobs
@@ -50,8 +69,8 @@ class JQMSchedulerLib
 
 		// Load payments configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
-		// Load employees configuration
 
+		// Load employees configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Employees');
 	}
 
@@ -97,8 +116,8 @@ class JQMSchedulerLib
 			$dbModel = new DB_Model();
 
 			//
-			$newUsersResult = $dbModel->execReadOnlyQuery('
-				SELECT ps.person_id
+			$newUsersResult = $dbModel->execReadOnlyQuery(
+				'SELECT ps.person_id
 				  FROM public.tbl_prestudent ps
 				  JOIN public.tbl_prestudentstatus pss USING(prestudent_id)
 				 WHERE pss.studiensemester_kurzbz = ?
@@ -129,13 +148,25 @@ class JQMSchedulerLib
 								tbl_prestudent.person_id = ps.person_id
 								AND studiengang_kz = ps.studiengang_kz
 								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
+						) OR EXISTS (
+							-- Interessent with at least one payment and same degree program
+							SELECT
+								1
+							FROM
+								public.tbl_prestudent
+							JOIN	public.tbl_konto k USING(person_id)
+							WHERE
+								tbl_prestudent.person_id = ps.person_id
+								AND public.tbl_prestudent.studiengang_kz = ps.studiengang_kz
+								AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
 						)
 					)
 			      GROUP BY ps.person_id
-			', array(
-				$currentOrNextStudySemester,
-				$this->_ci->config->item(self::USERS_BLOCK_LIST_COURSES)
-			  )
+				',
+				array(
+					$currentOrNextStudySemester,
+					$this->_ci->config->item(self::USERS_BLOCK_LIST_COURSES)
+				)
 			);
 
 			// If error occurred while retrieving new users from database then return the error
@@ -297,8 +328,6 @@ class JQMSchedulerLib
 	 */
 	public function updateServices()
 	{
-		$jobInput = null;
-
 		$dbModel = new DB_Model();
 
 		// Gets all the employees
@@ -336,9 +365,12 @@ class JQMSchedulerLib
 			FROM
 				public.tbl_konto bk
 			WHERE
-				betrag < 0
+				bk.betrag < 0
 				AND NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
 				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
+				AND bk.buchungsnr_verweis IS NULL
+				AND bk.buchungsdatum <= now()
+				AND bk.buchungsdatum >= ?
 				AND
 				(
 					EXISTS(
@@ -390,11 +422,20 @@ class JQMSchedulerLib
 							AND studiengang_kz = bk.studiengang_kz
 							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Aufgenommener\')
 					)
+					OR
+					EXISTS(
+						-- No benutzer and at least a payment of type StudiengebuehrAnzahlung (drittstaaten) and same degree program
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND studiengang_kz = bk.studiengang_kz
+							AND bk.buchungstyp_kurzbz = \'StudiengebuehrAnzahlung\'
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
+					)
 				)
-
-				AND buchungsnr_verweis IS NULL
-				AND buchungsdatum <= now()
-				AND buchungsdatum >= ?
 		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
 
 		return $newPaymentsResult;
@@ -408,8 +449,8 @@ class JQMSchedulerLib
 		$dbModel = new DB_Model();
 
 		// Get users that have updated credit memo
-		$creditMemoResult = $dbModel->execReadOnlyQuery('
-			SELECT ko.person_id
+		$creditMemoResult = $dbModel->execReadOnlyQuery(
+			'SELECT ko.person_id
 			  FROM public.tbl_konto ko
 			  JOIN sync.tbl_sap_students s USING(person_id)
 			 WHERE ko.betrag > 0
@@ -420,10 +461,11 @@ class JQMSchedulerLib
 				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
 			)
 		      GROUP BY ko.person_id
-		',
-		array(
-			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
-		));
+			',
+			array(
+				$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+			)
+		);
 
 		return $creditMemoResult;
 	}
@@ -583,3 +625,4 @@ class JQMSchedulerLib
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
 	}
 }
+
