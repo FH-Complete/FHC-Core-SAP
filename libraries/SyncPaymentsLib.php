@@ -41,6 +41,8 @@ class SyncPaymentsLib
 	const INCOMING_OUTGOING_GRANT = 'payments_incoming_outgoing_grant';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
+	const PAYMENTS_FH_COST_CENTERS_BUCHUNG = 'payments_fh_cost_centers_buchung';
+	
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
@@ -104,6 +106,8 @@ class SyncPaymentsLib
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
+		$this->_ci->load->helper('hlp_authentication');
+		
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -869,7 +873,7 @@ class SyncPaymentsLib
 					// This needs to be overwritten here to make sure it creates a separate SalesOrder if neccassary
 					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 					{
-						$singlePayment->kostenstellenzuordnung = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz];
+						$singlePayment->kostenstellenzuordnung = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
 					}
 
 					if ($lastCostCenter != $singlePayment->kostenstellenzuordnung)
@@ -951,7 +955,7 @@ class SyncPaymentsLib
 							}
 							else // alternative payment cost center
 							{
-								$salesUnitPartyID = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz];
+								$salesUnitPartyID = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
 								$lastCostCenter = $salesUnitPartyID;
 							}
 
@@ -1002,6 +1006,15 @@ class SyncPaymentsLib
 						$data['SalesOrder']['CashDiscountTerms'] = array(
 							'actionCode' => '01',
 							'Code' => 'z006' // 5 Werktage
+						);
+					}
+					
+					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
+					{
+						$data['SalesOrder']['mahnsperre'] = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['mahnsperre'];
+						$data['SalesOrder']['CashDiscountTerms'] = array(
+							'actionCode' => '01',
+							'Code' =>  $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['zahlungsbedingung']
 						);
 					}
 

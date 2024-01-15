@@ -37,7 +37,7 @@ $config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungss
 // Couples of Buchungstyp_kurzbz => cost center used in the FH payments when is not wanted
 // the linked cost centers from database
 $config['payments_fh_cost_centers_buchung'] = array(
-	// Buchungstyp_kurzbz => cost center
-	'EBCL_001' => '100100'
+	//[Buchungstyp_kurzbz => cost center, zahlungsbedingung => 1001 (Zahlbar sofort ohne Abzug), mahnsperre => 1]
+	'EBCL_001' => array('kostenstelle' => '100100', 'zahlungsbedingung' => '1001', 'mahnsperre' => '1'),
 );
 

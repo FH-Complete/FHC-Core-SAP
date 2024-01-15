@@ -434,8 +434,21 @@ class JQMSchedulerLib
 							AND bk.buchungstyp_kurzbz = \'StudiengebuehrAnzahlung\'
 							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
 					)
+					OR
+					EXISTS (
+						-- All booking types from the configuration that are associated with "ETW."
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND buchungstyp_kurzbz IN ?
+							AND bk.studiengang_kz = 0
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\', \'Student\', \'Aufgenommener\', \'Wartender\')
+					)
 				)
-		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
+		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START, array_keys($this->_ci->config->item(SyncPaymentsLib::PAYMENTS_FH_COST_CENTERS_BUCHUNG))));
 
 		return $newPaymentsResult;
 	}
