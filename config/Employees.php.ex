@@ -4,7 +4,8 @@
 $config['sap_employees_warnings_enabled'] = false;
 
 // contract types that have to be synced
-$config['fhc_contract_types'] = array('103', '109', '111');
+//$config['fhc_contract_types'] = array('103', '109', '111');
+$config['fhc_contract_types'] = array('echterdv');
 
 // Block list of employees that have _not_ to be synced
 // NOTE: keep at least one element otherwise the query will fail
