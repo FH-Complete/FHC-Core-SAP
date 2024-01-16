@@ -3,23 +3,25 @@ $(document).ready(function() {
 	$("#sync").click(function()
 	{
 		var emp_id = $("#empId").val();
-
+		var stammdaten = $("#stammdaten").is(':checked');
 		if (emp_id === '')
 			return FHC_DialogLib.alertWarning('Bitte alle Felder ausfüllen');
 
-		Emps.sync(emp_id);
+		var data = {
+			'emp_id': emp_id,
+			'stammdaten': stammdaten
+		}
+		Emps.sync(data);
 	});
 });
 
 var Emps = {
 
-	sync: function(emp_id)
+	sync: function(data)
 	{
 		FHC_AjaxClient.ajaxCallPost(
 			"extensions/FHC-Core-SAP/emps/SyncEmps/syncEmp",
-			{
-				'emp_id': emp_id
-			},
+			data,
 			{
 				successCallback: function(response, textStatus, jqXHR) {
 					if (FHC_AjaxClient.isError(response))
