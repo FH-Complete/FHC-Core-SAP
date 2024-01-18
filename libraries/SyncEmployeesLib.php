@@ -33,6 +33,7 @@ class SyncEmployeesLib
 	const JOB_ID_2 = 'ECINT_DUMMY_JOB_2';
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 	const AFTER_END = 'sap_sync_employees_x_days_after_end';
+	const BEFORE_START = 'sap_sync_employees_x_days_before_start';
 	const SYNC_START = 'sap_sync_start_date';
 	
 	const ERROR_MSG = 'Please check the logs';
@@ -1373,12 +1374,12 @@ class SyncEmployeesLib
 							tbl_dienstverhaeltnis.bis
 					FROM hr.tbl_dienstverhaeltnis
 					WHERE mitarbeiter_uid = ?
-						AND (tbl_dienstverhaeltnis.von <= NOW() OR tbl_dienstverhaeltnis.von IS NULL)
+						AND (tbl_dienstverhaeltnis.von::DATE <= (NOW() + INTERVAL ?\' Days\')::DATE)
 						AND (tbl_dienstverhaeltnis.bis >= NOW() OR tbl_dienstverhaeltnis.bis IS NULL)
 						AND vertragsart_kurzbz IN ?
 					ORDER BY tbl_dienstverhaeltnis.von
 					LIMIT 1
-					', array($empAllData->uid, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+					', array($empAllData->uid, $this->_ci->config->item(self::BEFORE_START), $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
 				
 				if (isError($dienstverhaeltnis)) return $dienstverhaeltnis;
 				
