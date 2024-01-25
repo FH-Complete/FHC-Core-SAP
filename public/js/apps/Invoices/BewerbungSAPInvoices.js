@@ -62,7 +62,7 @@ const SAPInvoicesApp = Vue.createApp({
 			// 
 			if (payloadData.FHTW_INVOICES_EXISTS)
 			{
-				document.getElementById("ibans").innerHTML += "<br/><strong>Fachhochschule Technikum Wien<br/>IBAN: AT71 1100 0085 7328 7300</strong>";
+				document.getElementById("ibans").innerHTML += "<br/><strong>"+ SAPInvoicesApp.config.globalProperties.$p.t('infocenter', 'zahlungsempfaenger') + "<br/>IBAN: AT71 1100 0085 7328 7300</strong>";
 			}
 
 			//
