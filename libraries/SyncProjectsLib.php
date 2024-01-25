@@ -1129,7 +1129,7 @@ class SyncProjectsLib
 							'beginn' => $project->start_date,
 							'ende' => $project->end_date,
 							'titel' => $project->name,
-							'beschreibung' => $project->name,
+							//'beschreibung' => $project->name,
 							'zeitaufzeichnung' => $project->time_recording
 						)
 					);
@@ -1194,7 +1194,7 @@ class SyncProjectsLib
 							'start' => $projectTask->start_date,
 							'ende' => $projectTask->end_date,
 							'bezeichnung' => substr($projectTask->name, 0, 32),
-							'beschreibung' => $projectTask->name,
+							//'beschreibung' => $projectTask->name,
 							'zeitaufzeichnung' => $projectTask->time_recording
 						)
 					);
@@ -1234,7 +1234,7 @@ class SyncProjectsLib
 
 		$dbModel = new DB_Model();
 
-		// Gets 
+		// Gets
 		$projectResults = $dbModel->execReadOnlyQuery('
 			SELECT p.project_object_id
 			  FROM sync.tbl_sap_projects p
@@ -1348,7 +1348,7 @@ class SyncProjectsLib
 			if (hasData($purchaseOrderCheckBundleResult))
 			{
 				$purchaseOrderCheckBundle = getData($purchaseOrderCheckBundleResult);
-				
+
 				// If the purchase order check was fine
 				if ((isset($purchaseOrderCheckBundle->PurchaseOrder) && !isset($purchaseOrderCheckBundle->Log))
 					|| (isset($purchaseOrderCheckBundle->Log) && isEmptyArray((array)$purchaseOrderCheckBundle->Log)))
@@ -3000,7 +3000,7 @@ class SyncProjectsLib
 		$customResult = $dbModel->execReadOnlyQuery('
 			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
 				UPPER(s0.typ || s0.kurzbz) AS name,
-				200000 AS unit_responsible,
+				\'200000\' AS unit_responsible,
 				s0.studiengang_kz
 			  FROM public.tbl_studiengang s0
 			 WHERE s0.studiengang_kz IN ?
@@ -3236,7 +3236,7 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
-							$addEmployeeToTaskResult->retval = 'Add employee to a task: '.$addEmployeeToTaskResult->retval;
+							$addEmployeeToTaskResult->retval = 'Add employee to a task: sapeeid:'.$sapEeid.' serviceid: '.$sapServiceId.' '.$addEmployeeToTaskResult->retval;
 							return $addEmployeeToTaskResult; // return the error
 						}
 						else // if non blocking error then log it
@@ -3267,4 +3267,3 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
-

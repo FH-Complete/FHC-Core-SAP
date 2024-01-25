@@ -902,7 +902,9 @@ class SyncPaymentsLib
 							}
 						}
 
-						if ($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
+						if (($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
+							&& !in_array($singlePayment->studiengangstyp, array('b','m'))
+							)
 						{
 							// GMBH or Special Courses
 
@@ -1247,7 +1249,8 @@ class SyncPaymentsLib
 				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
 				bk.buchungstext, bk.buchungstyp_kurzbz,
 				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
-				tbl_studiensemester.start as studiensemester_start
+				tbl_studiensemester.start as studiensemester_start,
+				tbl_studiengang.typ as studiengangstyp
 			FROM
 				public.tbl_konto bk
 				JOIN public.tbl_studiengang USING(studiengang_kz)

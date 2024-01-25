@@ -39,6 +39,14 @@ class Invoices extends FHC_Controller
 
 		// Loads the SyncPaymentsLib library
 		$this->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
+		
+		$this->load->library('PhrasesLib');
+		$this->loadPhrases(
+			array(
+				'infocenter',
+				'bewerbung',
+			)
+		);
 	}
 
 	// -----------------------------------------------------------------------------------------------------------------

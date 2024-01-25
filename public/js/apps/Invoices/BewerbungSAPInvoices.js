@@ -17,6 +17,7 @@
 
 import {CoreFetchCmpt} from '../../../../../js/components/Fetch.js';
 import {CoreRESTClient} from '../../../../../js/RESTClient.js';
+import Phrasen from '../../../../../js/plugin/Phrasen.js';
 
 import {SAPInvoicesAPIs} from './API.js';
 
@@ -61,7 +62,7 @@ const SAPInvoicesApp = Vue.createApp({
 			// 
 			if (payloadData.FHTW_INVOICES_EXISTS)
 			{
-				document.getElementById("ibans").innerHTML += "<br/><strong>Fachhochschule Technikum Wien<br/>IBAN: AT71 1100 0085 7328 7300</strong>";
+				document.getElementById("ibans").innerHTML += "<br/><strong>"+ SAPInvoicesApp.config.globalProperties.$p.t('infocenter', 'zahlungsempfaenger') + "<br/>IBAN: AT71 1100 0085 7328 7300</strong>";
 			}
 
 			//
@@ -159,16 +160,16 @@ const SAPInvoicesApp = Vue.createApp({
 			<table class="table table-bordered">
 				<thead>
 					<tr>
-						<th scope="col">RechnungsNr.</th>
-						<th scope="col">Bezeichnung</th>
-						<th scope="col">Studiensemester</th>
-						<th scope="col">Datum</th>
-						<th scope="col">Fällig am</th>
-						<th scope="col">Gesamtbetrag</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnungsnummer') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'bezeichnung') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'studiensemester') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'datum') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'faelligam') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'gesamtbetrag') }}</th>
 						<!-- <th scope="col">Eingezahlt</th> -->
-						<th scope="col">Rechnungsempfänger</th>
-						<th scope="col">Status</th>
-						<th scope="col">Rechnung</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnungsempfaenger') }}</th>
+						<th scope="col">{{ $p.t('global', 'status') }}</th>
+						<th scope="col">{{ $p.t('infocenter', 'rechnung') }}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -247,5 +248,5 @@ const SAPInvoicesApp = Vue.createApp({
 	`
 });
 
-SAPInvoicesApp.mount('#divInvoicesTable');
+SAPInvoicesApp.use(Phrasen).mount('#divInvoicesTable');
 
