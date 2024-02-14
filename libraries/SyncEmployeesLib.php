@@ -13,6 +13,7 @@ class SyncEmployeesLib
 	const SAP_EMPLOYEES_CREATE = 'SAPEmployeesCreate';
 	const SAP_EMPLOYEES_UPDATE = 'SAPEmployeesUpdate';
 	const SAP_EMPLOYEES_WORK_AGREEMENT_UPDATE = 'SAPEmployeesWorkAgreementUpdate';
+	const SAP_CHECK_EMPLOYEE_DV = 'SAPEmployeeCheckDV';
 
 	const CREATE_EMP_PREFIX = 'CE';
 	const UPDATE_EMP_PREFIX = 'UU';
@@ -39,6 +40,8 @@ class SyncEmployeesLib
 	const ERROR_MSG = 'Please check the logs';
 
 	private $_ci; // Code igniter instance
+
+	private $testlauf = false; // Testlauf
 
 	/**
 	 * Object initialization
@@ -580,6 +583,7 @@ class SyncEmployeesLib
 			$startDates = array();
 			$sapEmpType = new stdClass();
 			$updated = null;
+			$testReturn = array();
 			foreach ($sapEmpData as $sapData)
 			{
 				$workAgreements =  $this->checkIfObject($sapData->WorkAgreementData);
@@ -598,8 +602,8 @@ class SyncEmployeesLib
 					foreach($benutzerFunctionsSAP as $benutzerFunctionSAP)
 					{
 						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate] = new stdClass();
-						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->ValidityPeriod = $benutzerFunctionSAP->ValidityPeriod;
-						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->AgreedWorkingTimeRate = number_format($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue, 2);
+						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->ValidityPeriod = isset($benutzerFunctionSAP->ValidityPeriod) ? $benutzerFunctionSAP->ValidityPeriod :'';
+						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->AgreedWorkingTimeRate = isset($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue) ? number_format($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue, 2) : '';
 					}
 
 					$benutzerOrganisationalsSAP = $this->checkIfObject($workAgreement->OrganisationalAssignment);
@@ -799,7 +803,11 @@ class SyncEmployeesLib
 						($sapEmpType->functions[$dbDVEmpData->von]->AgreedWorkingTimeRate !== $dbDVEmpData->wochenstunden))
 					{
 						$updated = $this->transferEmployee($sapID, $dbDVEmpData->von, $dbDVEmpData->wochenstunden, $dbDVEmpData->oe_kurzbz_sap, $empData->person_id, true);
-						if (!$updated)
+						if ($this->testlauf)
+						{
+							$testReturn[] = $updated;
+						}
+						else if (!$updated)
 						{
 							if (!is_cli())
 								return error(self::ERROR_MSG);
@@ -821,8 +829,12 @@ class SyncEmployeesLib
 						if ($dbDVEmpData->von > $sapEndDate)
 						{
 							$updated = $this->rehireEmployee($sapID, $dbDVEmpData->von, self::SAP_TYPE_PERMANENT, $dbDVEmpData->wochenstunden, $dbDVEmpData->oe_kurzbz_sap, $empData->person_id);
-							
-							if (!$updated)
+
+							if ($this->testlauf)
+							{
+								$testReturn[] = $updated;
+							}
+							else if (!$updated)
 							{
 								if (!is_cli())
 									return error(self::ERROR_MSG);
@@ -844,7 +856,11 @@ class SyncEmployeesLib
 					{
 						$updated = $this->transferEmployee($sapID, $dbDVEmpData->von, $dbDVEmpData->wochenstunden, $dbDVEmpData->oe_kurzbz_sap, $empData->person_id, true);
 						
-						if (!$updated)
+						if ($this->testlauf)
+						{
+							$testReturn[] = $updated;
+						}
+						else if (!$updated)
 						{
 							if (!is_cli())
 								return error(self::ERROR_MSG);
@@ -875,7 +891,11 @@ class SyncEmployeesLib
 					{
 						$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
 						
-						if (!$updated)
+						if ($this->testlauf)
+						{
+							$testReturn[] = $updated;
+						}
+						else if (!$updated)
 						{
 							if (!is_cli())
 								return error(self::ERROR_MSG);
@@ -886,8 +906,12 @@ class SyncEmployeesLib
 					}
 				}
 			}
-	
-			if ($updated !== false)
+
+			if ($this->testlauf)
+			{
+				return success($testReturn);
+			}
+			else if ($updated !== false)
 			{
 				$update = $this->_ci->SAPMitarbeiterModel->update(
 					array(
@@ -907,7 +931,7 @@ class SyncEmployeesLib
 		}
 		return success('Users data updated successfully');
 	}
-	
+
 	private function _getStunden(&$bestandteil, $bestandteile)
 	{
 		
@@ -928,7 +952,7 @@ class SyncEmployeesLib
 		}
 		
 	}
-	
+
 	private function _getKostenstelle(&$bestandteil, $bestandteile)
 	{
 		$result = array_flip(array_keys(array_column($bestandteile, 'vertragsbestandteiltyp_kurzbz'), 'funktion'));
@@ -947,7 +971,7 @@ class SyncEmployeesLib
 			}
 		}
 	}
-	
+
 	private function _getKostenstelleSap(&$bestandteil, $empData)
 	{
 		$dbModel = new DB_Model();
@@ -980,7 +1004,6 @@ class SyncEmployeesLib
 			$bestandteil->oe_kurzbz_sap = $oe_kurzbz_sap;
 		}
 	}
-
 
 	private function _getBestandteile($dienstverhaeltnis, $empData)
 	{
@@ -1033,7 +1056,7 @@ class SyncEmployeesLib
 		}
 	}
 
-	public function sync($empID, $onlyStammdaten)
+	public function sync($empID, $onlyStammdaten, $testlauf)
 	{
 		$dbModel = new DB_Model();
 
@@ -1044,6 +1067,8 @@ class SyncEmployeesLib
 			', array($empID));
 
 		if (isError($sapIdResult)) return $sapIdResult;
+
+		$this->testlauf = $testlauf;
 
 		$emp = array($empID);
 
@@ -1059,99 +1084,201 @@ class SyncEmployeesLib
 		}
 	}
 
-/*	public function getCSVEmployees()
+	public function checkEmployeesDVs($emps)
 	{
-		$data = [];
-		$emps = $this->getAllEmps();
-
-		foreach ($emps as $emp)
+		if (isEmptyArray($emps)) return success('No services to be updated');
+		
+		$diffEmps = $this->_removeNotCreatedEmps($emps);
+		
+		if (isError($diffEmps)) return $diffEmps;
+		if (!hasData($diffEmps)) return success('No DVs to be compared after diff');
+		
+		$empsAllData = $this->_getAllEmpsDataWorkAgreement($diffEmps);
+		
+		if (isError($empsAllData)) return $empsAllData;
+		if (!hasData($empsAllData)) return error('No data available for the given emps');
+		
+		foreach (getData($empsAllData) as $empData)
 		{
-			if (!isset($emp->EmploymentData))
+			$dbModel = new DB_Model();
+			// SAP ID vom EMP holen
+			$sapResult = $dbModel->execReadOnlyQuery('
+				SELECT s.sap_eeid
+				FROM sync.tbl_sap_mitarbeiter s
+				WHERE s.mitarbeiter_uid = ?
+			', array($empData->uid));
+			
+			if (isError($sapResult))
+				return $sapResult;
+			if (!hasData($sapResult))
 				continue;
-
-			$additionalClauses['emp'] = $emp->EmployeeID->_;
-			$additionalClauses['workingAgreement'] = [];
-
-			if (is_array($emp->EmploymentData))
+			
+			$sapID = getData($sapResult)[0]->sap_eeid;
+			
+			$sapEmpData = $this->getEmployeeById($sapID);
+			
+			if (isError($sapEmpData))
+				return $sapEmpData;
+			
+			if (!hasData($sapEmpData))
+				continue;
+			
+			$sapEmpData = getData($sapEmpData);
+			
+			if ($sapEmpData->ProcessingConditions->ReturnedQueryHitsNumberValue === 0)
 			{
-				foreach($emp->EmploymentData as $empData)
+				$this->_ci->LogLibSAP->logWarningDB('Emp not found in SAP: '. $empData->uid);
+				continue;
+			}
+			
+			
+			$sapEmpData = $sapEmpData->EmployeeData->EmploymentData;
+			
+			$sapEmpData = $this->checkIfObject($sapEmpData);
+			
+			foreach ($sapEmpData as $sapData)
+			{
+				if (!isset($data[$empData->uid]))
+					$data[$empData->uid] = array();
+				
+				$workAgreements = $this->checkIfObject($sapData->WorkAgreementData);
+				foreach ($workAgreements as $workAgreement)
 				{
-					if (isset($empData->WorkAgreementData))
-						$additionalClauses['workingAgreement'] = $this->getWorkAgreementData($empData->WorkAgreementData, $additionalClauses['workingAgreement']);
+					$data[$empData->uid] = [];
+					
+					$benutzerFunctionsSAP = $this->checkIfObject($workAgreement->AdditionalClauses);
+					
+					foreach ($benutzerFunctionsSAP as $benutzerFunctionSAP)
+					{
+						$data[$empData->uid]['stunden'][] = ['stunden_von' => isset($benutzerFunctionSAP->ValidityPeriod->StartDate) ? $benutzerFunctionSAP->ValidityPeriod->StartDate : '', 'stunden_bis' => isset($benutzerFunctionSAP->ValidityPeriod->EndDate) ? $benutzerFunctionSAP->ValidityPeriod->EndDate : '', 'stunden' => isset($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue) ? number_format($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue, 2) : ''];
+					}
+					
+					$benutzerOrganisationalsSAP = $this->checkIfObject($workAgreement->OrganisationalAssignment);
+					
+					foreach ($benutzerOrganisationalsSAP as $benutzerOrganisationalSAP)
+					{
+						$positions = $this->checkIfObject($benutzerOrganisationalSAP->PositionAssignment);
+						
+						foreach ($positions as $position)
+						{
+							$organisationStart = $position->ValidityPeriod->StartDate;
+							$organisationEnde = $position->ValidityPeriod->EndDate;
+							$sap_oe = null;
+							if (isset($position->OrganisationalCenterDetails->OrganisationalCenterID))
+							{
+								$sap_oe = $position->OrganisationalCenterDetails->OrganisationalCenterID;
+							} else if (isset($position->OrganisationalCenterDetails) && is_array($position->OrganisationalCenterDetails))
+							{
+								$tmp_sap_oe = array();
+								
+								foreach ($position->OrganisationalCenterDetails as $orgCenterDetails)
+								{
+									$tmp_sap_oe[] = $orgCenterDetails->OrganisationalCenterID;
+								}
+								
+								sort($tmp_sap_oe);
+								
+								$sap_oe = $tmp_sap_oe[0];
+							}
+							
+							$data[$empData->uid]['position'][] = ['von' => $organisationStart, 'bis' => $organisationEnde, 'oe' => $sap_oe];
+						}
+					}
+				}
+				
+				/**
+				 * only the last SAP Work agreement needs to be checked
+				 */
+				krsort($data[$empData->uid]['position']);
+				krsort($data[$empData->uid]['stunden']);
+				$data[$empData->uid]['stunden'] = array_slice($data[$empData->uid]['stunden'], 0, 1);
+				$data[$empData->uid]['position'] = array_slice($data[$empData->uid]['position'], 0, 1);
+			}
+		}
+		ksort($data);
+
+		$export = [];
+		foreach ($data as $mitarbeiter_uid => $emp)
+		{
+			foreach ($emp['stunden'] as $arbeitsvertragSap)
+			{
+				$query = '
+					SELECT *
+					FROM hr.tbl_dienstverhaeltnis
+						JOIN hr.tbl_vertragsbestandteil ON tbl_dienstverhaeltnis.dienstverhaeltnis_id = tbl_vertragsbestandteil.dienstverhaeltnis_id
+						JOIN hr.tbl_vertragsbestandteil_stunden ON tbl_vertragsbestandteil.vertragsbestandteil_id = tbl_vertragsbestandteil_stunden.vertragsbestandteil_id
+					WHERE mitarbeiter_uid = ?
+						ORDER BY tbl_vertragsbestandteil.von DESC NULLS LAST
+					LIMIT 1
+				';
+
+				$params = [$mitarbeiter_uid];
+				
+				$dbModel = new DB_Model();
+				$result = $dbModel->execReadOnlyQuery($query, $params);
+				if (hasData($result))
+				{
+					$dbStunden = getData($result)[0];
+					
+					if ($arbeitsvertragSap['stunden'] !== $dbStunden->wochenstunden)
+					{
+						$daten = array($mitarbeiter_uid, 'stunden', $arbeitsvertragSap['stunden_von'], $arbeitsvertragSap['stunden_bis'], $arbeitsvertragSap['stunden']);
+
+						$daten['db_von'] = $dbStunden->von;
+						$daten['db_bis'] = is_null($dbStunden->bis) ? 'Kein Enddatum' : $dbStunden->bis;
+						$daten['db_ist'] = $dbStunden->wochenstunden;
+						$export[] = $daten;
+					}
+					
 				}
 			}
-			else if(isset($emp->EmploymentData->WorkAgreementData))
+
+			foreach ($emp['position'] as $oeZuordnung)
 			{
-				$additionalClauses['workingAgreement'] = $this->getWorkAgreementData($emp->EmploymentData->WorkAgreementData, $additionalClauses['workingAgreement']);
-			}
-			else
-				continue;
+				$query = '
+					SELECT tbl_sap_organisationsstruktur.*
+					FROM hr.tbl_dienstverhaeltnis
+						JOIN hr.tbl_vertragsbestandteil ON tbl_dienstverhaeltnis.dienstverhaeltnis_id = tbl_vertragsbestandteil.dienstverhaeltnis_id
+						JOIN hr.tbl_vertragsbestandteil_funktion ON tbl_vertragsbestandteil.vertragsbestandteil_id = tbl_vertragsbestandteil_funktion.vertragsbestandteil_id
+						JOIN public.tbl_benutzerfunktion ON tbl_vertragsbestandteil_funktion.benutzerfunktion_id = tbl_benutzerfunktion.benutzerfunktion_id AND funktion_kurzbz = ?
+						JOIN tbl_organisationseinheit ON tbl_benutzerfunktion.oe_kurzbz = tbl_organisationseinheit.oe_kurzbz
+						JOIN sync.tbl_sap_organisationsstruktur ON tbl_organisationseinheit.oe_kurzbz = tbl_sap_organisationsstruktur.oe_kurzbz
+					WHERE mitarbeiter_uid = ?
+					ORDER BY tbl_vertragsbestandteil.von DESC NULLS LAST
+					LIMIT 1
+				';
 
-			array_push($data, $additionalClauses);
-		}
+				$params = ['kstzuordnung', $mitarbeiter_uid];
 
-		sort($data);
-
-		return $data;
-	}
-
-	public function getWorkAgreementData($workAgreement, $additionalClauses)
-	{
-		if (isset($workAgreement->AdditionalClauses))
-		{
-			if (is_array($workAgreement->AdditionalClauses))
-			{
-				foreach ($workAgreement->AdditionalClauses as $additionalClause)
+				$dbModel = new DB_Model();
+				$result = $dbModel->execReadOnlyQuery($query, $params);
+				if (hasData($result))
 				{
-					$additionalClauses[] = $this->addAdditionalClause($additionalClause);
+					$dbOe = getData($result)[0];
+					if ($dbOe->oe_kurzbz_sap !== $oeZuordnung['oe'])
+					{
+						$daten = array($mitarbeiter_uid, "zuordnung", $oeZuordnung['von'], $oeZuordnung['bis'], $oeZuordnung['oe']);
+						$daten['db_von_oe'] = !isset($dbOe->von) ? 'Kein Startdatum' : $dbOe->von;
+						$daten['db_bis_oe'] = !isset($dbOe->bis) ? 'Kein Enddatum' : $dbOe->bis;
+						$daten['db_ist_oe'] =  !isset($dbOe->oe_kurzbz_sap) ? 'Keine OE' : $dbOe->oe_kurzbz_sap;
+						$export[] = $daten;
+					}
 				}
 			}
-			else
-			{
-				$additionalClauses[] =  $this->addAdditionalClause($workAgreement->AdditionalClauses);
-			}
 		}
-		return $additionalClauses;
+
+		$filename = "employees.csv";
+		$file = fopen($filename, 'w');
+
+		fputcsv($file, array('Mitarbeiter','Kategorie', 'SAP_Von','SAP_Bis', 'SAP_Ist', 'FH_von', 'FH_Bis', 'FH_Ist'));
+
+		foreach ($export as $line)
+		{
+			fputcsv($file, $line);
+		}
+		fclose($file);
+		return success('csv exportiert');
 	}
-
-	public function addAdditionalClause($additionalClause)
-	{
-		$startDate = (isset($additionalClause->ValidityPeriod->StartDate)) ? $additionalClause->ValidityPeriod->StartDate : '';
-		$decimal = (isset($additionalClause->AgreedWorkingTimeRate->DecimalValue)) ? $additionalClause->AgreedWorkingTimeRate->DecimalValue : '';
-		$category = (isset($additionalClause->WorkAgreementAdministrativeCategoryCode->_)) ? $additionalClause->WorkAgreementAdministrativeCategoryCode->_ : '';
-		return array('startDate' => $startDate, 'timeRate' => $decimal, 'category' => $category);
-	}
-
-	public function getAllEmps()
-	{
-		$objID = null;
-		$emps = [];
-
-		do {
-			$empsData = $this->_ci->QueryEmployeeInModel->findByIdentification(
-				array(
-					'PROCESSING_CONDITIONS' => array(
-						'QueryHitsMaximumNumberValue' => 40,
-						'QueryHitsUnlimitedIndicator' => false,
-						'LastReturnedObjectID' => $objID
-					)
-				)
-			);
-
-			if (!isset(getData($empsData)->EmployeeData))
-				break;
-
-			$objID = getData($empsData)->ProcessingConditions->LastReturnedObjectID->_;
-
-			$emps[] = (array)(getData($empsData)->EmployeeData);
-
-		} while (hasData($empsData));
-
-		$emps = call_user_func_array('array_merge', $emps);
-
-		return $emps;
-	}*/
-
 	// --------------------------------------------------------------------------------------------
 	// Private methods
 
@@ -1759,6 +1886,11 @@ class SyncEmployeesLib
 
 	private function addLeavingDate($empID, $endDate, $person_id)
 	{
+		if ($this->testlauf === true)
+		{
+			return array('type' => 'leaving', 'date' => $endDate);
+		}
+		
 		$manageEmpResult = $this->_ci->ManagePersonnelLeavingInModel->MaintainBundle(
 			array(
 				'BasicMessageHeader' => array(
@@ -1813,6 +1945,11 @@ class SyncEmployeesLib
 
 	private function rehireEmployee($empID, $beginn, $typeCode, $stunden, $oe, $person_id, $ende = null)
 	{
+		if ($this->testlauf === true)
+		{
+			return array('type' => 'rehire', 'date' => $beginn, 'hours' => $stunden, 'oe' => $oeID);
+		}
+
 		$array = array(
 			'BasicMessageHeader' => array(
 				'ID' => generateUID(self::CREATE_EMP_PREFIX),
@@ -1885,6 +2022,11 @@ class SyncEmployeesLib
 
 	private function transferEmployee($empID, $transferDate, $hours, $oeID, $person_id, $secondTry = false, $jobID = self::JOB_ID)
 	{
+		if ($this->testlauf === true)
+		{
+			return array('type' => 'transfer', 'date' => $transferDate, 'hours' => $hours, 'oe' => $oeID);
+		}
+
 		$manageEmpResult = $this->_ci->ManagePersonnelTransferInModel->MaintainBundle(
 			array(
 				'BasicMessageHeader' => array(
