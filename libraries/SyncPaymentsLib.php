@@ -41,6 +41,8 @@ class SyncPaymentsLib
 	const INCOMING_OUTGOING_GRANT = 'payments_incoming_outgoing_grant';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
+	const PAYMENTS_FH_COST_CENTERS_BUCHUNG = 'payments_fh_cost_centers_buchung';
+	
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
 
@@ -104,6 +106,8 @@ class SyncPaymentsLib
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
+		$this->_ci->load->helper('hlp_authentication');
+		
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -841,7 +845,11 @@ class SyncPaymentsLib
 		{
 			$data = array();
 			$UserPartyID = '';
+
+			// can hold the CostCenterID or GMBHLehrgaenge if it is assigned to a gmbh project
+			$lastCostCenter = '-1';
 			$last_stg = '';
+			$ProjectRequired = false;
 			$buchungsnr_arr = array();
 
 			// Get SAP ID of the Student
@@ -868,8 +876,17 @@ class SyncPaymentsLib
 				$paymentData = getData($result_openpayments);
 				foreach ($paymentData as $singlePayment)
 				{
-					if ($last_stg != $singlePayment->studiengang_kz)
+					// If it is a Special Buchungstyp from the config, then it is automatically redirected to an other cost center
+					// This needs to be overwritten here to make sure it creates a separate SalesOrder if neccassary
+					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 					{
+						$singlePayment->kostenstellenzuordnung = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
+					}
+
+					if ($lastCostCenter != $singlePayment->kostenstellenzuordnung)
+					{
+						$ProjectRequired = false;
+
 						if ($last_stg != '')
 						{
 							if ($last_stg < 0)
@@ -881,6 +898,7 @@ class SyncPaymentsLib
 							$this->_createSalesOrder($data, $buchungsnr_arr, $release);
 						}
 
+						$lastCostCenter = $singlePayment->kostenstellenzuordnung;
 						$last_stg = $singlePayment->studiengang_kz;
 						$buchungsnr_arr = array();
 						$task_id = '';
@@ -902,23 +920,13 @@ class SyncPaymentsLib
 							}
 						}
 
+						// GMBH or Special Courses
 						if (($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
 							&& !in_array($singlePayment->studiengangstyp, array('b','m'))
 							)
 						{
-							// GMBH or Special Courses
-
 							// Get ProjectID if it is a Lehrgang or Special Course
-							$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
-							if (!isError($TaskResult) && hasData($TaskResult))
-								$task_id = getData($TaskResult)[0]->project_id;
-							else
-							{
-								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.
-									$singlePayment->studiengang_kz.' and studysemester '.
-									$singlePayment->studiensemester_kurzbz;
-								continue 2;
-							}
+							$ProjectRequired = true;
 
 							// Speziallehrgänge die in der FH sind statt in der GMBH!
 							if ($singlePayment->studiengang_kz < 0
@@ -938,16 +946,24 @@ class SyncPaymentsLib
 							 	$salesUnitPartyID = $this->_ci->config->item('payments_sales_unit_custom');
 							}
 						}
-						else
+						else // FH payments
 						{
-							// FH
-							$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
-							if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
-								$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
-							else
+							// Standard payment cost center
+							if (!isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 							{
-								$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
-								continue;
+								$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
+								if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
+									$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
+								else
+								{
+									$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
+									continue;
+								}
+							}
+							else // alternative payment cost center
+							{
+								$salesUnitPartyID = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
+								$lastCostCenter = $salesUnitPartyID;
 							}
 
 							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
@@ -988,6 +1004,7 @@ class SyncPaymentsLib
 						);
 					}
 
+					//
 					if ($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 					{
 						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
@@ -996,6 +1013,15 @@ class SyncPaymentsLib
 						$data['SalesOrder']['CashDiscountTerms'] = array(
 							'actionCode' => '01',
 							'Code' => 'z006' // 5 Werktage
+						);
+					}
+					
+					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
+					{
+						$data['SalesOrder']['mahnsperre'] = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['mahnsperre'];
+						$data['SalesOrder']['CashDiscountTerms'] = array(
+							'actionCode' => '01',
+							'Code' =>  $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['zahlungsbedingung']
 						);
 					}
 
@@ -1038,8 +1064,19 @@ class SyncPaymentsLib
 
 					// If it is Payment for a Lehrgang or Special Degree Programm
 					// add the reference to a project
-					if ($task_id != '')
+					if ($ProjectRequired)
 					{
+						$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
+						if (!isError($TaskResult) && hasData($TaskResult))
+							$task_id = getData($TaskResult)[0]->project_id;
+						else
+						{
+							$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.
+								$singlePayment->studiengang_kz.' and studysemester '.
+								$singlePayment->studiensemester_kurzbz;
+							continue 2;
+						}
+
 						$position['ItemAccountingCodingBlockDistribution'] = array(
 							'AccountingCodingBlockAssignment' => array(
 								'ProjectTaskKey' => array(
@@ -1246,26 +1283,32 @@ class SyncPaymentsLib
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
-				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
+				bk.buchungsnr,
+				bk.studiengang_kz,
+				bk.studiensemester_kurzbz,
+				bk.betrag,
+				bk.buchungsdatum,
 				bk.buchungstext, bk.buchungstyp_kurzbz,
-				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
-				tbl_studiensemester.start as studiensemester_start,
-				tbl_studiengang.typ as studiengangstyp
+				UPPER(sg.typ || sg.kurzbz) as studiengang_kurzbz,
+				ss.start as studiensemester_start,
+				sg.typ as studiengangstyp,
+				COALESCE(so.oe_kurzbz_sap, \'GMBHPROJEKT\') as kostenstellenzuordnung
 			FROM
 				public.tbl_konto bk
-				JOIN public.tbl_studiengang USING(studiengang_kz)
-				JOIN public.tbl_studiensemester USING(studiensemester_kurzbz)
+				JOIN public.tbl_studiengang sg USING(studiengang_kz)
+				JOIN public.tbl_studiensemester ss USING(studiensemester_kurzbz)
+				LEFT JOIN sync.tbl_sap_organisationsstruktur so ON(so.oe_kurzbz = sg.oe_kurzbz)
 			WHERE
-				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
-				AND betrag < 0
-				AND 0 != betrag + COALESCE((SELECT sum(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr),0)
-				AND buchungsnr_verweis IS NULL
-				AND person_id = ?
-				AND buchungsdatum >= ?
-				AND buchungsdatum <= now()
-				AND tbl_studiensemester.start <= ?
+				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
+				AND bk.betrag < 0
+				AND 0 != bk.betrag + COALESCE((SELECT SUM(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr), 0)
+				AND bk.buchungsnr_verweis IS NULL
+				AND bk.person_id = ?
+				AND bk.buchungsdatum >= ?
+				AND bk.buchungsdatum <= NOW()
+				AND ss.start <= ?
 			ORDER BY
-				studiengang_kz, studiensemester_start
+				kostenstellenzuordnung, studiengang_kz, studiensemester_start
 		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
 
 		return $dbPaymentData;
