@@ -29,6 +29,7 @@ class SyncPaymentsLib
 	// Jobs types used by this lib
 	const SAP_PAYMENT_CREATE = 'SAPPaymentCreate';
 	const SAP_PAYMENT_GUTSCHRIFT = 'SAPPaymentGutschrift';
+	const SAP_SONSTIGE_PAYMENT_GUTSCHRIFT = 'SAPSonstigeGutschrift';
 
 	// Prefix for SAP SOAP id calls
 	const CREATE_PAYMENT_PREFIX = 'CP';
@@ -45,6 +46,9 @@ class SyncPaymentsLib
 	
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
+
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS = 'payments_other_credits';
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS_COMPANY = 'payments_other_credits_company';
 
 	//
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
@@ -96,11 +100,16 @@ class SyncPaymentsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesOrderIn_model', 'ManageSalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerInvoiceRequestIn_model', 'ManageCustomerInvoiceRequestInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/SORelease_model', 'SOReleaseModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/Y95KEPJZY_WS_CRPE_ManageRecPayEntry_model', 'ManageRecPayEntryModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/RPFINGLAU08_Q0002_model', 'RPFINGLAU08_Q0002Model');
 		$this->_ci->load->model('crm/Konto_model', 'KontoModel');
+		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
+		$this->_ci->load->model('organisation/Studiengang_model', 'StudiengangModel');
 
 		// Loads SAPSalesOrderModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPSalesOrder_model', 'SAPSalesOrderModel');
+		
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudentsGutschriften_model', 'SAPStudentsGutschriftenModel');
 
 		// Loads Payment configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
@@ -538,7 +547,241 @@ class SyncPaymentsLib
 			)
 		);
 	}
+	
+	public function createSonstigeGutschrift($personIdArray)
+	{
+		// If the given array of person ids is empty stop here
+		if (isEmptyArray($personIdArray)) return success('No gutschrift to be created');
 
+		// For each person id
+		foreach ($personIdArray as $person_id)
+		{
+			// Get the SAP user id for this person
+			$sapUserIdResult = $this->_getSAPUserId($person_id);
+
+			// If an error occurred then return it
+			if (isError($sapUserIdResult)) return $sapUserIdResult;
+
+			// If no data have been found
+			if (!hasData($sapUserIdResult))
+			{
+				// Then log it
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find the sap user id with this person id: '.$person_id);
+				continue; // and continue to the next one
+			}
+
+			// Here the sap user id!
+			$sapUserId = getData($sapUserIdResult)[0]->sap_user_id;
+
+			// Get all Open Payments of Person that are not yet transfered to SAP
+			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id, array_keys($this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)));
+			
+			// If an error occurred then return it
+			if (isError($resultCreditMemoResult)) return $resultCreditMemoResult;
+			
+			// If no data have been found
+			if (!hasData($resultCreditMemoResult))
+			{
+				// Then log it
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a credit memos with this person id: '.$person_id);
+				continue; // and continue to the next one
+			}
+			// For each payment found
+			foreach (getData($resultCreditMemoResult) as $singlePayment)
+			{
+				$studiengang = $this->_ci->StudiengangModel->load(array('studiengang_kz' => $singlePayment->studiengang_kz));
+				if (isError($studiengang)) return $studiengang;
+				$studiengang_oe = getData($studiengang)[0]->oe_kurzbz;
+
+				$oeRoot = $this->_ci->MessageTokenModel->getOeRoot($studiengang_oe);
+				if (isError($oeRoot)) return $oeRoot;
+				$oeRoot = getData($oeRoot)[0]->oe_kurzbz;
+
+				$dbModel = new DB_Model();
+				$sapOe = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($oeRoot));
+
+				if (isError($sapOe)) return $sapOe;
+
+				if (!hasData($sapOe))
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Could not get SAP OE for '. $oeRoot);
+					continue; // and continue to the next one
+				}
+
+				$company = getData($sapOe)[0]->oe_kurzbz_sap;
+
+				$dbModel = new DB_Model();
+				$qry = "SELECT nextval('sync.tbl_sap_students_gutschriften_id_seq')";
+				$nextValResult = $dbModel->execReadOnlyQuery($qry);
+				if (isError($nextValResult)) return $nextValResult;
+				$nextValResult = getData($nextValResult)[0];
+				$id = $nextValResult->nextval;
+
+				$zahlungsCheck = $this->_ci->SAPStudentsGutschriftenModel->load(array('buchungsnr' => $singlePayment->buchungsnr));
+
+				if (isError($zahlungsCheck)) return $zahlungsCheck;
+
+				if (hasData($zahlungsCheck))
+				{
+					$zahlungsCheck = getData($zahlungsCheck)[0];
+					
+					if (!($zahlungsCheck->done))
+					{
+						$this->_ci->LogLibSAP->logWarningDB("counter booking should already exist " . $zahlungsCheck->buchungsnr);
+					}
+
+					$createPayReceivables = $this->createPayReceivablesEntry($zahlungsCheck->id, $singlePayment);
+					if (isError($createPayReceivables)) return $createPayReceivables;
+					continue;
+				}
+
+				$data = array(
+					'BasicMessageHeader' => array(
+						'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+						'UUID' => generateUUID()
+					),
+					'BO_CRPE_OpenItemRequest' => array(
+						'ID' => $id,
+						'CompanyID' => $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS_COMPANY),
+						'BusinessPartnerInternalID' => $sapUserId,
+						'Description' => mb_substr($singlePayment->buchungstext, 0, 40),
+						'PostingDate' => $singlePayment->buchungsdatum,
+						'DocumentDate' => $singlePayment->buchungsdatum,
+						'DueDate' => $singlePayment->buchungsdatum,
+						'NetAmount' => array(
+							'currencyCode' => 'EUR',
+							'_' => str_replace(',', '.', $singlePayment->betrag),
+						),
+						'TypeCode' => '2',
+						'GLAccountOtherLiabilities' => $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)[$singlePayment->buchungstyp_kurzbz]['GLAccountOtherLiabilities']
+					)
+				);
+
+				$createResult = $this->_ci->ManageRecPayEntryModel->create($data);
+				if (isError($createResult)) return $createResult;
+
+				$createResult = getData($createResult);
+				
+				if (isset($createResult->BO_CRPE_OpenItemRequest) &&
+					isset($createResult->BO_CRPE_OpenItemRequest->SAP_UUID) &&
+					isset($createResult->BO_CRPE_OpenItemRequest->ID))
+				{
+					$insertResult = $this->_ci->SAPStudentsGutschriftenModel->insert(
+						array('id' => $id,
+							'buchungsnr' => $singlePayment->buchungsnr)
+					);
+					
+					if (isError($insertResult)) return $insertResult;
+					$createPayReceivables = $this->createPayReceivablesEntry($id, $singlePayment);
+					if (isError($createPayReceivables)) return $createPayReceivables;
+				}
+				else
+				{
+					if (isset($createResult->Log) && isset($createResult->Log->Item))
+					{
+						if (!isEmptyArray($createResult->Log->Item))
+						{
+							foreach ($createResult->Log->Item as $item)
+							{
+								if (isset($item->Note))
+								{
+									$this->_ci->LogLibSAP->logWarningDB($item->Note.' for create gutschrift/rechnung: '.$id);
+								}
+							}
+						}
+					}
+					elseif ($createResult->Log->Item->Note)
+					{
+						$this->_ci->LogLibSAP->logWarningDB(
+							$createResult->Log->Item->Note.' for create gutschrift/rechnung: '. $id
+						);
+					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return ID sonstige gutschrift/rechnung: ' . $id);
+					}
+				}
+			}
+		}
+
+		return success('SAP credit memo created successfully');
+	}
+
+	public function createPayReceivablesEntry($id, $singlePayment)
+	{
+		$data = array(
+			'BasicMessageHeader' => array(
+				'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+				'UUID' => generateUUID()
+			),
+			'BO_CRPE_OpenItemRequest' => array(
+				'ID' => $id
+			)
+		);
+		$createPayReceivablesEntry = $this->_ci->ManageRecPayEntryModel->createPayReceivablesEntry($data);
+
+		if (isError($createPayReceivablesEntry)) return $createPayReceivablesEntry;
+		$createPayReceivablesEntry = getData($createPayReceivablesEntry);
+
+		if (isset($createPayReceivablesEntry->Log) &&
+			isset($createPayReceivablesEntry->Log->Item))
+		{
+			if (!isEmptyArray($createPayReceivablesEntry->Log->Item))
+			{
+				foreach ($createPayReceivablesEntry->Log->Item as $item)
+				{
+					if (isset($item->Note))
+					{
+						$this->_ci->LogLibSAP->logWarningDB(
+							$item->Note.' for createPayReceivablesEntry gutschrift/rechnung: '. $id
+						);
+					}
+				}
+			}
+			elseif ($createPayReceivablesEntry->Log->Item->Note)
+			{
+				$note = $createPayReceivablesEntry->Log->Item->Note;
+
+				if (strpos($note, 'Action') !== false && strpos($note, 'executed') !== false)
+				{
+					$kontoResult = $this->_ci->KontoModel->insert(
+						array(
+							'person_id' => $singlePayment->person_id,
+							'studiengang_kz' => $singlePayment->studiengang_kz,
+							'studiensemester_kurzbz' => $singlePayment->studiensemester_kurzbz,
+							'buchungsnr_verweis' => $singlePayment->buchungsnr,
+							'betrag' => str_replace(',', '.', $singlePayment->betrag*(-1)),
+							'buchungsdatum' => date('Y-m-d'),
+							'buchungstext' => $singlePayment->buchungstext,
+							'buchungstyp_kurzbz' => $singlePayment->buchungstyp_kurzbz
+						)
+					);
+					if (isError($kontoResult)) return $kontoResult;
+					
+					$updateResult = $this->_ci->SAPStudentsGutschriftenModel->update(
+						array('buchungsnr' => $singlePayment->buchungsnr),
+						array(
+							'done' => true,
+							'updateamum' => date('Y-m-d H:i:s')
+						)
+					);
+					if (isError($updateResult)) return $updateResult;
+				}
+				else
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						$createPayReceivablesEntry->Log->Item->Note.' for createPayReceivablesEntry gutschrift/rechnung: '. $id
+					);
+				}
+			}
+		}
+		return success('success');
+	}
+	
 	/**
 	 * Creates new SalesOrders in SAP using the array of person ids given as parameter
 	 */
@@ -568,7 +811,7 @@ class SyncPaymentsLib
 			$sapUserId = getData($sapUserIdResult)[0]->sap_user_id;
 
 			// Get all Open Payments of Person that are not yet transfered to SAP
-			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id);
+			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id, $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS));
 
 			// If an error occurred then return it
 			if (isError($resultCreditMemoResult)) return $resultCreditMemoResult;
@@ -1241,7 +1484,7 @@ class SyncPaymentsLib
 	 * @param $person_id ID of the Person
 	 * @return payment results
 	 */
-	private function _getUnsyncedCreditMemo($person_id)
+	private function _getUnsyncedCreditMemo($person_id, $buchungstypen)
 	{
 		$dbModel = new DB_Model();
 
@@ -1264,7 +1507,7 @@ class SyncPaymentsLib
 		', array(
 			$person_id,
 			self::BUCHUNGSDATUM_SYNC_START,
-			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+			$buchungstypen
 		));
 
 		return $dbPaymentData;
