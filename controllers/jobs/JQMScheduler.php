@@ -464,7 +464,7 @@ class JQMScheduler extends JQW_Controller
 					$addNewJobResult = $this->addNewJobsToQueue(
 						JQMSchedulerLib::JOB_TYPE_SAP_UPDATE_EMPLOYEE_SERVICE, // job type
 						$this->generateJobs( // gnerate the structure of the new job
-							JobsQueueLib::STATUS_DONE,
+							JobsQueueLib::STATUS_NEW,
 							json_encode($jobInputArray)
 						)
 					);
@@ -513,7 +513,7 @@ class JQMScheduler extends JQW_Controller
 					$addNewJobResult = $this->addNewJobsToQueue(
 						JQMSchedulerLib::JOB_TYPE_SAP_CHECK_EMPLOYEE_DV, // job type
 						$this->generateJobs( // gnerate the structure of the new job
-							JobsQueueLib::STATUS_DONE,
+							JobsQueueLib::STATUS_NEW,
 							json_encode($jobInputArray)
 						)
 					);
