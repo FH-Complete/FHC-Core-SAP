@@ -189,8 +189,30 @@ function loadFUEPhases(projekt_kurzbz)
 }
 
 $(function() {
+    $(document).on("tableInit", function(event,tabulatorInstance) {
+     
+        let uniqueTableID = tabulatorInstance.element.parentElement.parentElement.parentElement.attributes.tableuniqueid.value;
+        switch(uniqueTableID){
+            case "SAPProjects": 
+                tabulatorInstance.on("rowSelected",(row)=>{ rowSelected_onSAPProject(row);});
+                tabulatorInstance.on("rowDeselected",(row)=>{ rowDeselected_onSAPProject(row);});
+                break;
+            case "FUEProjects": 
+                tabulatorInstance.on("rowUpdated",(row)=>{ row.deselect();});
+                tabulatorInstance.on("rowAdded",(row)=>{ resortTable(row);});
+                break;
+            case "SAPPhases":
+                tabulatorInstance.on("rowAdded",(row)=>{ resortTable(row);});    
+                break;
+            case "FUEPhases":
+                tabulatorInstance.on("rowUpdated",(row)=>{ row.deselect();});
+                break;
+            default: break;
+        } 
+    });
+
 // Init tooltip
-$('[data-toggle="tooltip"]').tooltip();
+$('[data-bs-toggle="tooltip"]').tooltip();
 
 // Synchronize SAP and FH project.
 $("#btn-sync-project").click(function () {

@@ -29,13 +29,12 @@ $tableWidgetArray = array(
 		height: "300px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		tableWidgetHeader: false,
 		selectable: 1,
 		selectablePersistence: false,
-	    rowUpdated: function(row){
-	        row.deselect();
-        }
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
+		}
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},

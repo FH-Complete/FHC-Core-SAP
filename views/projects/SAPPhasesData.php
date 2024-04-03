@@ -45,14 +45,13 @@ $tableWidgetArray = array(
 		height: "300px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		tableWidgetHeader: false,
 	    selectable: true,
         selectableRangeMode: "click",
 		selectablePersistence: false,
-        rowAdded:function(row){
-	        resortTable(row);
-	    }
+        columnDefaults:{
+			headerFilterPlaceholder: " ",
+		}
 	}',
 	'datasetRepFieldsDefs' => '{
 		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},

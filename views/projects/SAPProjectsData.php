@@ -59,7 +59,6 @@ $tableWidgetArray = array(
 		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
 		initialHeaderFilter:[
@@ -69,11 +68,8 @@ $tableWidgetArray = array(
 		    {column:"isSynced", dir:"asc"} // start with false
 	    ],
 		tableWidgetHeader: false,
-		rowSelected: function(row){
-			rowSelected_onSAPProject(row);
-		},
-		rowDeselected:function(row) {
-			rowDeselected_onSAPProject(row);
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
