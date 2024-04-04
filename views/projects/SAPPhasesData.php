@@ -54,7 +54,7 @@ $tableWidgetArray = array(
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
 			formatter:"lookup",
 			formatterParams:getSAPPhasesStatusbezeichnung

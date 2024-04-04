@@ -37,7 +37,7 @@ $tableWidgetArray = array(
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		projects_timesheets_project: {visible: false},
 		projekt_id: {visible: false},
 		projekt_kurzbz: {visible:false},

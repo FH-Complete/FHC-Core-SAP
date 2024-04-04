@@ -73,7 +73,7 @@ $tableWidgetArray = array(
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
 			headerFilter: "select",
 			headerFilterParams: getSAPProjectStatusbezeichnung,
