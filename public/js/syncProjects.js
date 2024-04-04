@@ -212,7 +212,7 @@ $(function() {
     });
 
 // Init tooltip
-$('[data-bs-toggle="tooltip"]').tooltip();
+$('[data-toggle="tooltip"]').tooltip();
 
 // Synchronize SAP and FH project.
 $("#btn-sync-project").click(function () {
