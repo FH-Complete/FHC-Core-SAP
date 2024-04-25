@@ -252,7 +252,7 @@ class SyncPaymentsLib
 		     LEFT JOIN sync.tbl_sap_salesorder sso USING(buchungsnr)
 			 WHERE k.person_id = ?
 			   AND k.buchungsnr_verweis IS NULL
-			   AND (k.studiengang_kz > 0 OR k.studiengang_kz IN ?)
+			   AND (k.studiengang_kz >= 0 OR k.studiengang_kz IN ?)
 			   AND k.buchungsdatum >= ?
 		      ORDER BY k.buchungsdatum DESC
 		', array(
