@@ -61,9 +61,9 @@ $tableWidgetArray = array(
 		persistantLayout: false,
 		selectable: 1,
 		selectablePersistence: false,
-		initialHeaderFilter:[
+		 initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
-        ],
+        ], 
         initialSort:[
 		    {column:"isSynced", dir:"asc"} // start with false
 	    ],
@@ -75,10 +75,11 @@ $tableWidgetArray = array(
 	'datasetRepFieldsDefs' => '{
 		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
-			headerFilter: "select",
-			headerFilterParams: getSAPProjectStatusbezeichnung,
+			editor: "list",
+			headerFilter:true,
+			headerFilterParams:{ values:getSAPProjectStatusbezeichnung()},
 			formatter:"lookup",
-			formatterParams: getSAPProjectStatusbezeichnung
+            formatterParams: getSAPProjectStatusbezeichnung
 		},
 		projects_timesheet_id: {visible: false},
 		start_date: {headerFilter: "input", mutator: mut_formatStringDate},

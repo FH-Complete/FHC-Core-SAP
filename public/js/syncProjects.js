@@ -18,6 +18,7 @@ const SAP_PROJECT_STATUSBEZEICHNUNG = {
     '99': 'Deleted [still synced]'
 };
 
+
 const SAP_PHASES_STATUSBEZEICHNUNG = {
     '2': 'Approved',
     '3': 'Stopped',
@@ -47,8 +48,15 @@ var mut_formatStringDate = function(value, data, type, params, component) {
 /**
  * Returns nice readable sap projekt instead of numeric value
  */
+
 function getSAPProjectStatusbezeichnung() {
     return SAP_PROJECT_STATUSBEZEICHNUNG;
+    
+}
+
+function getSAPProjectStatusbezeichnungFormat(label, value, item, element) {
+    
+    return SAP_PROJECT_STATUSBEZEICHNUNG[label];
 }
 
 /**
@@ -231,6 +239,7 @@ $("#btn-sync-project").click(function () {
     var projekt_id = fue_project_data[0].projekt_id;
     var projekt_kurzbz = fue_project_data[0].projekt_kurzbz;
     var titel = fue_project_data[0].titel;
+    console.log(projects_timesheet_id, projekt_id, projekt_kurzbz, titel);
 
     FHC_AjaxClient.ajaxCallPost(
         FHC_JS_DATA_STORAGE_OBJECT.called_path + "/syncProjects",
