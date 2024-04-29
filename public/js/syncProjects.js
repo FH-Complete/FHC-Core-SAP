@@ -191,7 +191,7 @@ function loadFUEPhases(projekt_kurzbz)
 $(function() {
     $(document).on("tableInit", function(event,tabulatorInstance) {
      
-        let uniqueTableID = tabulatorInstance.element.parentElement.parentElement.parentElement.attributes.tableuniqueid.value;
+        let uniqueTableID = tabulatorInstance.element.parentElement.parentElement.attributes.tableuniqueid.value;
         switch(uniqueTableID){
             case "SAPProjects": 
                 tabulatorInstance.on("rowSelected",(row)=>{ rowSelected_onSAPProject(row);});

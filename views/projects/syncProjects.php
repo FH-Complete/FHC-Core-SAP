@@ -9,7 +9,6 @@ $includesArray = array(
     'sbadmintemplate3' => true,
     'tabulator5' => true,
     'tabulator5JQuery' => true,
-    'cis'=>true,
     'momentjs2' => true,
     'ajaxlib' => true,
     'dialoglib' => true,
