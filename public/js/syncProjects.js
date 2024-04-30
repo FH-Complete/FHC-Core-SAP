@@ -196,10 +196,23 @@ function loadFUEPhases(projekt_kurzbz)
 
 }
 
+const findTableUniqueID = function (tableElement,count =0){
+    if(count >=10){
+        // after 10 iterations end the recursion
+        return null;
+    }
+    if(tableElement.attributes.tableuniqueid){
+       return tableElement.attributes.tableuniqueid.value;
+    }else{
+        findTableUniqueID(tableElement.parentElement, ++count);
+    }
+}
+
 $(function() {
     $(document).on("tableInit", function(event,tabulatorInstance) {
-     
-        let uniqueTableID = tabulatorInstance.element.parentElement.parentElement.attributes.tableuniqueid.value;
+        
+        let uniqueTableID = findTableUniqueID(tabulatorInstance.element);
+        
         switch(uniqueTableID){
             case "SAPProjects": 
                 tabulatorInstance.on("rowSelected",(row)=>{ rowSelected_onSAPProject(row);});
@@ -215,6 +228,7 @@ $(function() {
             case "FUEPhases":
                 tabulatorInstance.on("rowUpdated",(row)=>{ row.deselect();});
                 break;
+            // if the function findTableUniqueID returned null because it couldnt find the attribute tableuniqueid
             default: break;
         } 
     });
