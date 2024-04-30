@@ -196,6 +196,7 @@ function loadFUEPhases(projekt_kurzbz)
 
 }
 
+//recursive function that returns the tableuniqueid using the tableInstance
 const findTableUniqueID = function (tableElement,count =0){
     if(count >=10){
         // after 10 iterations end the recursion
