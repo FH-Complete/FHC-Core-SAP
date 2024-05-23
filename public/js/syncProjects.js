@@ -199,7 +199,7 @@ function loadFUEPhases(projekt_kurzbz)
 $(function() {
     $(document).on("tableInit", function(event,tabulatorInstance) {
         
-        let uniqueTableID = tabulatorInstance.element.closest('[tableuniqueid]')
+        let uniqueTableID = tabulatorInstance.element.closest('[tableuniqueid]').attributes.tableuniqueid.value;
         
         switch(uniqueTableID){
             case "SAPProjects": 
