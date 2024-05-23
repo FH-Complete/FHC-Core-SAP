@@ -196,23 +196,10 @@ function loadFUEPhases(projekt_kurzbz)
 
 }
 
-//recursive function that returns the tableuniqueid using the tableInstance
-const findTableUniqueID = function (tableElement,count =0){
-    if(count >=10){
-        // after 10 iterations end the recursion
-        return null;
-    }
-    if(tableElement.attributes.tableuniqueid){
-       return tableElement.attributes.tableuniqueid.value;
-    }else{
-        findTableUniqueID(tableElement.parentElement, ++count);
-    }
-}
-
 $(function() {
     $(document).on("tableInit", function(event,tabulatorInstance) {
         
-        let uniqueTableID = findTableUniqueID(tabulatorInstance.element);
+        let uniqueTableID = tabulatorInstance.element.closest('[tableuniqueid]')
         
         switch(uniqueTableID){
             case "SAPProjects": 
