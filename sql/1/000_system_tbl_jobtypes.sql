@@ -9,6 +9,8 @@ INSERT INTO system.tbl_jobtypes (type, description) VALUES
 ('SAPPurchaseOrdersSync', 'Activate purchase orders on SAP Business by design'),
 ('SAPEmployeesCreate', 'Create employee on SAP Business by design'),
 ('SAPEmployeesUpdate', 'Update employee on SAP Business by design'),
-('SAPEmployeesWorkAgreementUpdate', 'Update employees working agreement on SAP Business by design')
+('SAPEmployeesWorkAgreementUpdate', 'Update employees working agreement on SAP Business by design'),
+('SAPEmployeeIDServiceUpdate', 'Set employees_id on service'),
+('SAPEmployeeCheckDV', 'Compare last DV between FH and SAP')
 ON CONFLICT (type) DO NOTHING;
 

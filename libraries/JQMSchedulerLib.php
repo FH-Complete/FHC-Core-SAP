@@ -38,6 +38,9 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 
+	const JOB_TYPE_SAP_UPDATE_EMPLOYEE_SERVICE = 'SAPEmployeeIDServiceUpdate';
+	const JOB_TYPE_SAP_CHECK_EMPLOYEE_DV = 'SAPEmployeeCheckDV';
+
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
@@ -308,6 +311,9 @@ class JQMSchedulerLib
 			   AND b.person_id NOT IN (
 				SELECT ss.person_id FROM sync.tbl_sap_services ss
 			   )
+			   AND m.mitarbeiter_uid IN (
+			       SELECT sm.mitarbeiter_uid FROM sync.tbl_sap_mitarbeiter sm
+			   )
 			   AND m.personalnummer > 0
 		');
 
@@ -339,6 +345,9 @@ class JQMSchedulerLib
 			   AND bf.funktion_kurzbz = \'oezuordnung\'
 			   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
 			   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
+			   AND vwm.uid IN (
+			       SELECT sm.mitarbeiter_uid FROM sync.tbl_sap_mitarbeiter sm
+			   )
 		      ORDER BY vwm.person_id DESC
 		');
 
@@ -636,6 +645,53 @@ class JQMSchedulerLib
 		if (hasData($personResult)) $functions = getData($personResult);
 
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
+	}
+	
+	public function setEmployeeOnService()
+	{
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+			SELECT DISTINCT tbl_person.person_id
+			FROM sync.tbl_sap_services
+				JOIN public.tbl_person ON tbl_sap_services.person_id = tbl_person.person_id
+				JOIN public.tbl_benutzer ON tbl_person.person_id = tbl_benutzer.person_id
+				JOIN public.tbl_mitarbeiter ON tbl_benutzer.uid = tbl_mitarbeiter.mitarbeiter_uid
+				JOIN sync.tbl_sap_mitarbeiter ON tbl_mitarbeiter.mitarbeiter_uid = tbl_sap_mitarbeiter.mitarbeiter_uid');
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($personResult)) return $personResult;
+		
+		// Return a success that contains all the arrays merged together
+		return success(getData($personResult));
+	}
+	
+	public function checkEmployeesDVs()
+	{
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+				SELECT DISTINCT tbl_dienstverhaeltnis.mitarbeiter_uid AS uid
+				FROM sync.tbl_sap_mitarbeiter
+					JOIN hr.tbl_dienstverhaeltnis ON tbl_sap_mitarbeiter.mitarbeiter_uid = tbl_dienstverhaeltnis.mitarbeiter_uid
+					JOIN public.tbl_mitarbeiter ON tbl_dienstverhaeltnis.mitarbeiter_uid = tbl_mitarbeiter.mitarbeiter_uid
+					JOIN public.tbl_benutzer ON tbl_mitarbeiter.mitarbeiter_uid = tbl_benutzer.uid
+					JOIN public.tbl_person ON tbl_benutzer.person_id = tbl_person.person_id
+				WHERE EXISTS (
+					SELECT 1
+					FROM hr.tbl_dienstverhaeltnis dv
+					WHERE dv.mitarbeiter_uid = tbl_dienstverhaeltnis.mitarbeiter_uid
+						AND dv.vertragsart_kurzbz IN ?
+						AND (dv.von <= NOW())
+						AND (dv.bis >= NOW() OR dv.bis IS NULL)
+				)
+				ORDER BY tbl_dienstverhaeltnis.mitarbeiter_uid;
+				', array($this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+		
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($personResult)) return $personResult;
+		
+		// Return a success that contains all the arrays merged together
+		return success(getData($personResult));
 	}
 }
 
