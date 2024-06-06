@@ -427,7 +427,13 @@ class SyncEmployeesLib
 				}
 
 				$sapBankData = $this->getBankDetails(getData($sapIdResult)[0]->sap_eeid);
-				$bankDetailsOfEmployee = getData(($sapBankData))->BankDetailsOfEmployee;
+				$bankDetailsOfEmployee = null;
+
+				if (hasData($sapBankData) && isset(getData($sapBankData)->BankDetailsOfEmployee))
+				{
+					$bankDetailsOfEmployee = getData($sapBankData)->BankDetailsOfEmployee;
+				}
+
 				$sapBanksIban = [];
 				$newBankKeyId = '0001';
 
