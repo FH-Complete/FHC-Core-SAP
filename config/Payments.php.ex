@@ -29,9 +29,6 @@ $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
 $config['payments_international_office_sales_unit_party_id'] = '100097';
 
 // Credit memo types read from database
-$config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungstipendium');
-
-// Credit memo types read from database
 $config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungsstipendium');
 
 // Couples of Buchungstyp_kurzbz => cost center used in the FH payments when is not wanted
