@@ -37,12 +37,14 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
+	const JOB_TYPE_SAP_OTHER_CREDIT_MEMO = 'SAPSonstigeGutschrift';
 
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEE_SERVICE = 'SAPEmployeeIDServiceUpdate';
 	const JOB_TYPE_SAP_CHECK_EMPLOYEE_DV = 'SAPEmployeeCheckDV';
 
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS = 'payments_other_credits';
 
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 	const BEFORE_START = 'sap_sync_employees_x_days_before_start';
@@ -486,6 +488,36 @@ class JQMSchedulerLib
 			',
 			array(
 				$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+			)
+		);
+
+		return $creditMemoResult;
+	}
+	
+	public function creditSonstigeGutschrift()
+	{
+		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
+		
+		$dbModel = new DB_Model();
+
+		// Get users that have updated credit memo
+		$creditMemoResult = $dbModel->execReadOnlyQuery(
+			'SELECT ko.person_id
+			  FROM public.tbl_konto ko
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE ko.betrag > 0
+			   AND ko.buchungstyp_kurzbz IN ?
+			   AND ko.buchungsdatum >= ?
+			   AND ko.buchungsnr NOT IN (
+				SELECT kos.buchungsnr_verweis
+				  FROM public.tbl_konto kos
+				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
+			)
+		      GROUP BY ko.person_id
+			',
+			array(
+				array_keys($this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)),
+				SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START
 			)
 		);
 

@@ -41,3 +41,10 @@ $config['payments_fh_cost_centers_buchung'] = array(
 	'EBCL_001' => array('kostenstelle' => '100100', 'zahlungsbedingung' => '1001', 'mahnsperre' => '1'),
 );
 
+//sonstige gutschriften
+$config['payments_other_credits'] = array(
+	'ZuschussIO' => array('GLAccountOtherLiabilities' => 'Z-2311'),
+	'Leistungsstipendium' => array('GLAccountOtherLiabilities' => 'Z2302')
+);
+
+$config['payments_other_credits_company'] = '100000';
