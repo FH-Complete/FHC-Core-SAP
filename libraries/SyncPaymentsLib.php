@@ -195,21 +195,21 @@ class SyncPaymentsLib
 			)
 		);
 
-		// There are no invoices for this user
-		if (!hasData($customerInvoiceResult)) return success('Currently there are no invoices');
-		if (!isset(getData($customerInvoiceResult)->CustomerInvoice)) return success('Currently there are no invoices');
-
+		// List of SAP invoices
+		$data = array();
 		// List of SAP invoices related to a sale order
 		$sapInvoicesWithSO = array();
 
-		// For each SAP invoice
-
-		$data = getData($customerInvoiceResult)->CustomerInvoice;
+		// If there are data in the SAP response and the property CustomerInvoice is set
+		if (hasData($customerInvoiceResult) && isset(getData($customerInvoiceResult)->CustomerInvoice))
+		{
+			$data = getData($customerInvoiceResult)->CustomerInvoice;
+		}
 		
 		// If there is only one Invoice it is just an object instead of an array of objects
-		if(!is_array($data))
-			$data = array($data);
+		if (isEmptyArray($data)) $data = array($data);
 
+		// For each SAP invoice
 		foreach ($data as $customerInvoice)
 		{
 			// If the invoice is not a "Gutschrift" => self::GUTSCHRIFT_CODE
@@ -244,9 +244,6 @@ class SyncPaymentsLib
 				}
 			}
 		}
-
-		//
-		if (isEmptyArray($sapInvoicesWithSO)) return success('Currently there are no invoices related to sales orders');
 
 		// Get the info from the tbl_konto database table
 		$sapSOsResult = $dbModel->execReadOnlyQuery('
