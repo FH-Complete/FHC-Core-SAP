@@ -51,6 +51,34 @@ const SAPInvoicesApp = Vue.createApp({
 			if (payloadData.hasOwnProperty("INVOICES_TO_BE_SYNCED"))
 			{
 				this.notSyncedInvoices = payloadData.INVOICES_TO_BE_SYNCED;
+
+				// Sort by study semester
+                                this.notSyncedInvoices.sort(function(a, b) {
+
+                                        let r = 0; // by default they are equal
+
+                                        // Sort by year, last 4 chars
+                                        if (a.studiensemester.substring(2, a.studiensemester.length) < b.studiensemester.substring(2, a.studiensemester.length))
+                                        {
+                                                r =  1;
+                                        }
+                                        else if (a.studiensemester.substring(2, a.studiensemester.length) > b.studiensemester.substring(2, a.studiensemester.length))
+                                        {
+                                                r = -1;
+                                        }
+
+                                        // If the same year and different semester
+                                        if (r == 0 && a.studiensemester.substring(0, 2) != b.studiensemester.substring(0, 2))
+                                        {
+                                                // Winter Semester after the Summer Semester
+                                                r = -1;
+                                                if (a.studiensemester.substring(0, 2) == 'WS') r = 1;
+                                        }
+
+                                        return r;
+                                });
+
+				console.log(this.notSyncedInvoices);
 			}
 
 			//
@@ -178,15 +206,15 @@ const SAPInvoicesApp = Vue.createApp({
 					<template v-for="(invoice, invoiceIndex) in notSyncedInvoices">
 						<tr>
 							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">Wird erstellt</td>
-							<td class="align-middle">{{ formatValueIfNull(invoice.bezeichnung) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.studiensemester) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(getTotal(notSyncedInvoices)) }}</td>
-							<!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td> -->
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">Wird erstellt</td>
-							<td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
+                                                        <td class="align-middle">{{ formatValueIfNull(invoice.bezeichnung) }}</td>
+                                                        <td class="align-middle">{{ formatValueIfNull(invoice.studiensemester) }}</td>
+                                                        <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.datum) }}</td>
+                                                        <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">{{ formatValueIfNull(invoice.faellingAm) }}</td>
+                                                        <td class="align-middle">{{ formatValueIfNull(invoice.betrag) }}</td>
+                                                        <!-- <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td> -->
+                                                        <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
+                                                        <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">Wird erstellt</td>
+                                                        <td class="align-middle" v-if="invoiceIndex == 0" v-bind:rowspan="notSyncedInvoices.length">-</td>
 						</tr>
 					</template>
 
