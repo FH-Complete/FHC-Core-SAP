@@ -119,7 +119,8 @@ const SAPInvoicesApp = Vue.createApp({
 			return FHC_JS_DATA_STORAGE_OBJECT.app_root +
 				"cis/private/pdfExport.php?xml=konto.rdf.php" +
 				"&xsl=Zahlung&buchungsnummern=" + buchungsnummern +
-				"&uid=" + invoiceEntries[0].uid;
+				"&uid=" + invoiceEntries[0].uid +
+				"&stg_kz=" + invoiceEntries[0].studiengang_kz;
 		},
 		formatValueIfNull: function(value) {
 			return value == null ? '-' : value;
