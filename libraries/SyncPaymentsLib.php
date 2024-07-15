@@ -1518,8 +1518,6 @@ class SyncPaymentsLib
 	 */
 	private function _getUnsyncedPayments($person_id)
 	{
-		$studiensemesterStartMaxDate = $this->_ci->config->item('payments_studiensemester_start_max_date');
-
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
@@ -1549,7 +1547,12 @@ class SyncPaymentsLib
 				AND ss.start <= ?
 			ORDER BY
 				kostenstellenzuordnung, studiengang_kz, studiensemester_start
-		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
+		',
+		array(
+			$person_id,
+			$this->_ci->config->item('payments_create_start_date'),
+			$this->_ci->config->item('payments_studiensemester_start_max_date')
+		));
 
 		return $dbPaymentData;
 	}

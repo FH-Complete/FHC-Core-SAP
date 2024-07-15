@@ -21,6 +21,8 @@ $config['payments_sales_unit_custom'] = '100003';
 // Do not create Payments from a StudySemester with a start date
 // after this date - because there are no projects available
 $config['payments_studiensemester_start_max_date'] = '2021-01-01';
+// Do not create Payments older than this date                  
+$config['payments_create_start_date'] = '2024-01-01';
 
 // Incoming/outgoing grant
 $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
