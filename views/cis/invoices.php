@@ -8,7 +8,7 @@
 		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/SAPInvoices.js')
 	);
 
-	$this->load->view('templates/FHC-Header', $includesArray);
+	$this->load->view('templates/CISHTML-Header', $includesArray);
 ?>
 
 	<div id="main">
@@ -247,5 +247,5 @@
 		</div>
 	</div>
 
-<?php $this->load->view('templates/FHC-Footer', $includesArray); ?>
+<?php $this->load->view('templates/CISHTML-Footer', $includesArray); ?>
 
