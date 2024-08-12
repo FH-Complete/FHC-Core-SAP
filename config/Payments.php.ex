@@ -29,9 +29,6 @@ $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';
 $config['payments_international_office_sales_unit_party_id'] = '100097';
 
 // Credit memo types read from database
-$config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungstipendium');
-
-// Credit memo types read from database
 $config['payments_booking_type_organizations'] = array('ZuschussIO', 'Leistungsstipendium');
 
 // Couples of Buchungstyp_kurzbz => cost center used in the FH payments when is not wanted
@@ -41,3 +38,10 @@ $config['payments_fh_cost_centers_buchung'] = array(
 	'EBCL_001' => array('kostenstelle' => '100100', 'zahlungsbedingung' => '1001', 'mahnsperre' => '1'),
 );
 
+//sonstige gutschriften
+$config['payments_other_credits'] = array(
+	'ZuschussIO' => array('GLAccountOtherLiabilities' => 'Z-2311'),
+	'Leistungsstipendium' => array('GLAccountOtherLiabilities' => 'Z2302')
+);
+
+$config['payments_other_credits_company'] = '100000';

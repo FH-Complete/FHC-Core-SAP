@@ -42,6 +42,13 @@
 						</div>
 					</div>
 					<div class="col-lg-2">
+						<div class="checkbox">
+							<label>
+								<input type="checkbox" id="testlauf" checked> Testlauf (nur DVs)
+							</label>
+						</div>
+					</div>
+					<div class="col-lg-2">
 						<button id="sync" class="btn btn-default">Syncen</button>
 					</div>
 				</div>
