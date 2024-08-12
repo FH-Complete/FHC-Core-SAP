@@ -29,6 +29,7 @@ class SyncPaymentsLib
 	// Jobs types used by this lib
 	const SAP_PAYMENT_CREATE = 'SAPPaymentCreate';
 	const SAP_PAYMENT_GUTSCHRIFT = 'SAPPaymentGutschrift';
+	const SAP_SONSTIGE_PAYMENT_GUTSCHRIFT = 'SAPSonstigeGutschrift';
 
 	// Prefix for SAP SOAP id calls
 	const CREATE_PAYMENT_PREFIX = 'CP';
@@ -41,8 +42,13 @@ class SyncPaymentsLib
 	const INCOMING_OUTGOING_GRANT = 'payments_incoming_outgoing_grant';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
 
+	const PAYMENTS_FH_COST_CENTERS_BUCHUNG = 'payments_fh_cost_centers_buchung';
+	
 	// International office sales unit party id config entry name
 	const INTERNATIONAL_OFFICE_SALES_UNIT_PARTY_ID = 'payments_international_office_sales_unit_party_id';
+
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS = 'payments_other_credits';
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS_COMPANY = 'payments_other_credits_company';
 
 	//
 	const INVOICES_EXISTS_SAP = 'INVOICES_EXISTS_SAP';
@@ -94,16 +100,23 @@ class SyncPaymentsLib
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageSalesOrderIn_model', 'ManageSalesOrderInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManageCustomerInvoiceRequestIn_model', 'ManageCustomerInvoiceRequestInModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/SORelease_model', 'SOReleaseModel');
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/Y95KEPJZY_WS_CRPE_ManageRecPayEntry_model', 'ManageRecPayEntryModel');
 		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/RPFINGLAU08_Q0002_model', 'RPFINGLAU08_Q0002Model');
 		$this->_ci->load->model('crm/Konto_model', 'KontoModel');
+		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
+		$this->_ci->load->model('organisation/Studiengang_model', 'StudiengangModel');
 
 		// Loads SAPSalesOrderModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPSalesOrder_model', 'SAPSalesOrderModel');
+		
+		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPStudentsGutschriften_model', 'SAPStudentsGutschriftenModel');
 
 		// Loads Payment configuration
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Payments');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Users');
 		$this->_ci->config->load('extensions/FHC-Core-SAP/Projects');
+		$this->_ci->load->helper('hlp_authentication');
+		
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -182,21 +195,21 @@ class SyncPaymentsLib
 			)
 		);
 
-		// There are no invoices for this user
-		if (!hasData($customerInvoiceResult)) return success('Currently there are no invoices');
-		if (!isset(getData($customerInvoiceResult)->CustomerInvoice)) return success('Currently there are no invoices');
-
+		// List of SAP invoices
+		$data = array();
 		// List of SAP invoices related to a sale order
 		$sapInvoicesWithSO = array();
 
-		// For each SAP invoice
-
-		$data = getData($customerInvoiceResult)->CustomerInvoice;
+		// If there are data in the SAP response and the property CustomerInvoice is set
+		if (hasData($customerInvoiceResult) && isset(getData($customerInvoiceResult)->CustomerInvoice))
+		{
+			$data = getData($customerInvoiceResult)->CustomerInvoice;
+		}
 		
 		// If there is only one Invoice it is just an object instead of an array of objects
-		if(!is_array($data))
-			$data = array($data);
+		if (isEmptyArray($data)) $data = array($data);
 
+		// For each SAP invoice
 		foreach ($data as $customerInvoice)
 		{
 			// If the invoice is not a "Gutschrift" => self::GUTSCHRIFT_CODE
@@ -232,9 +245,6 @@ class SyncPaymentsLib
 			}
 		}
 
-		//
-		if (isEmptyArray($sapInvoicesWithSO)) return success('Currently there are no invoices related to sales orders');
-
 		// Get the info from the tbl_konto database table
 		$sapSOsResult = $dbModel->execReadOnlyQuery('
 			SELECT k.buchungsnr,
@@ -248,7 +258,7 @@ class SyncPaymentsLib
 		     LEFT JOIN sync.tbl_sap_salesorder sso USING(buchungsnr)
 			 WHERE k.person_id = ?
 			   AND k.buchungsnr_verweis IS NULL
-			   AND (k.studiengang_kz > 0 OR k.studiengang_kz IN ?)
+			   AND (k.studiengang_kz >= 0 OR k.studiengang_kz IN ?)
 			   AND k.buchungsdatum >= ?
 		      ORDER BY k.buchungsdatum DESC
 		', array(
@@ -534,7 +544,241 @@ class SyncPaymentsLib
 			)
 		);
 	}
+	
+	public function createSonstigeGutschrift($personIdArray)
+	{
+		// If the given array of person ids is empty stop here
+		if (isEmptyArray($personIdArray)) return success('No gutschrift to be created');
 
+		// For each person id
+		foreach ($personIdArray as $person_id)
+		{
+			// Get the SAP user id for this person
+			$sapUserIdResult = $this->_getSAPUserId($person_id);
+
+			// If an error occurred then return it
+			if (isError($sapUserIdResult)) return $sapUserIdResult;
+
+			// If no data have been found
+			if (!hasData($sapUserIdResult))
+			{
+				// Then log it
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find the sap user id with this person id: '.$person_id);
+				continue; // and continue to the next one
+			}
+
+			// Here the sap user id!
+			$sapUserId = getData($sapUserIdResult)[0]->sap_user_id;
+
+			// Get all Open Payments of Person that are not yet transfered to SAP
+			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id, array_keys($this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)));
+			
+			// If an error occurred then return it
+			if (isError($resultCreditMemoResult)) return $resultCreditMemoResult;
+			
+			// If no data have been found
+			if (!hasData($resultCreditMemoResult))
+			{
+				// Then log it
+				$this->_ci->LogLibSAP->logWarningDB('Was not possible to find a credit memos with this person id: '.$person_id);
+				continue; // and continue to the next one
+			}
+			// For each payment found
+			foreach (getData($resultCreditMemoResult) as $singlePayment)
+			{
+				$studiengang = $this->_ci->StudiengangModel->load(array('studiengang_kz' => $singlePayment->studiengang_kz));
+				if (isError($studiengang)) return $studiengang;
+				$studiengang_oe = getData($studiengang)[0]->oe_kurzbz;
+
+				$oeRoot = $this->_ci->MessageTokenModel->getOeRoot($studiengang_oe);
+				if (isError($oeRoot)) return $oeRoot;
+				$oeRoot = getData($oeRoot)[0]->oe_kurzbz;
+
+				$dbModel = new DB_Model();
+				$sapOe = $dbModel->execReadOnlyQuery('
+									SELECT *
+									FROM sync.tbl_sap_organisationsstruktur
+									WHERE oe_kurzbz = ?
+								', array($oeRoot));
+
+				if (isError($sapOe)) return $sapOe;
+
+				if (!hasData($sapOe))
+				{
+					$this->_ci->LogLibSAP->logWarningDB('Could not get SAP OE for '. $oeRoot);
+					continue; // and continue to the next one
+				}
+
+				$company = getData($sapOe)[0]->oe_kurzbz_sap;
+
+				$dbModel = new DB_Model();
+				$qry = "SELECT nextval('sync.tbl_sap_students_gutschriften_id_seq')";
+				$nextValResult = $dbModel->execReadOnlyQuery($qry);
+				if (isError($nextValResult)) return $nextValResult;
+				$nextValResult = getData($nextValResult)[0];
+				$id = $nextValResult->nextval;
+
+				$zahlungsCheck = $this->_ci->SAPStudentsGutschriftenModel->load(array('buchungsnr' => $singlePayment->buchungsnr));
+
+				if (isError($zahlungsCheck)) return $zahlungsCheck;
+
+				if (hasData($zahlungsCheck))
+				{
+					$zahlungsCheck = getData($zahlungsCheck)[0];
+					
+					if (!($zahlungsCheck->done))
+					{
+						$this->_ci->LogLibSAP->logWarningDB("counter booking should already exist " . $zahlungsCheck->buchungsnr);
+					}
+
+					$createPayReceivables = $this->createPayReceivablesEntry($zahlungsCheck->id, $singlePayment);
+					if (isError($createPayReceivables)) return $createPayReceivables;
+					continue;
+				}
+
+				$data = array(
+					'BasicMessageHeader' => array(
+						'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+						'UUID' => generateUUID()
+					),
+					'BO_CRPE_OpenItemRequest' => array(
+						'ID' => $id,
+						'CompanyID' => $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS_COMPANY),
+						'BusinessPartnerInternalID' => $sapUserId,
+						'Description' => mb_substr($singlePayment->buchungstext, 0, 40),
+						'PostingDate' => $singlePayment->buchungsdatum,
+						'DocumentDate' => $singlePayment->buchungsdatum,
+						'DueDate' => $singlePayment->buchungsdatum,
+						'NetAmount' => array(
+							'currencyCode' => 'EUR',
+							'_' => str_replace(',', '.', $singlePayment->betrag),
+						),
+						'TypeCode' => '2',
+						'GLAccountOtherLiabilities' => $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)[$singlePayment->buchungstyp_kurzbz]['GLAccountOtherLiabilities']
+					)
+				);
+
+				$createResult = $this->_ci->ManageRecPayEntryModel->create($data);
+				if (isError($createResult)) return $createResult;
+
+				$createResult = getData($createResult);
+				
+				if (isset($createResult->BO_CRPE_OpenItemRequest) &&
+					isset($createResult->BO_CRPE_OpenItemRequest->SAP_UUID) &&
+					isset($createResult->BO_CRPE_OpenItemRequest->ID))
+				{
+					$insertResult = $this->_ci->SAPStudentsGutschriftenModel->insert(
+						array('id' => $id,
+							'buchungsnr' => $singlePayment->buchungsnr)
+					);
+					
+					if (isError($insertResult)) return $insertResult;
+					$createPayReceivables = $this->createPayReceivablesEntry($id, $singlePayment);
+					if (isError($createPayReceivables)) return $createPayReceivables;
+				}
+				else
+				{
+					if (isset($createResult->Log) && isset($createResult->Log->Item))
+					{
+						if (!isEmptyArray($createResult->Log->Item))
+						{
+							foreach ($createResult->Log->Item as $item)
+							{
+								if (isset($item->Note))
+								{
+									$this->_ci->LogLibSAP->logWarningDB($item->Note.' for create gutschrift/rechnung: '.$id);
+								}
+							}
+						}
+					}
+					elseif ($createResult->Log->Item->Note)
+					{
+						$this->_ci->LogLibSAP->logWarningDB(
+							$createResult->Log->Item->Note.' for create gutschrift/rechnung: '. $id
+						);
+					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return ID sonstige gutschrift/rechnung: ' . $id);
+					}
+				}
+			}
+		}
+
+		return success('SAP credit memo created successfully');
+	}
+
+	public function createPayReceivablesEntry($id, $singlePayment)
+	{
+		$data = array(
+			'BasicMessageHeader' => array(
+				'ID' => generateUID(self::CREATE_PAYMENT_PREFIX),
+				'UUID' => generateUUID()
+			),
+			'BO_CRPE_OpenItemRequest' => array(
+				'ID' => $id
+			)
+		);
+		$createPayReceivablesEntry = $this->_ci->ManageRecPayEntryModel->createPayReceivablesEntry($data);
+
+		if (isError($createPayReceivablesEntry)) return $createPayReceivablesEntry;
+		$createPayReceivablesEntry = getData($createPayReceivablesEntry);
+
+		if (isset($createPayReceivablesEntry->Log) &&
+			isset($createPayReceivablesEntry->Log->Item))
+		{
+			if (!isEmptyArray($createPayReceivablesEntry->Log->Item))
+			{
+				foreach ($createPayReceivablesEntry->Log->Item as $item)
+				{
+					if (isset($item->Note))
+					{
+						$this->_ci->LogLibSAP->logWarningDB(
+							$item->Note.' for createPayReceivablesEntry gutschrift/rechnung: '. $id
+						);
+					}
+				}
+			}
+			elseif ($createPayReceivablesEntry->Log->Item->Note)
+			{
+				$note = $createPayReceivablesEntry->Log->Item->Note;
+
+				if (strpos($note, 'Action') !== false && strpos($note, 'executed') !== false)
+				{
+					$kontoResult = $this->_ci->KontoModel->insert(
+						array(
+							'person_id' => $singlePayment->person_id,
+							'studiengang_kz' => $singlePayment->studiengang_kz,
+							'studiensemester_kurzbz' => $singlePayment->studiensemester_kurzbz,
+							'buchungsnr_verweis' => $singlePayment->buchungsnr,
+							'betrag' => str_replace(',', '.', $singlePayment->betrag*(-1)),
+							'buchungsdatum' => date('Y-m-d'),
+							'buchungstext' => $singlePayment->buchungstext,
+							'buchungstyp_kurzbz' => $singlePayment->buchungstyp_kurzbz
+						)
+					);
+					if (isError($kontoResult)) return $kontoResult;
+					
+					$updateResult = $this->_ci->SAPStudentsGutschriftenModel->update(
+						array('buchungsnr' => $singlePayment->buchungsnr),
+						array(
+							'done' => true,
+							'updateamum' => date('Y-m-d H:i:s')
+						)
+					);
+					if (isError($updateResult)) return $updateResult;
+				}
+				else
+				{
+					$this->_ci->LogLibSAP->logWarningDB(
+						$createPayReceivablesEntry->Log->Item->Note.' for createPayReceivablesEntry gutschrift/rechnung: '. $id
+					);
+				}
+			}
+		}
+		return success('success');
+	}
+	
 	/**
 	 * Creates new SalesOrders in SAP using the array of person ids given as parameter
 	 */
@@ -564,7 +808,7 @@ class SyncPaymentsLib
 			$sapUserId = getData($sapUserIdResult)[0]->sap_user_id;
 
 			// Get all Open Payments of Person that are not yet transfered to SAP
-			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id);
+			$resultCreditMemoResult = $this->_getUnsyncedCreditMemo($person_id, $this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS));
 
 			// If an error occurred then return it
 			if (isError($resultCreditMemoResult)) return $resultCreditMemoResult;
@@ -841,7 +1085,11 @@ class SyncPaymentsLib
 		{
 			$data = array();
 			$UserPartyID = '';
+
+			// can hold the CostCenterID or GMBHLehrgaenge if it is assigned to a gmbh project
+			$lastCostCenter = '-1';
 			$last_stg = '';
+			$ProjectRequired = false;
 			$buchungsnr_arr = array();
 
 			// Get SAP ID of the Student
@@ -868,8 +1116,17 @@ class SyncPaymentsLib
 				$paymentData = getData($result_openpayments);
 				foreach ($paymentData as $singlePayment)
 				{
-					if ($last_stg != $singlePayment->studiengang_kz)
+					// If it is a Special Buchungstyp from the config, then it is automatically redirected to an other cost center
+					// This needs to be overwritten here to make sure it creates a separate SalesOrder if neccassary
+					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 					{
+						$singlePayment->kostenstellenzuordnung = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
+					}
+
+					if ($lastCostCenter != $singlePayment->kostenstellenzuordnung)
+					{
+						$ProjectRequired = false;
+
 						if ($last_stg != '')
 						{
 							if ($last_stg < 0)
@@ -881,6 +1138,7 @@ class SyncPaymentsLib
 							$this->_createSalesOrder($data, $buchungsnr_arr, $release);
 						}
 
+						$lastCostCenter = $singlePayment->kostenstellenzuordnung;
 						$last_stg = $singlePayment->studiengang_kz;
 						$buchungsnr_arr = array();
 						$task_id = '';
@@ -902,23 +1160,13 @@ class SyncPaymentsLib
 							}
 						}
 
+						// GMBH or Special Courses
 						if (($singlePayment->studiengang_kz < 0 || $singlePayment->studiengang_kz > 10000)
 							&& !in_array($singlePayment->studiengangstyp, array('b','m'))
 							)
 						{
-							// GMBH or Special Courses
-
 							// Get ProjectID if it is a Lehrgang or Special Course
-							$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
-							if (!isError($TaskResult) && hasData($TaskResult))
-								$task_id = getData($TaskResult)[0]->project_id;
-							else
-							{
-								$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.
-									$singlePayment->studiengang_kz.' and studysemester '.
-									$singlePayment->studiensemester_kurzbz;
-								continue 2;
-							}
+							$ProjectRequired = true;
 
 							// Speziallehrgänge die in der FH sind statt in der GMBH!
 							if ($singlePayment->studiengang_kz < 0
@@ -938,16 +1186,24 @@ class SyncPaymentsLib
 							 	$salesUnitPartyID = $this->_ci->config->item('payments_sales_unit_custom');
 							}
 						}
-						else
+						else // FH payments
 						{
-							// FH
-							$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
-							if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
-								$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
-							else
+							// Standard payment cost center
+							if (!isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
 							{
-								$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
-								continue;
+								$salesUnitPartyIDResult = $this->_getsalesUnitPartyID($singlePayment->studiengang_kz);
+								if (!isError($salesUnitPartyIDResult) && hasData($salesUnitPartyIDResult))
+									$salesUnitPartyID = getData($salesUnitPartyIDResult)[0]->oe_kurzbz_sap;
+								else
+								{
+									$nonBlockingErrorsArray[] = 'Could not get SalesUnit for DegreeProgramm: '.$singlePayment->studiengang_kz;
+									continue;
+								}
+							}
+							else // alternative payment cost center
+							{
+								$salesUnitPartyID = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['kostenstelle'];
+								$lastCostCenter = $salesUnitPartyID;
 							}
 
 							$ResponsiblePartyID = $this->_ci->config->item('payments_responsible_party')['fh'];
@@ -988,6 +1244,7 @@ class SyncPaymentsLib
 						);
 					}
 
+					//
 					if ($singlePayment->buchungstyp_kurzbz == 'StudiengebuehrAnzahlung')
 					{
 						// Zahlung zur Studienplatzsicherung wird nicht gemahnt und hat
@@ -996,6 +1253,15 @@ class SyncPaymentsLib
 						$data['SalesOrder']['CashDiscountTerms'] = array(
 							'actionCode' => '01',
 							'Code' => 'z006' // 5 Werktage
+						);
+					}
+					
+					if (isset($this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]))
+					{
+						$data['SalesOrder']['mahnsperre'] = $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['mahnsperre'];
+						$data['SalesOrder']['CashDiscountTerms'] = array(
+							'actionCode' => '01',
+							'Code' =>  $this->_ci->config->item('payments_fh_cost_centers_buchung')[$singlePayment->buchungstyp_kurzbz]['zahlungsbedingung']
 						);
 					}
 
@@ -1038,8 +1304,19 @@ class SyncPaymentsLib
 
 					// If it is Payment for a Lehrgang or Special Degree Programm
 					// add the reference to a project
-					if ($task_id != '')
+					if ($ProjectRequired)
 					{
+						$TaskResult = $this->_getTaskId($singlePayment->studiengang_kz, $singlePayment->studiensemester_kurzbz);
+						if (!isError($TaskResult) && hasData($TaskResult))
+							$task_id = getData($TaskResult)[0]->project_id;
+						else
+						{
+							$nonBlockingErrorsArray[] = 'Could not get Project for DegreeProgramm: '.
+								$singlePayment->studiengang_kz.' and studysemester '.
+								$singlePayment->studiensemester_kurzbz;
+							continue 2;
+						}
+
 						$position['ItemAccountingCodingBlockDistribution'] = array(
 							'AccountingCodingBlockAssignment' => array(
 								'ProjectTaskKey' => array(
@@ -1204,7 +1481,7 @@ class SyncPaymentsLib
 	 * @param $person_id ID of the Person
 	 * @return payment results
 	 */
-	private function _getUnsyncedCreditMemo($person_id)
+	private function _getUnsyncedCreditMemo($person_id, $buchungstypen)
 	{
 		$dbModel = new DB_Model();
 
@@ -1227,7 +1504,7 @@ class SyncPaymentsLib
 		', array(
 			$person_id,
 			self::BUCHUNGSDATUM_SYNC_START,
-			$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+			$buchungstypen
 		));
 
 		return $dbPaymentData;
@@ -1246,26 +1523,32 @@ class SyncPaymentsLib
 		$dbModel = new DB_Model();
 		$dbPaymentData = $dbModel->execReadOnlyQuery('
 			SELECT
-				bk.buchungsnr, bk.studiengang_kz, bk.studiensemester_kurzbz, bk.betrag, bk.buchungsdatum,
+				bk.buchungsnr,
+				bk.studiengang_kz,
+				bk.studiensemester_kurzbz,
+				bk.betrag,
+				bk.buchungsdatum,
 				bk.buchungstext, bk.buchungstyp_kurzbz,
-				UPPER(tbl_studiengang.typ || tbl_studiengang.kurzbz) as studiengang_kurzbz,
-				tbl_studiensemester.start as studiensemester_start,
-				tbl_studiengang.typ as studiengangstyp
+				UPPER(sg.typ || sg.kurzbz) as studiengang_kurzbz,
+				ss.start as studiensemester_start,
+				sg.typ as studiengangstyp,
+				COALESCE(so.oe_kurzbz_sap, \'GMBHPROJEKT\') as kostenstellenzuordnung
 			FROM
 				public.tbl_konto bk
-				JOIN public.tbl_studiengang USING(studiengang_kz)
-				JOIN public.tbl_studiensemester USING(studiensemester_kurzbz)
+				JOIN public.tbl_studiengang sg USING(studiengang_kz)
+				JOIN public.tbl_studiensemester ss USING(studiensemester_kurzbz)
+				LEFT JOIN sync.tbl_sap_organisationsstruktur so ON(so.oe_kurzbz = sg.oe_kurzbz)
 			WHERE
-				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr=bk.buchungsnr)
-				AND betrag < 0
-				AND 0 != betrag + COALESCE((SELECT sum(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr),0)
-				AND buchungsnr_verweis IS NULL
-				AND person_id = ?
-				AND buchungsdatum >= ?
-				AND buchungsdatum <= now()
-				AND tbl_studiensemester.start <= ?
+				NOT EXISTS(SELECT 1 FROM sync.tbl_sap_salesorder WHERE buchungsnr = bk.buchungsnr)
+				AND bk.betrag < 0
+				AND 0 != bk.betrag + COALESCE((SELECT SUM(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr), 0)
+				AND bk.buchungsnr_verweis IS NULL
+				AND bk.person_id = ?
+				AND bk.buchungsdatum >= ?
+				AND bk.buchungsdatum <= NOW()
+				AND ss.start <= ?
 			ORDER BY
-				studiengang_kz, studiensemester_start
+				kostenstellenzuordnung, studiengang_kz, studiensemester_start
 		', array($person_id, self::BUCHUNGSDATUM_SYNC_START, $studiensemesterStartMaxDate));
 
 		return $dbPaymentData;

@@ -37,9 +37,14 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
+	const JOB_TYPE_SAP_OTHER_CREDIT_MEMO = 'SAPSonstigeGutschrift';
+
+	const JOB_TYPE_SAP_UPDATE_EMPLOYEE_SERVICE = 'SAPEmployeeIDServiceUpdate';
+	const JOB_TYPE_SAP_CHECK_EMPLOYEE_DV = 'SAPEmployeeCheckDV';
 
 	const USERS_BLOCK_LIST_COURSES = 'users_block_list_courses';
 	const PAYMENTS_BOOKING_TYPE_ORGANIZATIONS = 'payments_booking_type_organizations';
+	const PAYMENTS_BOOKING_TYPE_OTHER_CREDITS = 'payments_other_credits';
 
 	const FHC_CONTRACT_TYPES = 'fhc_contract_types';
 	const BEFORE_START = 'sap_sync_employees_x_days_before_start';
@@ -308,6 +313,9 @@ class JQMSchedulerLib
 			   AND b.person_id NOT IN (
 				SELECT ss.person_id FROM sync.tbl_sap_services ss
 			   )
+			   AND m.mitarbeiter_uid IN (
+			       SELECT sm.mitarbeiter_uid FROM sync.tbl_sap_mitarbeiter sm
+			   )
 			   AND m.personalnummer > 0
 		');
 
@@ -339,6 +347,9 @@ class JQMSchedulerLib
 			   AND bf.funktion_kurzbz = \'oezuordnung\'
 			   AND (bf.datum_von IS NULL OR bf.datum_von <= NOW())
 			   AND (bf.datum_bis IS NULL OR bf.datum_bis >= NOW())
+			   AND vwm.uid IN (
+			       SELECT sm.mitarbeiter_uid FROM sync.tbl_sap_mitarbeiter sm
+			   )
 		      ORDER BY vwm.person_id DESC
 		');
 
@@ -435,8 +446,21 @@ class JQMSchedulerLib
 							AND bk.buchungstyp_kurzbz = \'StudiengebuehrAnzahlung\'
 							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
 					)
+					OR
+					EXISTS (
+						-- All booking types from the configuration that are associated with "ETW."
+						SELECT
+							1
+						FROM
+							public.tbl_prestudent
+						WHERE
+							tbl_prestudent.person_id = bk.person_id
+							AND buchungstyp_kurzbz IN ?
+							AND bk.studiengang_kz = 0
+							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\', \'Student\', \'Aufgenommener\', \'Wartender\')
+					)
 				)
-		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START));
+		', array(SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START, array_keys($this->_ci->config->item(SyncPaymentsLib::PAYMENTS_FH_COST_CENTERS_BUCHUNG))));
 
 		return $newPaymentsResult;
 	}
@@ -464,6 +488,36 @@ class JQMSchedulerLib
 			',
 			array(
 				$this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_ORGANIZATIONS)
+			)
+		);
+
+		return $creditMemoResult;
+	}
+	
+	public function creditSonstigeGutschrift()
+	{
+		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
+		
+		$dbModel = new DB_Model();
+
+		// Get users that have updated credit memo
+		$creditMemoResult = $dbModel->execReadOnlyQuery(
+			'SELECT ko.person_id
+			  FROM public.tbl_konto ko
+			  JOIN sync.tbl_sap_students s USING(person_id)
+			 WHERE ko.betrag > 0
+			   AND ko.buchungstyp_kurzbz IN ?
+			   AND ko.buchungsdatum >= ?
+			   AND ko.buchungsnr NOT IN (
+				SELECT kos.buchungsnr_verweis
+				  FROM public.tbl_konto kos
+				 WHERE kos.buchungsnr_verweis = ko.buchungsnr
+			)
+		      GROUP BY ko.person_id
+			',
+			array(
+				array_keys($this->_ci->config->item(self::PAYMENTS_BOOKING_TYPE_OTHER_CREDITS)),
+				SyncPaymentsLib::BUCHUNGSDATUM_SYNC_START
 			)
 		);
 
@@ -623,6 +677,53 @@ class JQMSchedulerLib
 		if (hasData($personResult)) $functions = getData($personResult);
 
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
+	}
+	
+	public function setEmployeeOnService()
+	{
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+			SELECT DISTINCT tbl_person.person_id
+			FROM sync.tbl_sap_services
+				JOIN public.tbl_person ON tbl_sap_services.person_id = tbl_person.person_id
+				JOIN public.tbl_benutzer ON tbl_person.person_id = tbl_benutzer.person_id
+				JOIN public.tbl_mitarbeiter ON tbl_benutzer.uid = tbl_mitarbeiter.mitarbeiter_uid
+				JOIN sync.tbl_sap_mitarbeiter ON tbl_mitarbeiter.mitarbeiter_uid = tbl_sap_mitarbeiter.mitarbeiter_uid');
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($personResult)) return $personResult;
+		
+		// Return a success that contains all the arrays merged together
+		return success(getData($personResult));
+	}
+	
+	public function checkEmployeesDVs()
+	{
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+				SELECT DISTINCT tbl_dienstverhaeltnis.mitarbeiter_uid AS uid
+				FROM sync.tbl_sap_mitarbeiter
+					JOIN hr.tbl_dienstverhaeltnis ON tbl_sap_mitarbeiter.mitarbeiter_uid = tbl_dienstverhaeltnis.mitarbeiter_uid
+					JOIN public.tbl_mitarbeiter ON tbl_dienstverhaeltnis.mitarbeiter_uid = tbl_mitarbeiter.mitarbeiter_uid
+					JOIN public.tbl_benutzer ON tbl_mitarbeiter.mitarbeiter_uid = tbl_benutzer.uid
+					JOIN public.tbl_person ON tbl_benutzer.person_id = tbl_person.person_id
+				WHERE EXISTS (
+					SELECT 1
+					FROM hr.tbl_dienstverhaeltnis dv
+					WHERE dv.mitarbeiter_uid = tbl_dienstverhaeltnis.mitarbeiter_uid
+						AND dv.vertragsart_kurzbz IN ?
+						AND (dv.von <= NOW())
+						AND (dv.bis >= NOW() OR dv.bis IS NULL)
+				)
+				ORDER BY tbl_dienstverhaeltnis.mitarbeiter_uid;
+				', array($this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+		
+		// If error occurred while retrieving new users from database then return the error
+		if (isError($personResult)) return $personResult;
+		
+		// Return a success that contains all the arrays merged together
+		return success(getData($personResult));
 	}
 }
 

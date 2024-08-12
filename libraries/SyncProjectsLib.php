@@ -849,7 +849,7 @@ class SyncProjectsLib
 										);
 
 										// If error occurred then return the error
-										if (isError($insertResult)) return $intertResult;
+										if (isError($insertResult)) return $insertResult;
 									}
 									// else skip to the next one
 								}
@@ -987,7 +987,7 @@ class SyncProjectsLib
 								);
 
 								// If error occurred then return the error
-								if (isError($insertResult)) return $intertResult;
+								if (isError($insertResult)) return $insertResult;
 							}
 							// else skip to the next one
 						}
