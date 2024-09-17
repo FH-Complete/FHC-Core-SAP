@@ -90,6 +90,10 @@ class SyncProjectsLib
 	const TIME_RECORDING_NO_APPROVAL = '2';
 	const TIME_RECORDING_APPROVAL = '3';
 
+	const TIME_RECORDING_DESCRIPTION_NOT_REQUIRED = '1';
+
+	const TIME_RECORDING_DESCRIPTION_REQUIRED = '2';
+
 	private $_ci; // Code igniter instance
 
 	/**
@@ -485,6 +489,7 @@ class SyncProjectsLib
 						// Any other value means that the time recording is allowed on FHC
 						// If true it means the time recording is enabled
 						$timeRecording = $projectTask->TimeConfirmationProfileCode != self::TIME_RECORDING_NOT_ALLOWED;
+						$timeRecordingDescription = $projectTask->TimeConfirmationWorkDescriptionProfileCode != self::TIME_RECORDING_DESCRIPTION_NOT_REQUIRED;
 
 						// If the current task is the project itself then update:
 						// - name
@@ -498,6 +503,7 @@ class SyncProjectsLib
 								array(
 									'name' => $projectTask->Name,
 									'time_recording' => $timeRecording,
+									'time_recording_work_description' => $timeRecordingDescription,
 									// to enforce that this is a project and _not_ a task
 									'project_task_object_id' => null
 								)
@@ -548,7 +554,8 @@ class SyncProjectsLib
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
 									'name' => $projectTask->Name,
-									'time_recording' => $timeRecording
+									'time_recording' => $timeRecording,
+									'time_recording_work_description' => $timeRecordingDescription
 								)
 							);
 
@@ -570,7 +577,8 @@ class SyncProjectsLib
 									'status' => $projectTask->LifeCycleStatusCode,
 									'deleted' => false,
 									'name' => $projectTask->Name,
-									'time_recording' => $timeRecording
+									'time_recording' => $timeRecording,
+									'time_recording_work_description' => $timeRecordingDescription
 								)
 							);
 
@@ -1130,7 +1138,8 @@ class SyncProjectsLib
 							'ende' => $project->end_date,
 							'titel' => $project->name,
 							//'beschreibung' => $project->name,
-							'zeitaufzeichnung' => $project->time_recording
+							'zeitaufzeichnung' => $project->time_recording,
+							'arbeitsbeschreibung' => $project->time_recording_work_description
 						)
 					);
 
@@ -1195,7 +1204,8 @@ class SyncProjectsLib
 							'ende' => $projectTask->end_date,
 							'bezeichnung' => substr($projectTask->name, 0, 32),
 							//'beschreibung' => $projectTask->name,
-							'zeitaufzeichnung' => $projectTask->time_recording
+							'zeitaufzeichnung' => $projectTask->time_recording,
+							'arbeitsbeschreibung' => $projectTask->time_recording_work_description
 						)
 					);
 
