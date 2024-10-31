@@ -1,6 +1,6 @@
 DO $$
 BEGIN
-    ALTER TABLE sync.tbl_sap_projects_timesheets ADD COLUMN custom_fields jsonb;
+    ALTER TABLE sync.tbl_sap_projects_timesheets ADD COLUMN sap_custom_fields jsonb;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -22,5 +22,3 @@ ALTER TABLE sync.tbl_sap_projects_timesheets
         FOREIGN KEY (mitarbeiter_uid) REFERENCES public.tbl_mitarbeiter(mitarbeiter_uid) ON UPDATE CASCADE ON DELETE RESTRICT;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
-
-
