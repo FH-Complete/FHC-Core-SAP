@@ -1,10 +1,10 @@
 DO $$
 BEGIN
-    ALTER TABLE sync.tbl_sap_projects_timesheets ADD COLUMN sap_custom_fields jsonb;
+    ALTER TABLE sync.tbl_sap_projects_timesheets ADD COLUMN custom_fields jsonb;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
-COMMENT ON COLUMN sync.tbl_sap_projects_timesheets.sap_custom_fields IS 'Custom SAP fields';
+COMMENT ON COLUMN sync.tbl_sap_projects_timesheets.custom_fields IS 'Custom SAP fields';
 
 
 DO $$
