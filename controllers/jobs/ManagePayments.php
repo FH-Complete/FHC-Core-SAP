@@ -176,6 +176,74 @@ class ManagePayments extends JQW_Controller
 
 		$this->logInfo('End data synchronization with SAP ByD: Gutschrift');
 	}
+	
+	public function createSonstigeGutschrift()
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: sonstige Gutschrift');
+
+		// Gets the latest jobs
+		$oldestJob = $this->getOldestJob(SyncPaymentsLib::SAP_SONSTIGE_PAYMENT_GUTSCHRIFT);
+		if (isError($oldestJob))
+		{
+			$this->logError(getCode($oldestJob).': '.getError($oldestJob), SyncPaymentsLib::SAP_SONSTIGE_PAYMENT_GUTSCHRIFT);
+		}
+		elseif (hasData($oldestJob)) // if there are jobs to work
+		{
+			// Update jobs start time
+			$this->updateJobs(
+				getData($oldestJob), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date("Y-m-d H:i:s")) // Job properties new values
+			);
+			$updateResult = $this->updateJobsQueue(SyncPaymentsLib::SAP_SONSTIGE_PAYMENT_GUTSCHRIFT, getData($oldestJob));
+
+			// If there were an error then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // work the jobs
+			{
+				// Gets the oldest job in the queue to create credit memos
+				$syncResult = $this->syncpaymentslib->createSonstigeGutschrift(mergeUsersPersonIdArray(getData($oldestJob)));
+
+				// Log the result
+				if (isError($syncResult))
+				{
+					// Save all the errors
+					$errors = getError($syncResult);
+
+					// If it is NOT an array...
+					if (isEmptyArray($errors))
+					{
+						// ...then convert it to an array
+						$errors = array($errors);
+					}
+					// otherwise it is already an array
+
+					// For each error found
+					foreach ($errors as $error)
+					{
+						$this->logError(getCode($syncResult).': '.$error);
+					}
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($oldestJob), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date("Y-m-d H:i:s")) // Job properties new values
+				);
+				$this->updateJobsQueue(SyncPaymentsLib::SAP_SONSTIGE_PAYMENT_GUTSCHRIFT, getData($oldestJob));
+			}
+		}
+
+		$this->logInfo('End data synchronization with SAP ByD: sonstige Gutschrift');
+	}
 
 	/**
 	 * This method is called to synchronize Payments with SAP Business by Design

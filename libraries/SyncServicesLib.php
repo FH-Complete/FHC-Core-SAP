@@ -10,6 +10,7 @@ class SyncServicesLib
 	// Jobs types used by this lib
 	const SAP_SERVICES_CREATE = 'SAPServicesCreate';
 	const SAP_SERVICES_UPDATE = 'SAPServicesUpdate';
+	const SAP_UPDATE_EMPLOYEE_SERVICE = 'SAPEmployeeIDServiceUpdate';
 
 	// Prefix for SAP SOAP id calls
 	const CREATE_SERVICE_PREFIX = 'CS';
@@ -177,6 +178,12 @@ class SyncServicesLib
 				continue; // ...and continue to the next one
 			}
 
+			// If the sap personal is not set skip this user...
+			if (isEmptyString($serviceData->sappersonalnumber))
+			{
+				$this->_ci->LogLibSAP->logWarningDB('No SAP personal number for user: ' . $serviceData->sappersonalnumber);
+				continue; // ...and continue to the next one
+			}
 			// Checks if the current service is already present in SAP
 			$serviceDataSAP = $this->_serviceExistsByDescriptionSAP($serviceData->description);
 
@@ -190,7 +197,8 @@ class SyncServicesLib
 					$serviceData->description,
 					$serviceData->person_id,
 					$serviceData->category,
-					$serviceData->root_organization_unit
+					$serviceData->root_organization_unit,
+					$serviceData->sappersonalnumber
 				);
 
 				if (isError($createResult)) return $createResult; // if fatal error
@@ -361,6 +369,7 @@ class SyncServicesLib
 							'actionCode' => '02',
 							'descriptionListCompleteTransmissionIndicator' => true,
 							'InternalID' => getData($sapIdResult)[0]->sap_service_id,
+							'Z_EmployeeID' => $serviceData->sappersonalnumber,
 							'Description' => array(
 								0 => array(
 									'Description' => array(
@@ -447,6 +456,117 @@ class SyncServicesLib
 
 		return success('Services successfully updated');
 	}
+	
+	
+	/**
+	 * It should only run once!
+	 * setting the SAP employee ID (custom field) on the service
+	 */
+	public function setEmployeeOnService($users)
+	{
+		if (isEmptyArray($users)) return success('No services to be updated');
+		
+		$diffUsers = $this->_removeNotCreatedUsers($users);
+		
+		if (isError($diffUsers)) return $diffUsers;
+		if (!hasData($diffUsers)) return success('No services to be updated after diff');
+		
+		// Retrieves all users data
+		$servicesAllData = $this->_getEmployeeIDForService($diffUsers);
+
+		if (isError($servicesAllData)) return $servicesAllData;
+		if (!hasData($servicesAllData)) return error('No data available for the given users');
+		
+		$dbModel = new DB_Model(); // outside the loop!
+		
+		// Loops through users data
+		foreach (getData($servicesAllData) as $serviceData)
+		{
+			// Gets the SAP service id for the current user
+			$sapIdResult = $dbModel->execReadOnlyQuery('
+				SELECT DISTINCT s.sap_service_id
+				  FROM sync.tbl_sap_services s
+	 			 WHERE s.person_id = ?
+			', array($serviceData->person_id));
+			
+			if (isError($sapIdResult)) return $sapIdResult;
+			if (!hasData($sapIdResult)) continue; // should never happen since it was checked earlier
+			
+			// Checks if the current service is already present in SAP
+			$serviceDataSAP = $this->_serviceExistsByIdSAP(getData($sapIdResult)[0]->sap_service_id);
+			
+			// If an error occurred then return it
+			if (isError($serviceDataSAP)) return $serviceDataSAP;
+			
+			// If the current service is present in SAP
+			if (hasData($serviceDataSAP))
+			{
+				// Then update it!
+				$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
+					array(
+						'BasicMessageHeader' => array(
+							'ID' => generateUID(self::CREATE_SERVICE_PREFIX),
+							'UUID' => generateUUID()
+						),
+						'ServiceProduct' => array(
+							'actionCode' => '02',
+							'InternalID' => getData($sapIdResult)[0]->sap_service_id,
+							'Z_EmployeeID' => $serviceData->sappersonalnumber,
+						)
+					)
+				);
+				
+				// If an error occurred then return it
+				if (isError($manageServiceResult)) return $manageServiceResult;
+				
+				// SAP data
+				$manageService = getData($manageServiceResult);
+				
+				// If data structure is ok...
+				if (isset($manageService->ServiceProduct)
+					&& isset($manageService->ServiceProduct->InternalID)
+					&& isset($manageService->ServiceProduct->InternalID->_))
+				{
+					continue;
+				}
+				else // ...otherwise store a non blocking error and continue with the next user
+				{
+					// If it is present a description from SAP then use it
+					if (isset($manageService->Log) && isset($manageService->Log->Item)
+						&& isset($manageService->Log->Item))
+					{
+						if (!isEmptyArray($manageService->Log->Item))
+						{
+							foreach ($manageService->Log->Item as $item)
+							{
+								if (isset($item->Note))
+								{
+									$this->_ci->LogLibSAP->logWarningDB($item->Note.' for user: '.$serviceData->person_id);
+								}
+							}
+						}
+						elseif ($manageService->Log->Item->Note)
+						{
+							$this->_ci->LogLibSAP->logWarningDB($manageService->Log->Item->Note.' for user: '.$serviceData->person_id);
+						}
+					}
+					else
+					{
+						// Default non blocking error
+						$this->_ci->LogLibSAP->logWarningDB('SAP did not return the InterlID for user: '.$serviceData->person_id);
+					}
+					continue;
+				}
+			}
+			else // if the service is already present in SAP
+			{
+				$this->_ci->LogLibSAP->logWarningDB('Service is not present: '.getData($sapIdResult)[0]->sap_service_id);
+				continue;
+			}
+		}
+		
+		return success('Services successfully updated');
+	}
 
 	// --------------------------------------------------------------------------------------------
 	// Private methods
@@ -528,6 +648,7 @@ class SyncServicesLib
 				p.nachname AS surname,
 				p.vorname AS name,
 				m.personalnummer AS personalnumber,
+				sm.sap_eeid AS sappersonalnumber,
 				(
 					SELECT bf.oe_kurzbz
 				 	  FROM public.tbl_benutzerfunktion bf
@@ -549,6 +670,7 @@ class SyncServicesLib
 			  FROM public.tbl_person p
 			  JOIN public.tbl_benutzer b USING(person_id)
 			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
+			  JOIN sync.tbl_sap_mitarbeiter sm ON(m.mitarbeiter_uid = sm.mitarbeiter_uid)
 			 WHERE p.person_id IN ?
 			   AND m.personalnummer > 0
 		', array(getData($users)));
@@ -693,7 +815,7 @@ class SyncServicesLib
 	/**
 	 *
 	 */
-	private function _manageServiceProductIn($description, $person_id, $category, $rootOU)
+	private function _manageServiceProductIn($description, $person_id, $category, $rootOU, $sappersonalnumber)
 	{
 		// Then create it!
 		$manageServiceResult = $this->_ci->ManageServiceProductInModel->MaintainBundle_V1(
@@ -725,6 +847,7 @@ class SyncServicesLib
 							)
 						)
 					),
+					'Z_EmployeeID' => $sappersonalnumber,
 					'Purchasing' => array(
 						'purchasingNoteListCompleteTransmissionIndicator' => true,
 						'LifeCycleStatusCode' => 2,
@@ -964,6 +1087,29 @@ class SyncServicesLib
 		}
 
 		return $taxesArray;
+	}
+	
+	private function _getEmployeeIDForService($users)
+	{
+		// Retrieves services data from database
+		$dbModel = new DB_Model();
+		
+		$dbServicesData = $dbModel->execReadOnlyQuery('
+			SELECT p.person_id,
+				m.personalnummer AS personalnumber,
+				sm.sap_eeid AS sappersonalnumber
+			  FROM public.tbl_person p
+			  JOIN public.tbl_benutzer b USING(person_id)
+			  JOIN public.tbl_mitarbeiter m ON(b.uid = m.mitarbeiter_uid)
+			  JOIN sync.tbl_sap_mitarbeiter sm ON(m.mitarbeiter_uid = sm.mitarbeiter_uid)
+			 WHERE p.person_id IN ?
+			   AND m.personalnummer > 0
+		', array(getData($users)));
+		
+		if (isError($dbServicesData)) return $dbServicesData;
+		if (!hasData($dbServicesData)) return error('The provided person ids are not present in database');
+		
+		return success(getData($dbServicesData)); // everything was fine!
 	}
 }
 
