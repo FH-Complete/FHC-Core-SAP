@@ -617,6 +617,7 @@ class SyncUsersLib
 			  JOIN public.tbl_bankverbindung b USING(person_id)
 			  JOIN public.tbl_person p USING(person_id)
 			 WHERE b.iban IS NOT NULL
+			 AND (b.insertamum>now() - \'14 days\'::interval OR b.updateamum > now() - \'14 days\'::interval)
 		');
 
 		// If an error occurred then return it
@@ -635,7 +636,11 @@ class SyncUsersLib
 
 			// If a _not_ valid BankInternalID was found then continue to the next user
 			// NOTE: _getBankInternalID logs warnings in case none or many BankInternalID have been found
-			if (isEmptyString($bankInternalID)) continue;
+			if (isEmptyString($bankInternalID))
+			{
+				$this->_ci->LogLibSAP->logWarningDB('No Bank Internal ID found for user: '.$userBankData->person_id);
+				continue;
+			}
 
 			// Otherwise set the data to proceed with the bank data update on SAP side
 			$data = array(
@@ -660,7 +665,11 @@ class SyncUsersLib
 			$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
 			// If an error occurred then return it
-			if (isError($manageCustomerResult)) return $manageCustomerResult;
+			if (isError($manageCustomerResult))
+			{
+				$this->_ci->LogLibSAP->logErrorDB('Error add Bankdata for user: '.$userBankData->person_id);
+				return $manageCustomerResult;
+			}
 
 			// SAP data
 			$manageCustomer = getData($manageCustomerResult);
@@ -1303,4 +1312,3 @@ class SyncUsersLib
 		return $bankInternalID;
 	}
 }
-
