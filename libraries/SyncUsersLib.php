@@ -1108,7 +1108,8 @@ class SyncUsersLib
 		{
 			$paymentCompanyIdsArray[] = array(
 				'CompanyID' => $paymentCompanyId,
-				'AccountDeterminationDebtorGroupCode' => $this->_ci->config->item(self::USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE)
+				'AccountDeterminationDebtorGroupCode' => $this->_ci->config->item(self::USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE),
+				'PaymentForm' => array('PaymentFormCode' => '05') // Ueberweisung
 			);
 		}
 
