@@ -29,16 +29,15 @@ $tableWidgetArray = array(
 		height: "300px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		tableWidgetHeader: false,
 		selectable: 1,
 		selectablePersistence: false,
-	    rowUpdated: function(row){
-	        row.deselect();
-        }
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
+		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		projects_timesheets_project: {visible: false},
 		projekt_id: {visible: false},
 		projekt_kurzbz: {visible:false},

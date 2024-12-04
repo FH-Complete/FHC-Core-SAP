@@ -59,30 +59,27 @@ $tableWidgetArray = array(
 		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
-		initialHeaderFilter:[
+		 initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
-        ],
+        ], 
         initialSort:[
 		    {column:"isSynced", dir:"asc"} // start with false
 	    ],
 		tableWidgetHeader: false,
-		rowSelected: function(row){
-			rowSelected_onSAPProject(row);
-		},
-		rowDeselected:function(row) {
-			rowDeselected_onSAPProject(row);
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
-			headerFilter: "select",
-			headerFilterParams: getSAPProjectStatusbezeichnung,
+			editor: "list",
+			headerFilter:true,
+			headerFilterParams:{ values:getSAPProjectStatusbezeichnung()},
 			formatter:"lookup",
-			formatterParams: getSAPProjectStatusbezeichnung
+            formatterParams: getSAPProjectStatusbezeichnung
 		},
 		projects_timesheet_id: {visible: false},
 		start_date: {headerFilter: "input", mutator: mut_formatStringDate},
