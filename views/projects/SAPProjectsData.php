@@ -63,9 +63,9 @@ $tableWidgetArray = array(
 		selectablePersistence: false,
 		 initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
-        ], 
+        ],
         initialSort:[
-		    {column:"isSynced", dir:"asc"} // start with false
+		    {column:"isSynced", dir:"desc"} // start with false
 	    ],
 		tableWidgetHeader: false,
 		columnDefaults:{

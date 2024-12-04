@@ -20,6 +20,7 @@ const SAP_PROJECT_STATUSBEZEICHNUNG = {
 
 
 const SAP_PHASES_STATUSBEZEICHNUNG = {
+	'1': 'Planning',
     '2': 'Approved',
     '3': 'Stopped',
     '4': 'Closed',
@@ -51,11 +52,11 @@ var mut_formatStringDate = function(value, data, type, params, component) {
 
 function getSAPProjectStatusbezeichnung() {
     return SAP_PROJECT_STATUSBEZEICHNUNG;
-    
+
 }
 
 function getSAPProjectStatusbezeichnungFormat(label, value, item, element) {
-    
+
     return SAP_PROJECT_STATUSBEZEICHNUNG[label];
 }
 
@@ -198,27 +199,27 @@ function loadFUEPhases(projekt_kurzbz)
 
 $(function() {
     $(document).on("tableInit", function(event,tabulatorInstance) {
-        
+
         let uniqueTableID = tabulatorInstance.element.closest('[tableuniqueid]').attributes.tableuniqueid.value;
-        
+
         switch(uniqueTableID){
-            case "SAPProjects": 
+            case "SAPProjects":
                 tabulatorInstance.on("rowSelected",(row)=>{ rowSelected_onSAPProject(row);});
                 tabulatorInstance.on("rowDeselected",(row)=>{ rowDeselected_onSAPProject(row);});
                 break;
-            case "FUEProjects": 
+            case "FUEProjects":
                 tabulatorInstance.on("rowUpdated",(row)=>{ row.deselect();});
                 tabulatorInstance.on("rowAdded",(row)=>{ resortTable(row);});
                 break;
             case "SAPPhases":
-                tabulatorInstance.on("rowAdded",(row)=>{ resortTable(row);});    
+                tabulatorInstance.on("rowAdded",(row)=>{ resortTable(row);});
                 break;
             case "FUEPhases":
                 tabulatorInstance.on("rowUpdated",(row)=>{ row.deselect();});
                 break;
             // if the function findTableUniqueID returned null because it couldnt find the attribute tableuniqueid
             default: break;
-        } 
+        }
     });
 
 // Init tooltip
@@ -809,5 +810,3 @@ var SyncProjects = {
         return true;
     }
 }
-
-
