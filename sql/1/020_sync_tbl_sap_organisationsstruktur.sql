@@ -17,4 +17,3 @@ BEGIN
 END $$;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON sync.tbl_sap_organisationsstruktur TO vilesci;
-
