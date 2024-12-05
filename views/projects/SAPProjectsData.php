@@ -75,8 +75,7 @@ $tableWidgetArray = array(
 	'datasetRepFieldsDefs' => '{
 		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
-			editor: "list",
-			headerFilter:true,
+			headerFilter:"list",
 			headerFilterParams:{ values:getSAPProjectStatusbezeichnung()},
 			formatter:"lookup",
             formatterParams: getSAPProjectStatusbezeichnung
