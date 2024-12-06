@@ -617,7 +617,7 @@ class SyncUsersLib
 			  JOIN public.tbl_bankverbindung b USING(person_id)
 			  JOIN public.tbl_person p USING(person_id)
 			 WHERE b.iban IS NOT NULL
-			 AND (b.insertamum>now() - \'14 days\'::interval OR b.updateamum > now() - \'14 days\'::interval)
+			 AND (b.insertamum>now() - \'2 days\'::interval OR b.updateamum > now() - \'2 days\'::interval)
 		');
 
 		// If an error occurred then return it
