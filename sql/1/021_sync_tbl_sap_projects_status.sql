@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_timesheets (
+CREATE TABLE IF NOT EXISTS sync.tbl_sap_projects_status (
 	status numeric,
 	description character varying(255)
 );
