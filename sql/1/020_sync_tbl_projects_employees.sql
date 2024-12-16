@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS sync.tbl_projects_employees (
     projects_employees_id bigint NOT NULL,
     mitarbeiter_uid character varying(32) NOT NULL,
     project_task_id varchar(42),
-    planstunden numeric(6, 2)
+    planstunden numeric(8, 2)
 );
 
 CREATE SEQUENCE IF NOT EXISTS sync.tbl_projects_employees_seq
