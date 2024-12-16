@@ -53,6 +53,9 @@ class SyncProjectsLib
 	const LEHRE_PROJECT = 'lehre';
 	const LEHRGAENGE_PROJECT = 'lehrgaenge';
 
+	const PROJECT_EMPLOYEE_SYNC_LIST_TYPE_CODES = 'project_employee_sync_list_type_codes';
+	const PROJECT_EMPLOYEE_SERVICE_MAPPING = 'project_employee_service_mapping';
+
 	// SAP ByD logic errors
 	const PROJECT_EXISTS_ERROR = 'PRO_CMN_SHRD:003';
 	const PARTECIPANT_PROJ_EXISTS_ERROR = 'PRO_CMN_PROJ:010';
@@ -123,6 +126,8 @@ class SyncProjectsLib
 		// Loads model ManagePurchaseOrderIn
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePurchaseOrderIn_model', 'ManagePurchaseOrderInModel');
 
+		// Loads model ProjectsModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/ProjectEmployee_model', 'ProjectEmployeeModel');
 		// Loads the StudiensemesterModel
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
 		// Loads the Projekt_model
@@ -135,6 +140,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('project/Ressource_model', 'RessourceModel');
 		// Loads MessageTokenModel
 		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
+
+		$this->_ci->load->model('project/Projects_employees_model', 'ProjectsEmployeesModel');
 
 		// Loads model SAPMitarbeiterModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPMitarbeiter_model', 'SAPMitarbeiterModel');
@@ -489,9 +496,36 @@ class SyncProjectsLib
 						// If the current task is the project itself then update:
 						// - name
 						// - time recording
+						// - custom fields
+						// - project leader
 						// and skip to the next one
 						if ($project->ProjectID == $projectTask->ID)
 						{
+							$objectVars = get_object_vars($project);
+							$filteredArray = array_filter($objectVars, function($value, $key) {
+								return substr($key, -4) === '_KUT'; //_KUT => SAP custom fields
+							}, ARRAY_FILTER_USE_BOTH);
+
+							$filteredObject = (object) $filteredArray;
+							$jsonResult = json_encode($filteredObject);
+
+							$sapLeaderId = null;
+							if (isset($projectTask->ResponsibleEmployeeID)
+								&& !isEmptyString($projectTask->ResponsibleEmployeeID))
+							{
+								$sapLeaderId = $projectTask->ResponsibleEmployeeID;
+							}
+
+							if ($sapLeaderId !== null)
+							{
+								$fhcLeaderUidResult = $this->_ci->SAPMitarbeiterModel->loadWhere(array('sap_eeid' => $sapLeaderId));
+
+								if (hasData($fhcLeaderUidResult) && !isEmptyString(getData($fhcLeaderUidResult)[0]->mitarbeiter_uid))
+								{
+									$sapLeaderId = getData($fhcLeaderUidResult)[0]->mitarbeiter_uid;
+								}
+							}
+
 							// Updates only the name and time recording
 							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 								$projects_timesheet_id,
@@ -499,7 +533,9 @@ class SyncProjectsLib
 									'name' => $projectTask->Name,
 									'time_recording' => $timeRecording,
 									// to enforce that this is a project and _not_ a task
-									'project_task_object_id' => null
+									'project_task_object_id' => null,
+									'custom_fields' => $jsonResult,
+									'project_leader' => $sapLeaderId,
 								)
 							);
 
@@ -589,6 +625,28 @@ class SyncProjectsLib
 		return success('All project have been imported successfully');
 	}
 
+	public function syncProjectsEmployees($project)
+	{
+		if (!is_null($project))
+		{
+			$result = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+				array(
+					'project_id' => $project,
+					'project_task_id' => null,
+					'deleted' => false
+				)
+			);
+
+			if (!hasData($result))
+				return success('Project not synced');
+
+			$project = array_column(getData($result), 'project_id');
+		}
+
+		$typeCodes = $this->_ci->config->item(self::PROJECT_EMPLOYEE_SYNC_LIST_TYPE_CODES);
+		$projectsResult = $this->_ci->ProjectEmployeeModel->getProjectsAndEmployees($typeCodes, $project);
+		return $this->getProjectEmployees($projectsResult);
+	}
 	/**
 	 *
 	 */
@@ -3255,6 +3313,92 @@ class SyncProjectsLib
 		// If here then everything is fine
 		// NOTE: it returns even the code of the latest attempt to add the employee to the project
 		return success('Employee successfully added to this project', getCode($addEmployeeResult));
+	}
+
+	private function getProjectEmployees($projectsResult)
+	{
+		if (hasData($projectsResult))
+		{
+			foreach (getData($projectsResult) as $project)
+			{
+				$this->_ci->ProjectsEmployeesModel->addDistinct('sync.tbl_projects_employees.project_task_id');
+				$this->_ci->ProjectsEmployeesModel->addSelect('sync.tbl_projects_employees.project_task_id');
+				$this->_ci->ProjectsEmployeesModel->addJoin('sync.tbl_sap_projects_timesheets', 'project_task_id');
+				$result = $this->_ci->ProjectsEmployeesModel->loadWhere(
+					array(
+						'project_id' => $project->ProjectID,
+						'deleted' => false
+					)
+				);
+
+				if (hasData($result))
+				{
+					$needToDelete = array_column(getData($result), 'project_task_id');
+					$deleteResult = $this->_ci->ProjectsEmployeesModel->deleteByProjectTaskId($needToDelete);
+					if (isError($deleteResult)) return $deleteResult;
+				}
+
+				$projectTasks = $project->ProjectTask;
+
+				foreach ($projectTasks as $projectTask)
+				{
+
+					$projectTaskAlreadySynced = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_id' => $project->ProjectID,
+							'project_task_id' => $projectTask->TaskID
+						)
+					);
+
+					if (hasData($projectTaskAlreadySynced))
+					{
+						foreach ($projectTask->ProjectTaskService as $projectTaskService)
+						{
+
+							if (isEmptyString($projectTaskService->AssignedEmployeeID))
+							{
+								$mitarbeiter_uid = $this->_ci->config->item(self::PROJECT_EMPLOYEE_SERVICE_MAPPING);
+							}
+							else
+							{
+								$mitarbeiter_uid = $this->_ci->SAPMitarbeiterModel->loadWhere(
+									array(
+										'sap_eeid' => $projectTaskService->AssignedEmployeeID
+									)
+								);
+
+								if (isError($mitarbeiter_uid)) return $mitarbeiter_uid;
+
+								if (!hasData($mitarbeiter_uid))
+								{
+									if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+									{
+										$this->_ci->LogLibSAP->logWarningDB('No employee found for ProjectTask: '.$projectTask->TaskID . ' employee:' . $projectTaskService->AssignedEmployeeID);
+									}
+									continue;
+								}
+								$mitarbeiter_uid = getData($mitarbeiter_uid)[0]->mitarbeiter_uid;
+							}
+
+							$insertResult = $this->_ci->ProjectsEmployeesModel->insert(
+								array(
+									'mitarbeiter_uid' => $mitarbeiter_uid,
+									'project_task_id' => $projectTask->ID,
+									'planstunden' => $projectTaskService->PlannedWorkQuantity
+								)
+							);
+							if (isError($insertResult)) return $insertResult;
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			return success('No projects are present on SAP ByD');
+		}
+
+		return success('All project employees have been imported successfully');
 	}
 
 	/**
