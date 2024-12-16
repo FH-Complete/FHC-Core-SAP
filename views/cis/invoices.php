@@ -8,7 +8,11 @@
 		'customJSModules' => array('public/extensions/FHC-Core-SAP/js/apps/Invoices/SAPInvoices.js')
 	);
 
-	$this->load->view('templates/FHC-Header', $includesArray);
+	if(defined("CIS4") && CIS4){
+		$this->load->view('templates/CISVUE-Header', $includesArray);
+	}else{
+		$this->load->view('templates/FHC-Header', $includesArray);
+	}
 ?>
 
 	<div id="main">
@@ -247,5 +251,12 @@
 		</div>
 	</div>
 
-<?php $this->load->view('templates/FHC-Footer', $includesArray); ?>
+<?php
 
+if (defined("CIS4") && CIS4) {
+	$this->load->view('templates/CISVUE-Footer', $includesArray);
+} else {
+	$this->load->view('templates/FHC-Footer', $includesArray);
+}
+
+?>
