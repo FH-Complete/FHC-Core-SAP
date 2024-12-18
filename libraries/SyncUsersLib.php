@@ -631,6 +631,33 @@ class SyncUsersLib
 			$iban = str_replace(' ', '', $userBankData->iban);
 			$swift = str_replace(' ', '', $userBankData->swift);
 
+			$sapCustomerResult = $this->_userExistsByIdSAP($userBankData->sap_user_id);
+
+			if(!isSuccess($sapCustomerResult) || !hasData($sapCustomerResult))
+			{
+				$this->_ci->LogLibSAP->logErrorDB('User not found in SAP PersonID: '.$userBankData->person_id);
+				continue;
+			}
+
+			// Check if IBAN is already set in SAP
+			// If it is already there we dont set it because this causes an error if we do so
+			$sapCustomerData = getData($sapCustomerResult);
+			if(isset($sapCustomerData->BankDetails))
+			{
+				if(isset($sapCustomerData->BankDetails->BankAccountStandardID))
+				{
+					if($sapCustomerData->BankDetails->BankAccountStandardID == $iban)
+					{
+						$this->_ci->LogLibSAP->logInfoDB('IBAN already set for PersonID: '.$userBankData->person_id.' - no action performed');
+						continue;
+					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Different IBAN Found: '.$userBankData->person_id.' - try to set');
+					}
+				}
+			}
+
 			// Get the BankInternalID with the given parameters
 			$bankInternalID = $this->_getBankInternalID($userBankData->person_id, $iban, $swift);
 
