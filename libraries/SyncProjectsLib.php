@@ -484,7 +484,7 @@ class SyncProjectsLib
 
 				// If this project has tasks and more then one
 				// NOTE: one of the tasks it's the project itself
-				if (!isEmptyArray($project->ProjectTask) && count($project->ProjectTask) >= 1)
+				if (!isEmptyArray($project->ProjectTask) && numberOfElements($project->ProjectTask) >= 1)
 				{
 					// For each task found except the firt one -> project itself
 					foreach ($project->ProjectTask as $projectTask)
@@ -1308,7 +1308,7 @@ class SyncProjectsLib
 		if (!hasData($projectResults)) return error('No project found with such a name!');
 
 		// If more then one project have been found
-		if (count(getData($projectResults)) > 1) return error('Too many projects found with this name');
+		if (numberOfElements(getData($projectResults)) > 1) return error('Too many projects found with this name');
 
 		// Update the project dates
 		$updateProjectDatesResult = $this->_ci->ProjectsModel->setDates(

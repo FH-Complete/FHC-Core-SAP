@@ -611,7 +611,7 @@ class SyncServicesLib
 		// Loops through the given users and depending on the value of the parameter initialFoundValue
 		// removes created (initialFoundValue == false) or not created (initialFoundValue == true) users
 		// from the users parameter
-		for ($i = 0; $i < count($users); $i++)
+		for ($i = 0; $i < numberOfElements($users); $i++)
 		{
 			$found = $initialFoundValue; // initial value is the same as initialFoundValue
 
