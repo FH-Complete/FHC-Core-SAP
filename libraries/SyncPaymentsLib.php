@@ -383,15 +383,43 @@ class SyncPaymentsLib
 		// SAP returned data about this invoice
 		if (hasData($sapDocumentResult))
 		{
+			$sapPDFResult = null;
 			$sapDocument = getData($sapDocumentResult);
 
-			// If the structure of the returned data is fine
-			if (isset($sapDocument->DocumentOutputRequestInformation)
-				&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID)
-				&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_))
+			// If there are more documents
+			if (isset($sapDocument->DocumentOutputRequestInformation) && is_array($sapDocument->DocumentOutputRequestInformation))
 			{
-	                	// Get the PDF document from SAP using the document UUID
-        	        	$sapPDFResult = $this->getPDF($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_);
+				$lastDocumentDate = null;
+				$lastDocumentUUID = null;
+
+				// For each document
+				foreach ($sapDocument->DocumentOutputRequestInformation as $dori)
+				{
+					// If it has a valid format and info inside
+					if (isset($dori->DocumentUUID) && isset($dori->DocumentUUID->_)
+						&& isset($dori->DocumentDetails) && isset($dori->DocumentDetails->OutputOn))
+					{
+						if ($dori->DocumentDetails->OutputOn > $lastDocumentDate)
+						{
+							$lastDocumentDate = $dori->DocumentDetails->OutputOn;
+							$lastDocumentUUID = $dori->DocumentUUID;
+						}
+					}
+				}
+
+				// Get the PDF document from SAP using the last document UUID
+				if ($lastDocumentUUID) $sapPDFResult = $this->getPDF($lastDocumentUUID);
+			}
+			else // Otherwise it is only one document
+			{
+				// If the structure of the returned data is fine
+				if (isset($sapDocument->DocumentOutputRequestInformation)
+					&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID)
+					&& isset($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_))
+				{
+	                		// Get the PDF document from SAP using the document UUID
+        	        		$sapPDFResult = $this->getPDF($sapDocument->DocumentOutputRequestInformation->DocumentUUID->_);
+				}
 			}
 
 			// If SAP returned valid PDF data about this document
