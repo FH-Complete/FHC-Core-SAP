@@ -13,6 +13,7 @@ class SyncEmployeesLib
 	const SAP_EMPLOYEES_CREATE = 'SAPEmployeesCreate';
 	const SAP_EMPLOYEES_UPDATE = 'SAPEmployeesUpdate';
 	const SAP_EMPLOYEES_WORK_AGREEMENT_UPDATE = 'SAPEmployeesWorkAgreementUpdate';
+	const SAP_EMPLOYEES_WORK_AGREEMENT_CANCEL = 'SAPEmployeesWorkAgreementCancel';
 	const SAP_CHECK_EMPLOYEE_DV = 'SAPEmployeeCheckDV';
 
 	const CREATE_EMP_PREFIX = 'CE';
@@ -540,6 +541,154 @@ class SyncEmployeesLib
 		return success('Users data updated successfully');
 	}
 
+	public function cancelEmployeeWorkAgreement($emps)
+	{
+		if (isEmptyArray($emps)) return success('No emps to be updated');
+
+		// Löscht alle nicht erstellten Emps
+		$diffEmps = $this->_removeNotCreatedEmps($emps);
+
+		if (isError($diffEmps)) return $diffEmps;
+		if (!hasData($diffEmps)) return success('No emps to be updated after diff');
+
+		$empsAllData = $this->_getAllEmpsDataWorkAgreement($diffEmps);
+
+		if (isError($empsAllData)) return $empsAllData;
+		if (!hasData($empsAllData)) return error('No data available for the given emps');
+
+		$dbModel = new DB_Model();
+
+		$updated = [];
+		foreach (getData($empsAllData) as $empData)
+		{
+			// SAP ID vom EMP holen
+			$sapResult = $dbModel->execReadOnlyQuery('
+				SELECT s.sap_eeid
+				FROM sync.tbl_sap_mitarbeiter s
+				WHERE s.mitarbeiter_uid = ?
+			', array($empData->uid));
+
+			if (isError($sapResult)) return $sapResult;
+
+			if (!hasData($sapResult)) continue;
+
+			$sapID = getData($sapResult)[0]->sap_eeid;
+
+			$sapEmpData = $this->getEmployeeById($sapID);
+
+			if (isError($sapEmpData)) return $sapEmpData;
+
+			if (!hasData($sapEmpData)) continue;
+
+			$sapEmpData = getData($sapEmpData);
+
+			if ($sapEmpData->ProcessingConditions->ReturnedQueryHitsNumberValue === 0)
+				return error('Emp not found in SAP: ' . $empData->uid);
+
+			$dienstverhaeltnisse = $dbModel->execReadOnlyQuery('
+				SELECT DISTINCT ON (mitarbeiter_uid) mitarbeiter_uid, dv.bis as lastende, updateamum
+					FROM hr.tbl_dienstverhaeltnis dv
+					WHERE mitarbeiter_uid = ?
+					AND vertragsart_kurzbz IN ?
+					ORDER BY mitarbeiter_uid, dv.bis DESC NULLS FIRST;
+			', array($empData->uid, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+
+			if (!hasData($dienstverhaeltnisse))
+			{
+				$this->_ci->LogLibSAP->logWarningDB('Kein Dienstverhaeltnis vorhanden: '. $empData->person_id);
+				continue;
+			}
+
+			$check_dv = $dbModel->execReadOnlyQuery('
+					SELECT 1
+					FROM hr.tbl_dienstverhaeltnis dv
+					WHERE dv.mitarbeiter_uid = ?
+						AND vertragsart_kurzbz IN ?
+						AND (dv.bis IS NULL OR dv.bis >= CURRENT_DATE)
+			', array($empData->uid, $this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
+
+			if (hasData($check_dv))
+			{
+				$this->_ci->LogLibSAP->logWarningDB('Zukünfigtes Dienstverhaeltnis vorhanden: '. $empData->person_id);
+				continue;
+			}
+
+			$startDates = array();
+			$sapEmpData = $sapEmpData->EmployeeData->EmploymentData;
+			$sapEmpData = $this->checkIfObject($sapEmpData);
+			$sapEmpType = new stdClass();
+
+			foreach ($sapEmpData as $sapData)
+			{
+				$workAgreements =  $this->checkIfObject($sapData->WorkAgreementData);
+				/*Gehen alle Verträge der Person durch*/
+				foreach ($workAgreements as $workAgreement)
+				{
+					/*Start des Arbeitsvertrages*/
+					$workAgreementStart = $workAgreement->ValidityPeriod->StartDate;
+
+					/*Klauseln aus dem SAPByD*/
+					$benutzerFunctionsSAP = $this->checkIfObject($workAgreement->AdditionalClauses);
+
+					$startDates[$workAgreementStart] = true;
+
+					/*speichern uns die Benutzer Funktionen aus SAPByD*/
+					foreach($benutzerFunctionsSAP as $benutzerFunctionSAP)
+					{
+						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate] = new stdClass();
+						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->ValidityPeriod = isset($benutzerFunctionSAP->ValidityPeriod) ? $benutzerFunctionSAP->ValidityPeriod :'';
+						$sapEmpType->functions[$benutzerFunctionSAP->ValidityPeriod->StartDate]->AgreedWorkingTimeRate = isset($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue) ? number_format($benutzerFunctionSAP->AgreedWorkingTimeRate->DecimalValue, 2) : '';
+					}
+				}
+			}
+
+			$dienstverhaeltniss = getData($dienstverhaeltnisse)[0];
+
+			$dvEnde = new DateTime($dienstverhaeltniss->lastende);
+			$dvEnde->modify('+'. $this->_ci->config->item(self::AFTER_END) .' days');
+			$today = Date('Y-m-d');
+
+			if ($today >= $dvEnde->format('Y-m-d'))
+			{
+				krsort($sapEmpType->functions);
+				$lastSAPFunctionDate = array_keys($sapEmpType->functions)[0];
+
+				$sapEndDate = $sapEmpType->functions[$lastSAPFunctionDate]->ValidityPeriod->EndDate;
+				$leavingDate = $dienstverhaeltniss->lastende;
+
+				if ($leavingDate != $sapEndDate)
+				{
+					if ($sapEndDate > $leavingDate)
+					{
+						$updated = $this->addLeavingDate($sapID, $leavingDate, $empData->person_id);
+					}
+
+					if (!$updated)
+					{
+						continue;
+					}
+
+				}
+			}
+
+			if ($updated !== false)
+			{
+
+				$update = $this->_ci->SAPMitarbeiterModel->update(
+					array(
+						'mitarbeiter_uid' => $empData->uid
+					),
+					array(
+						'last_update_workagreement' => 'NOW()'
+					)
+				);
+
+				// If database error occurred then return it
+				if (isError($update)) return $update;
+			}
+		}
+		return success('Users data updated successfully');
+	}
 	public function updateEmployeeWorkAgreement($emps)
 	{
 		if (isEmptyArray($emps)) return success('No emps to be updated');

@@ -36,6 +36,7 @@ class JQMSchedulerLib
 	const JOB_TYPE_SAP_NEW_EMPLOYEES = 'SAPEmployeesCreate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES = 'SAPEmployeesUpdate';
 	const JOB_TYPE_SAP_UPDATE_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementUpdate';
+	const JOB_TYPE_SAP_CANCEL_EMPLOYEES_WORKAGREEMENT = 'SAPEmployeesWorkAgreementCancel';
 	const JOB_TYPE_SAP_CREDIT_MEMO = 'SAPPaymentGutschrift';
 	const JOB_TYPE_SAP_OTHER_CREDIT_MEMO = 'SAPSonstigeGutschrift';
 
@@ -668,6 +669,52 @@ class JQMSchedulerLib
 			GROUP BY dv.mitarbeiter_uid
 		', array($this->_ci->config->item(self::AFTER_END),
 				$this->_ci->config->item(self::AFTER_END),
+				$this->_ci->config->item(self::EMPLOYEE_BLACKLIST)
+			)
+		);
+
+		if (isError($personResult)) return $personResult;
+
+		if (hasData($personResult)) $functions = getData($personResult);
+
+		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
+	}
+
+	public function cancelEmployeesWorkAgreement()
+	{
+		$functions = array();
+
+		$dbModel = new DB_Model();
+
+		$personResult = $dbModel->execReadOnlyQuery('
+			WITH last_dvs AS (
+				SELECT DISTINCT ON (mitarbeiter_uid) mitarbeiter_uid as uid, dv.bis as lastende, updateamum
+				FROM hr.tbl_dienstverhaeltnis dv
+				WHERE dv.vertragsart_kurzbz IN ?
+				ORDER BY mitarbeiter_uid, dv.bis DESC NULLS FIRST
+			)
+			SELECT uid
+			FROM last_dvs
+			JOIN sync.tbl_sap_mitarbeiter sm ON(sm.mitarbeiter_uid = last_dvs.uid)
+			WHERE
+				last_dvs.lastende + INTERVAL ?\' DAYS\' < CURRENT_DATE
+				AND (
+					last_dvs.updateamum > sm.last_update_workagreement
+					OR sm.last_update_workagreement IS NULL
+					OR last_update_workagreement < last_dvs.lastende + INTERVAL ?\' DAYS\')
+				AND NOT EXISTS (
+					SELECT 1
+					FROM hr.tbl_dienstverhaeltnis sdv
+					WHERE sdv.mitarbeiter_uid = last_dvs.uid
+						AND (sdv.bis IS NULL OR sdv.bis >= CURRENT_DATE)
+						AND sdv.vertragsart_kurzbz IN ?
+				)
+				AND last_dvs.uid NOT IN ?
+		', array(
+				$this->_ci->config->item(self::FHC_CONTRACT_TYPES),
+				$this->_ci->config->item(self::AFTER_END),
+				$this->_ci->config->item(self::AFTER_END),
+				$this->_ci->config->item(self::FHC_CONTRACT_TYPES),
 				$this->_ci->config->item(self::EMPLOYEE_BLACKLIST)
 			)
 		);
