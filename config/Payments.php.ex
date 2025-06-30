@@ -22,11 +22,8 @@ $config['payments_sales_unit_custom'] = '100003';
 // after this date - because there are no projects available
 $config['payments_studiensemester_start_max_date'] = '2021-01-01';
 
-// Do not create Payments older than this date
-$config['payments_create'] = array(
-	'start_date' => '2024-01-01',
-	'end_date' => '2025-01-01'
-);
+// Do not create payments older than this date (PostgreSQL interval type)
+$config['max_payment_age'] = '6 month';
 
 // Incoming/outgoing grant
 $config['payments_incoming_outgoing_grant'] = 'ZuschussIO';

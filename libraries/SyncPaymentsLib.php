@@ -1542,7 +1542,7 @@ class SyncPaymentsLib
 				AND 0 != bk.betrag + COALESCE((SELECT SUM(betrag) FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr), 0)
 				AND bk.buchungsnr_verweis IS NULL
 				AND bk.person_id = ?
-				AND (bk.buchungsdatum >= ? AND bk.buchungsdatum <= ?)
+				AND bk.buchungsdatum >= NOW() - INTERVAL \''.$this->_ci->config->item('max_payment_age').'\'
 				AND bk.buchungsdatum <= NOW()
 				AND ss.start <= ?
 			ORDER BY
@@ -1550,8 +1550,6 @@ class SyncPaymentsLib
 		',
 		array(
 			$person_id,
-			$this->_ci->config->item('payments_create')['start_date'],
-			$this->_ci->config->item('payments_create')['end_date'],
 			$this->_ci->config->item('payments_studiensemester_start_max_date')
 		));
 
