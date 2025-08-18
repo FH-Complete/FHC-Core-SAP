@@ -31,6 +31,8 @@ $qry = '
 	AND         ((deleted = FALSE) OR (deleted = TRUE AND projects_timesheets_project_id IS NOT NULL))
 	-- Filter out Intercompany (ICP) and Objektverwendung (OV) projects
 	AND         (project_id NOT LIKE \'ICP%\' AND project_id NOT LIKE \'OV%\')
+	-- bei unverknuepften nur aktive OEs anzeigen
+	AND (oe.aktiv=true or projects_timesheets_project_id is not null)
 	ORDER BY 	projects_timesheets_project_id, project_id
 ';
 
