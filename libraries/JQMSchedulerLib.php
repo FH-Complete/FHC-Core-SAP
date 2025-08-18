@@ -443,7 +443,7 @@ class JQMSchedulerLib
 						WHERE
 							tbl_prestudent.person_id = bk.person_id
 							AND studiengang_kz = bk.studiengang_kz
-							AND bk.buchungstyp_kurzbz = \'StudiengebuehrAnzahlung\'
+							AND bk.buchungstyp_kurzbz IN (\'StudiengebuehrAnzahlung\',\'KautionDrittStaat\')
 							AND get_rolle_prestudent(prestudent_id, NULL) IN (\'Interessent\')
 					)
 					OR
@@ -493,11 +493,11 @@ class JQMSchedulerLib
 
 		return $creditMemoResult;
 	}
-	
+
 	public function creditSonstigeGutschrift()
 	{
 		$this->_ci->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
-		
+
 		$dbModel = new DB_Model();
 
 		// Get users that have updated credit memo
@@ -678,7 +678,7 @@ class JQMSchedulerLib
 
 		return success(uniqudMitarbeiterUidArray(array_merge($functions)));
 	}
-	
+
 	public function setEmployeeOnService()
 	{
 		$dbModel = new DB_Model();
@@ -692,11 +692,11 @@ class JQMSchedulerLib
 				JOIN sync.tbl_sap_mitarbeiter ON tbl_mitarbeiter.mitarbeiter_uid = tbl_sap_mitarbeiter.mitarbeiter_uid');
 		// If error occurred while retrieving new users from database then return the error
 		if (isError($personResult)) return $personResult;
-		
+
 		// Return a success that contains all the arrays merged together
 		return success(getData($personResult));
 	}
-	
+
 	public function checkEmployeesDVs()
 	{
 		$dbModel = new DB_Model();
@@ -718,12 +718,11 @@ class JQMSchedulerLib
 				)
 				ORDER BY tbl_dienstverhaeltnis.mitarbeiter_uid;
 				', array($this->_ci->config->item(self::FHC_CONTRACT_TYPES)));
-		
+
 		// If error occurred while retrieving new users from database then return the error
 		if (isError($personResult)) return $personResult;
-		
+
 		// Return a success that contains all the arrays merged together
 		return success(getData($personResult));
 	}
 }
-

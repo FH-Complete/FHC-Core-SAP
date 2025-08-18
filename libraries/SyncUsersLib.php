@@ -617,6 +617,7 @@ class SyncUsersLib
 			  JOIN public.tbl_bankverbindung b USING(person_id)
 			  JOIN public.tbl_person p USING(person_id)
 			 WHERE b.iban IS NOT NULL
+			 AND (b.insertamum>now() - \'2 days\'::interval OR b.updateamum > now() - \'2 days\'::interval)
 		');
 
 		// If an error occurred then return it
@@ -630,12 +631,43 @@ class SyncUsersLib
 			$iban = str_replace(' ', '', $userBankData->iban);
 			$swift = str_replace(' ', '', $userBankData->swift);
 
+			$sapCustomerResult = $this->_userExistsByIdSAP($userBankData->sap_user_id);
+
+			if(!isSuccess($sapCustomerResult) || !hasData($sapCustomerResult))
+			{
+				$this->_ci->LogLibSAP->logErrorDB('User not found in SAP PersonID: '.$userBankData->person_id);
+				continue;
+			}
+
+			// Check if IBAN is already set in SAP
+			// If it is already there we dont set it because this causes an error if we do so
+			$sapCustomerData = getData($sapCustomerResult);
+			if(isset($sapCustomerData->BankDetails))
+			{
+				if(isset($sapCustomerData->BankDetails->BankAccountStandardID))
+				{
+					if($sapCustomerData->BankDetails->BankAccountStandardID == $iban)
+					{
+						$this->_ci->LogLibSAP->logInfoDB('IBAN already set for PersonID: '.$userBankData->person_id.' - no action performed');
+						continue;
+					}
+					else
+					{
+						$this->_ci->LogLibSAP->logWarningDB('Different IBAN Found: '.$userBankData->person_id.' - try to set');
+					}
+				}
+			}
+
 			// Get the BankInternalID with the given parameters
 			$bankInternalID = $this->_getBankInternalID($userBankData->person_id, $iban, $swift);
 
 			// If a _not_ valid BankInternalID was found then continue to the next user
 			// NOTE: _getBankInternalID logs warnings in case none or many BankInternalID have been found
-			if (isEmptyString($bankInternalID)) continue;
+			if (isEmptyString($bankInternalID))
+			{
+				$this->_ci->LogLibSAP->logWarningDB('No Bank Internal ID found for user: '.$userBankData->person_id);
+				continue;
+			}
 
 			// Otherwise set the data to proceed with the bank data update on SAP side
 			$data = array(
@@ -660,7 +692,11 @@ class SyncUsersLib
 			$manageCustomerResult = $this->_ci->ManageCustomerInModel->MaintainBundle_V1($data);
 
 			// If an error occurred then return it
-			if (isError($manageCustomerResult)) return $manageCustomerResult;
+			if (isError($manageCustomerResult))
+			{
+				$this->_ci->LogLibSAP->logErrorDB('Error add Bankdata for user: '.$userBankData->person_id);
+				return $manageCustomerResult;
+			}
 
 			// SAP data
 			$manageCustomer = getData($manageCustomerResult);
@@ -1099,7 +1135,8 @@ class SyncUsersLib
 		{
 			$paymentCompanyIdsArray[] = array(
 				'CompanyID' => $paymentCompanyId,
-				'AccountDeterminationDebtorGroupCode' => $this->_ci->config->item(self::USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE)
+				'AccountDeterminationDebtorGroupCode' => $this->_ci->config->item(self::USERS_ACCOUNT_DETERMINATION_DEBTOR_GROUP_CODE),
+				'PaymentForm' => array('PaymentFormCode' => '05') // Ueberweisung
 			);
 		}
 
@@ -1303,4 +1340,3 @@ class SyncUsersLib
 		return $bankInternalID;
 	}
 }
-

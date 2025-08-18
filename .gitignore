@@ -5,4 +5,5 @@ config/PriceLists.php
 config/Users.php
 config/Services.php
 config/Payments.php
+config/Employees.php
 
