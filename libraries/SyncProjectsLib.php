@@ -1825,8 +1825,8 @@ class SyncProjectsLib
 			$courseEmployeesResult = $dbModel->execReadOnlyQuery('
 				SELECT lm.mitarbeiter_uid,
 					b.person_id,
-					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
-					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
+					(SUM(lm.semesterstunden) * 2) AS planned_work,
+					(SUM(lm.semesterstunden) * 2) AS commited_work,
 					\'0\' AS ma_soll_stunden,
 					\'0\' AS lehre_grobplanung,
 					bf.oe_kurzbz
