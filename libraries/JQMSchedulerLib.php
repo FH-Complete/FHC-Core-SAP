@@ -381,6 +381,7 @@ class JQMSchedulerLib
 				AND NOT EXISTS(SELECT 1 FROM public.tbl_konto WHERE buchungsnr_verweis = bk.buchungsnr)
 				AND bk.buchungsnr_verweis IS NULL
 				AND bk.buchungsdatum <= now()
+				AND bk.buchungsdatum >= NOW() - INTERVAL \''.$this->_ci->config->item('max_payment_age').'\'
 				AND bk.buchungsdatum >= ?
 				AND
 				(
