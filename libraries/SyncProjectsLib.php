@@ -166,7 +166,7 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function sync($type, $studySemester = null, $no_lehrgaenge_lectors = true)
+	public function sync($type, $studySemester = null, $lehrgaenge_lectors = 'false')
 	{
 		$currentOrNextStudySemesterResult = null;
 
@@ -300,7 +300,7 @@ class SyncProjectsLib
 					$studySemesterEndDateTS,
 					$studySemesterStartDate,
 					$studySemesterEndDate,
-					$no_lehrgaenge_lectors
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -325,7 +325,7 @@ class SyncProjectsLib
 					$currentOrNextStudySemester,
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS,
-					$no_lehrgaenge_lectors
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -1707,7 +1707,7 @@ class SyncProjectsLib
 		$studySemesterEndDateTS,
 		$studySemesterStartDate,
 		$studySemesterEndDate,
-		$no_lehrgaenge_lectors
+		$lehrgaenge_lectors
 	)
 	{
 		$type = $projectTypes[self::LEHRGAENGE_PROJECT]; // Project type
@@ -1825,7 +1825,7 @@ class SyncProjectsLib
 			}
 
 			// If the sync of the lectors is required
-			if ($no_lehrgaenge_lectors === false)
+			if ($lehrgaenge_lectors === 'true')
 			{
 				// Loads employees for this course, study semester and their organization unit
 				$courseEmployeesResult = $dbModel->execReadOnlyQuery('
@@ -3052,7 +3052,7 @@ class SyncProjectsLib
 		$studySemester,
 		$studySemesterStartDateTS,
 		$studySemesterEndDateTS,
-		$no_lehrgaenge_lectors
+		$lehrgaenge_lectors
 	)
 	{
 		// Project person responsible
@@ -3164,7 +3164,7 @@ class SyncProjectsLib
 			}
 
 			// If the sync of the lectors is required
-			if ($no_lehrgaenge_lectors === false)
+			if ($lehrgaenge_lectors === 'true')
 			{
 				// Loads employees for this custom project
 				$customEmployeesResult = $dbModel->execReadOnlyQuery('
