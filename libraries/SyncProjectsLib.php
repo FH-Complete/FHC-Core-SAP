@@ -166,7 +166,7 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function sync($type, $studySemester = null)
+	public function sync($type, $studySemester = null, $lehrgaenge_lectors = 'false')
 	{
 		$currentOrNextStudySemesterResult = null;
 
@@ -299,7 +299,8 @@ class SyncProjectsLib
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS,
 					$studySemesterStartDate,
-					$studySemesterEndDate
+					$studySemesterEndDate,
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -323,7 +324,8 @@ class SyncProjectsLib
 				$createResult = $this->_syncGmbhCustomProject(
 					$currentOrNextStudySemester,
 					$studySemesterStartDateTS,
-					$studySemesterEndDateTS
+					$studySemesterEndDateTS,
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -1704,7 +1706,8 @@ class SyncProjectsLib
 		$studySemesterStartDateTS,
 		$studySemesterEndDateTS,
 		$studySemesterStartDate,
-		$studySemesterEndDate
+		$studySemesterEndDate,
+		$lehrgaenge_lectors
 	)
 	{
 		$type = $projectTypes[self::LEHRGAENGE_PROJECT]; // Project type
@@ -1821,72 +1824,76 @@ class SyncProjectsLib
 				return $setActiveResult;
 			}
 
-			// Loads employees for this course, study semester and their organization unit
-			$courseEmployeesResult = $dbModel->execReadOnlyQuery('
-				SELECT lm.mitarbeiter_uid,
-					b.person_id,
-					(SUM(lm.semesterstunden) * 2) AS planned_work,
-					(SUM(lm.semesterstunden) * 2) AS commited_work,
-					\'0\' AS ma_soll_stunden,
-					\'0\' AS lehre_grobplanung,
-					bf.oe_kurzbz
-				  FROM lehre.tbl_lehreinheitmitarbeiter lm
-				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
-				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
-				  JOIN public.tbl_studiengang s USING(studiengang_kz)
-				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
-			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
-				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-				 WHERE l.studiensemester_kurzbz = ?
-				   AND s.studiengang_kz = ?
-			   	   AND m.fixangestellt = TRUE
-				   AND m.personalnummer > 0
-				   AND b.aktiv = TRUE
-				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
-				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-				   AND bf.funktion_kurzbz = \'oezuordnung\'
-			      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
-			      ORDER BY lm.mitarbeiter_uid
-			', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
-
-			// If error occurred while retrieving course employee from database then return the error
-			if (isError($courseEmployeesResult)) return $courseEmployeesResult;
-
-			// If employees are present for this course
-			if (hasData($courseEmployeesResult))
+			// If the sync of the lectors is required
+			if ($lehrgaenge_lectors === 'true')
 			{
-				// For each employee
-				foreach (getData($courseEmployeesResult) as $courseEmployee)
+				// Loads employees for this course, study semester and their organization unit
+				$courseEmployeesResult = $dbModel->execReadOnlyQuery('
+					SELECT lm.mitarbeiter_uid,
+						b.person_id,
+						(SUM(lm.semesterstunden) * 2) AS planned_work,
+						(SUM(lm.semesterstunden) * 2) AS commited_work,
+						\'0\' AS ma_soll_stunden,
+						\'0\' AS lehre_grobplanung,
+						bf.oe_kurzbz
+					  FROM lehre.tbl_lehreinheitmitarbeiter lm
+					  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+					  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+					  JOIN public.tbl_studiengang s USING(studiengang_kz)
+					  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+				  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+					  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+					 WHERE l.studiensemester_kurzbz = ?
+					   AND s.studiengang_kz = ?
+				   	   AND m.fixangestellt = TRUE
+					   AND m.personalnummer > 0
+					   AND b.aktiv = TRUE
+					   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+					   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+					   AND bf.funktion_kurzbz = \'oezuordnung\'
+				      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
+				      ORDER BY lm.mitarbeiter_uid
+				', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
+
+				// If error occurred while retrieving course employee from database then return the error
+				if (isError($courseEmployeesResult)) return $courseEmployeesResult;
+
+				// If employees are present for this course
+				if (hasData($courseEmployeesResult))
 				{
-					// Add the employee to this project
-					$addEmployeeResult = $this->_addEmployeeToProject(
-						$courseEmployee,
-						$projectObjectId,
-						$projectObjectId,
-						$studySemesterStartDateTS,
-						$studySemesterEndDateTS
-					);
-
-					// If an error occurred then return it
-					if (isError($addEmployeeResult)) return $addEmployeeResult;
-
-					// If the employee was successfully added to this project
-					// and it is _not_ an alredy existing employee in this project
-					// and if config entry that enables the purchase orders is true
-					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
-						&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+					// For each employee
+					foreach (getData($courseEmployeesResult) as $courseEmployee)
 					{
-						$purchaseOrder = $this->_purchaseOrderLG(
+						// Add the employee to this project
+						$addEmployeeResult = $this->_addEmployeeToProject(
 							$courseEmployee,
-							$course,
-							$studySemesterStartDate,
-							$studySemesterEndDate,
-							$projectId,
-							$projectName
+							$projectObjectId,
+							$projectObjectId,
+							$studySemesterStartDateTS,
+							$studySemesterEndDateTS
 						);
 
-						// If error occurred then return the error
-						if (isError($purchaseOrder)) return $purchaseOrder;
+						// If an error occurred then return it
+						if (isError($addEmployeeResult)) return $addEmployeeResult;
+
+						// If the employee was successfully added to this project
+						// and it is _not_ an alredy existing employee in this project
+						// and if config entry that enables the purchase orders is true
+						if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+							&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+						{
+							$purchaseOrder = $this->_purchaseOrderLG(
+								$courseEmployee,
+								$course,
+								$studySemesterStartDate,
+								$studySemesterEndDate,
+								$projectId,
+								$projectName
+							);
+
+							// If error occurred then return the error
+							if (isError($purchaseOrder)) return $purchaseOrder;
+						}
 					}
 				}
 			}
@@ -3044,7 +3051,8 @@ class SyncProjectsLib
 	private function _syncGmbhCustomProject(
 		$studySemester,
 		$studySemesterStartDateTS,
-		$studySemesterEndDateTS
+		$studySemesterEndDateTS,
+		$lehrgaenge_lectors
 	)
 	{
 		// Project person responsible
@@ -3155,48 +3163,52 @@ class SyncProjectsLib
 				return $setActiveResult;
 			}
 
-			// Loads employees for this custom project
-			$customEmployeesResult = $dbModel->execReadOnlyQuery('
-				SELECT lm.mitarbeiter_uid,
-					b.person_id,
-					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
-					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
-					\'0\' AS ma_soll_stunden,
-					\'0\' AS lehre_grobplanung
-				  FROM lehre.tbl_lehreinheitmitarbeiter lm
-				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
-				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
-				  JOIN public.tbl_studiengang s USING(studiengang_kz)
-				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
-			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
-				 WHERE l.studiensemester_kurzbz = ?
-				   AND s.studiengang_kz = ?
-			   	   AND m.fixangestellt = TRUE
-				   AND m.personalnummer > 0
-			      GROUP BY lm.mitarbeiter_uid, b.person_id
-			      ORDER BY lm.mitarbeiter_uid
-			', array($studySemester, $customProject->studiengang_kz));
-
-			// If error occurred while retrieving csutom project employee from database then return the error
-			if (isError($customEmployeesResult)) return $customEmployeesResult;
-
-			// If employees are present for this custom project
-			if (hasData($customEmployeesResult))
+			// If the sync of the lectors is required
+			if ($lehrgaenge_lectors === 'true')
 			{
-				// For each employee
-				foreach (getData($customEmployeesResult) as $customEmployee)
-				{
-					// Add the employee to this project
-					$addEmployeeResult = $this->_addEmployeeToProject(
-						$customEmployee,
-						$projectObjectId,
-						$projectObjectId,
-						$studySemesterStartDateTS,
-						$studySemesterEndDateTS
-					);
+				// Loads employees for this custom project
+				$customEmployeesResult = $dbModel->execReadOnlyQuery('
+					SELECT lm.mitarbeiter_uid,
+						b.person_id,
+						(SUM(lm.semesterstunden) * 1.5) AS planned_work,
+						(SUM(lm.semesterstunden) * 1.5) AS commited_work,
+						\'0\' AS ma_soll_stunden,
+						\'0\' AS lehre_grobplanung
+					  FROM lehre.tbl_lehreinheitmitarbeiter lm
+					  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+					  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+					  JOIN public.tbl_studiengang s USING(studiengang_kz)
+					  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+				  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+					 WHERE l.studiensemester_kurzbz = ?
+					   AND s.studiengang_kz = ?
+				   	   AND m.fixangestellt = TRUE
+					   AND m.personalnummer > 0
+				      GROUP BY lm.mitarbeiter_uid, b.person_id
+				      ORDER BY lm.mitarbeiter_uid
+				', array($studySemester, $customProject->studiengang_kz));
 
-					// If an error occurred then return it
-					if (isError($addEmployeeResult)) return $addEmployeeResult;
+				// If error occurred while retrieving csutom project employee from database then return the error
+				if (isError($customEmployeesResult)) return $customEmployeesResult;
+
+				// If employees are present for this custom project
+				if (hasData($customEmployeesResult))
+				{
+					// For each employee
+					foreach (getData($customEmployeesResult) as $customEmployee)
+					{
+						// Add the employee to this project
+						$addEmployeeResult = $this->_addEmployeeToProject(
+							$customEmployee,
+							$projectObjectId,
+							$projectObjectId,
+							$studySemesterStartDateTS,
+							$studySemesterEndDateTS
+						);
+
+						// If an error occurred then return it
+						if (isError($addEmployeeResult)) return $addEmployeeResult;
+					}
 				}
 			}
 		}
