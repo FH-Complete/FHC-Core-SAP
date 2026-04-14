@@ -7,6 +7,9 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class ODATAClientLib
 {
+
+	const CURL_SSLVERSION_MAX_TLSv1_2 = 393216; // Curl constant that set the maximum used TLS version
+
 	const HTTP_GET_METHOD = 'GET'; // http get method name
 	const HTTP_POST_METHOD = 'POST'; // http post method name
 	const HTTP_MERGE_METHOD = 'MERGE'; // http merge method name
@@ -354,6 +357,7 @@ class ODATAClientLib
 			->expectsJson() // dangerous expectations
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+			->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
 			->send();
 	}
 
@@ -372,6 +376,7 @@ class ODATAClientLib
 			->addHeader(self::TOKEN_HEADER_FETCH_NAME, self::TOKEN_HEADER_FETCH_VALUE) // token with option to fetch
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+			->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
 			->send();
 
 		// Checks if the header is present and the needed data are present
@@ -413,6 +418,7 @@ class ODATAClientLib
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
 				->sendsJson() // content type json
 				->send();
 		}
@@ -438,6 +444,7 @@ class ODATAClientLib
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
 				->sendsJson() // content type json
 				->send();
 		}
@@ -463,6 +470,7 @@ class ODATAClientLib
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
+				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
 				->sendsJson() // content type json
 				->send();
 		}

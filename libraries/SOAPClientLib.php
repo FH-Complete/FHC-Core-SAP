@@ -157,6 +157,15 @@ class SOAPClientLib
 
 		try
 		{
+			// Workaround for the TLS1.3 problem
+			$this->_connectionsArray[$apiSetName]['stream_context'] = stream_context_create(
+				array(
+					'ssl' => array(
+						'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT
+					)
+				)
+			);
+
 			// Call the SoapClient giving the path in the file system to the WSDL file and the options needed to connect
 			$soapClient = new SoapClient(
 				sprintf(self::WSDL_FULL_NAME, $this->_activeConnectionName, $apiSetName, $serviceName),
