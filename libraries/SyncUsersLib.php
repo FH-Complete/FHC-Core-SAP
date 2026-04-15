@@ -334,20 +334,38 @@ class SyncUsersLib
 					continue;
 				}
 			}
-			else // Add the already present user to the sync table
+			else // Check if user already exists in the sync table, if _not_ then add the user id to the sync table
 			{
 				$sapCustomer = getData($userDataSAP); // get SAP customer data
 
-				// Store in database the couple person_id sap_user_id
-				$insert = $this->_ci->SAPStudentsModel->insert(
-					array(
-						'person_id' => $userData->person_id,
-						'sap_user_id' => $sapCustomer->InternalID
-					)
-				);
+				// Check if user already exists in the sync table
+				$resultSAPStudent = $this->_ci->SAPStudentsModel->loadWhere(array('sap_user_id' => $sapCustomer->InternalID));
 
 				// If database error occurred then return it
-				if (isError($insert)) return $insert;
+				if (isError($resultSAPStudent)) return $resultSAPStudent;
+
+				// If already exists in the sync table then log it
+				if (hasData($resultSAPStudent))
+				{
+					// Default non blocking error
+					$this->_ci->LogLibSAP->logWarningDB(
+						'Two users with the same email: '.$userData->email.', person IDs: '.$userData->person_id.' and '.getData($resultSAPStudent)[0]->person_id
+					);
+				}
+				// If _not_ then add the user id to the sync table
+				else
+				{
+					// Store in database the couple person_id sap_user_id
+					$insert = $this->_ci->SAPStudentsModel->insert(
+						array(
+							'person_id' => $userData->person_id,
+							'sap_user_id' => $sapCustomer->InternalID
+						)
+					);
+
+					// If database error occurred then return it
+					if (isError($insert)) return $insert;
+				}
 			}
 		}
 
