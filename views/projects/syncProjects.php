@@ -7,7 +7,8 @@ $includesArray = array(
     'bootstrap3' => true,
     'fontawesome4' => true,
     'sbadmintemplate3' => true,
-    'tabulator4' => true,
+    'tabulator5' => true,
+    'tabulator5JQuery' => true,
     'momentjs2' => true,
     'ajaxlib' => true,
     'dialoglib' => true,
@@ -56,10 +57,10 @@ $this->load->view('templates/FHC-Header', $includesArray);
                 </div>
             </div>
             <div class="row">
-                <div class="col-xs-9">
+                <div class="col-xs-9 tabulator-initialfontsize">
                     <?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPProjectsData.php'); ?>
                 </div>
-                <div class="col-xs-3">
+                <div class="col-xs-3 tabulator-initialfontsize">
                     <?php $this->load->view('extensions/FHC-Core-SAP/projects/FHProjectsData.php'); ?>
                 </div>
             </div>
@@ -81,10 +82,10 @@ $this->load->view('templates/FHC-Header', $includesArray);
                 </div>
             </div>
             <div class="row">
-                <div class="col-xs-9">
+                <div class="col-xs-9 tabulator-initialfontsize">
                     <?php $this->load->view('extensions/FHC-Core-SAP/projects/SAPPhasesData.php'); ?>
                 </div>
-                <div class="col-xs-3">
+                <div class="col-xs-3 tabulator-initialfontsize">
                     <?php $this->load->view('extensions/FHC-Core-SAP/projects/FHPhasesData.php'); ?>
                 </div>
             </div>

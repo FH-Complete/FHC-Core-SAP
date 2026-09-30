@@ -30,22 +30,18 @@ $tableWidgetArray = array(
 		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
 		initialSort:[
 		    {column:"isSynced", dir:"asc"} // start with false
 	    ],
 		tableWidgetHeader: false,
-	    rowUpdated: function(row){
-	        row.deselect();
-        },
-        rowAdded:function(row){
-	        resortTable(row);
-	    }
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
+		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		projekt_id: {visible: false},
 		projekt_kurzbz: {headerFilter:"input", tooltip: true},
 		titel: {headerFilter:"input", tooltip: true}

@@ -159,12 +159,12 @@ class ManageProjects extends JQW_Controller
 	/**
 	 * Updates and creates projects on SAP side only courses
 	 */
-	public function syncLehrgaenge($studySemester = null)
+	public function syncLehrgaenge($studySemester = null, $lehrgaenge_lectors = 'false')
 	{
 		$this->logInfo('Start projects lehrgaenge synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::LEHRGAENGE, $studySemester);
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::LEHRGAENGE, $studySemester, $lehrgaenge_lectors);
 
 		// Log result
 		if (isError($syncResult))
@@ -205,12 +205,12 @@ class ManageProjects extends JQW_Controller
 	/**
 	 * Updates and creates projects on SAP side only customs
 	 */
-	public function syncGmbhCustoms($studySemester = null)
+	public function syncGmbhCustoms($studySemester = null, $lehrgaenge_lectors = 'false')
 	{
 		$this->logInfo('Start projects custom custom synchronization with SAP ByD');
 
 		// Synchronize projects!
-		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::GMBH_CUSTOM, $studySemester);
+		$syncResult = $this->syncprojectslib->sync(SyncProjectsLib::GMBH_CUSTOM, $studySemester, $lehrgaenge_lectors);
 
 		// Log result
 		if (isError($syncResult))

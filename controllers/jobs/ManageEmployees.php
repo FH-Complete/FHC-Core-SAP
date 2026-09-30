@@ -196,6 +196,59 @@ class ManageEmployees extends JQW_Controller
 
 		$this->logInfo('End data synchronization with SAP ByD: update employees workagreement');
 	}
+	
+	public function checkEmployeesDVs()
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: checkEmployeesDVs');
+		
+		// Gets the oldest job
+		$oldestJob = $this->getOldestJob(SyncEmployeesLib::SAP_CHECK_EMPLOYEE_DV);
+		if (isError($oldestJob))
+		{
+			$this->logError(getCode($oldestJob).': '.getError($oldestJob), SyncEmployeesLib::SAP_CHECK_EMPLOYEE_DV);
+		}
+		elseif (hasData($oldestJob)) // if there jobs to work
+		{
+			// Update jobs properties
+			$this->updateJobs(
+				getData($oldestJob), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date('Y-m-d H:i:s')) // Job properties new values
+			);
+			$updateResult = $this->updateJobsQueue(SyncEmployeesLib::SAP_CHECK_EMPLOYEE_DV, getData($oldestJob));
+			
+			// If an error occurred then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // works the jobs
+			{
+				// Compare
+				$syncResult = $this->syncemployeeslib->checkEmployeesDVs(mergeUidArray(getData($oldestJob)));
+				
+				// Log result
+				if (isError($syncResult))
+				{
+					$this->logError(getCode($syncResult).': '.getError($syncResult));
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+				
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($oldestJob), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				);
+				$this->updateJobsQueue(SyncEmployeesLib::SAP_CHECK_EMPLOYEE_DV, getData($oldestJob));
+			}
+		}
+		
+		$this->logInfo('End data synchronization with SAP ByD: checkEmployeesDVs');
+	}
 
 }
 

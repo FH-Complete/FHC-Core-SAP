@@ -63,8 +63,9 @@ class Projects_model extends ODATAClientModel
 	public function getProjectsAndTasks($projectObjectIds = null)
 	{
 		// ODATA call parameters
+		// Commented out select because we need custom fields
+		//'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode,ResponsibleCostCentreID',
 		$odataParameters = array(
-			'$select' => 'ProjectID,ObjectID,PlannedStartDateTime,PlannedEndDateTime,ProjectTask,ProjectLifeCycleStatusCode,ResponsibleCostCentreID',
 			'$orderby' => 'ProjectID',
 			'$expand' => 'ProjectTask',
 			'$top' => 999999

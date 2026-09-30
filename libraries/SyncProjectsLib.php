@@ -53,6 +53,9 @@ class SyncProjectsLib
 	const LEHRE_PROJECT = 'lehre';
 	const LEHRGAENGE_PROJECT = 'lehrgaenge';
 
+	const PROJECT_EMPLOYEE_SYNC_LIST_TYPE_CODES = 'project_employee_sync_list_type_codes';
+	const PROJECT_EMPLOYEE_SERVICE_MAPPING = 'project_employee_service_mapping';
+
 	// SAP ByD logic errors
 	const PROJECT_EXISTS_ERROR = 'PRO_CMN_SHRD:003';
 	const PARTECIPANT_PROJ_EXISTS_ERROR = 'PRO_CMN_PROJ:010';
@@ -123,6 +126,8 @@ class SyncProjectsLib
 		// Loads model ManagePurchaseOrderIn
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SOAP/ManagePurchaseOrderIn_model', 'ManagePurchaseOrderInModel');
 
+		// Loads model ProjectsModel
+		$this->_ci->load->model('extensions/FHC-Core-SAP/ODATA/ProjectEmployee_model', 'ProjectEmployeeModel');
 		// Loads the StudiensemesterModel
 		$this->_ci->load->model('organisation/Studiensemester_model', 'StudiensemesterModel');
 		// Loads the Projekt_model
@@ -135,6 +140,8 @@ class SyncProjectsLib
 		$this->_ci->load->model('project/Ressource_model', 'RessourceModel');
 		// Loads MessageTokenModel
 		$this->_ci->load->model('system/MessageToken_model', 'MessageTokenModel');
+
+		$this->_ci->load->model('project/Projects_employees_model', 'ProjectsEmployeesModel');
 
 		// Loads model SAPMitarbeiterModel
 		$this->_ci->load->model('extensions/FHC-Core-SAP/SAPMitarbeiter_model', 'SAPMitarbeiterModel');
@@ -159,7 +166,7 @@ class SyncProjectsLib
 	/**
 	 * Create new projects for the current study semester
 	 */
-	public function sync($type, $studySemester = null)
+	public function sync($type, $studySemester = null, $lehrgaenge_lectors = 'false')
 	{
 		$currentOrNextStudySemesterResult = null;
 
@@ -292,7 +299,8 @@ class SyncProjectsLib
 					$studySemesterStartDateTS,
 					$studySemesterEndDateTS,
 					$studySemesterStartDate,
-					$studySemesterEndDate
+					$studySemesterEndDate,
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -316,7 +324,8 @@ class SyncProjectsLib
 				$createResult = $this->_syncGmbhCustomProject(
 					$currentOrNextStudySemester,
 					$studySemesterStartDateTS,
-					$studySemesterEndDateTS
+					$studySemesterEndDateTS,
+					$lehrgaenge_lectors
 				);
 				if (isError($createResult)) return $createResult;
 			}
@@ -489,9 +498,36 @@ class SyncProjectsLib
 						// If the current task is the project itself then update:
 						// - name
 						// - time recording
+						// - custom fields
+						// - project leader
 						// and skip to the next one
 						if ($project->ProjectID == $projectTask->ID)
 						{
+							$objectVars = get_object_vars($project);
+							$filteredArray = array_filter($objectVars, function($value, $key) {
+								return substr($key, -4) === '_KUT'; //_KUT => SAP custom fields
+							}, ARRAY_FILTER_USE_BOTH);
+
+							$filteredObject = (object) $filteredArray;
+							$jsonResult = json_encode($filteredObject);
+
+							$sapLeaderId = null;
+							if (isset($projectTask->ResponsibleEmployeeID)
+								&& !isEmptyString($projectTask->ResponsibleEmployeeID))
+							{
+								$sapLeaderId = $projectTask->ResponsibleEmployeeID;
+							}
+
+							if ($sapLeaderId !== null)
+							{
+								$fhcLeaderUidResult = $this->_ci->SAPMitarbeiterModel->loadWhere(array('sap_eeid' => $sapLeaderId));
+
+								if (hasData($fhcLeaderUidResult) && !isEmptyString(getData($fhcLeaderUidResult)[0]->mitarbeiter_uid))
+								{
+									$sapLeaderId = getData($fhcLeaderUidResult)[0]->mitarbeiter_uid;
+								}
+							}
+
 							// Updates only the name and time recording
 							$updateResult = $this->_ci->SAPProjectsTimesheetsModel->update(
 								$projects_timesheet_id,
@@ -499,7 +535,9 @@ class SyncProjectsLib
 									'name' => $projectTask->Name,
 									'time_recording' => $timeRecording,
 									// to enforce that this is a project and _not_ a task
-									'project_task_object_id' => null
+									'project_task_object_id' => null,
+									'custom_fields' => $jsonResult,
+									'project_leader' => $sapLeaderId,
 								)
 							);
 
@@ -589,6 +627,28 @@ class SyncProjectsLib
 		return success('All project have been imported successfully');
 	}
 
+	public function syncProjectsEmployees($project)
+	{
+		if (!is_null($project))
+		{
+			$result = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+				array(
+					'project_id' => $project,
+					'project_task_id' => null,
+					'deleted' => false
+				)
+			);
+
+			if (!hasData($result))
+				return success('Project not synced');
+
+			$project = array_column(getData($result), 'project_id');
+		}
+
+		$typeCodes = $this->_ci->config->item(self::PROJECT_EMPLOYEE_SYNC_LIST_TYPE_CODES);
+		$projectsResult = $this->_ci->ProjectEmployeeModel->getProjectsAndEmployees($typeCodes, $project);
+		return $this->getProjectEmployees($projectsResult);
+	}
 	/**
 	 *
 	 */
@@ -849,7 +909,7 @@ class SyncProjectsLib
 										);
 
 										// If error occurred then return the error
-										if (isError($insertResult)) return $intertResult;
+										if (isError($insertResult)) return $insertResult;
 									}
 									// else skip to the next one
 								}
@@ -987,7 +1047,7 @@ class SyncProjectsLib
 								);
 
 								// If error occurred then return the error
-								if (isError($insertResult)) return $intertResult;
+								if (isError($insertResult)) return $insertResult;
 							}
 							// else skip to the next one
 						}
@@ -1129,7 +1189,7 @@ class SyncProjectsLib
 							'beginn' => $project->start_date,
 							'ende' => $project->end_date,
 							'titel' => $project->name,
-							'beschreibung' => $project->name,
+							//'beschreibung' => $project->name,
 							'zeitaufzeichnung' => $project->time_recording
 						)
 					);
@@ -1194,7 +1254,7 @@ class SyncProjectsLib
 							'start' => $projectTask->start_date,
 							'ende' => $projectTask->end_date,
 							'bezeichnung' => substr($projectTask->name, 0, 32),
-							'beschreibung' => $projectTask->name,
+							//'beschreibung' => $projectTask->name,
 							'zeitaufzeichnung' => $projectTask->time_recording
 						)
 					);
@@ -1234,7 +1294,7 @@ class SyncProjectsLib
 
 		$dbModel = new DB_Model();
 
-		// Gets 
+		// Gets
 		$projectResults = $dbModel->execReadOnlyQuery('
 			SELECT p.project_object_id
 			  FROM sync.tbl_sap_projects p
@@ -1348,7 +1408,7 @@ class SyncProjectsLib
 			if (hasData($purchaseOrderCheckBundleResult))
 			{
 				$purchaseOrderCheckBundle = getData($purchaseOrderCheckBundleResult);
-				
+
 				// If the purchase order check was fine
 				if ((isset($purchaseOrderCheckBundle->PurchaseOrder) && !isset($purchaseOrderCheckBundle->Log))
 					|| (isset($purchaseOrderCheckBundle->Log) && isEmptyArray((array)$purchaseOrderCheckBundle->Log)))
@@ -1646,7 +1706,8 @@ class SyncProjectsLib
 		$studySemesterStartDateTS,
 		$studySemesterEndDateTS,
 		$studySemesterStartDate,
-		$studySemesterEndDate
+		$studySemesterEndDate,
+		$lehrgaenge_lectors
 	)
 	{
 		$type = $projectTypes[self::LEHRGAENGE_PROJECT]; // Project type
@@ -1763,72 +1824,76 @@ class SyncProjectsLib
 				return $setActiveResult;
 			}
 
-			// Loads employees for this course, study semester and their organization unit
-			$courseEmployeesResult = $dbModel->execReadOnlyQuery('
-				SELECT lm.mitarbeiter_uid,
-					b.person_id,
-					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
-					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
-					\'0\' AS ma_soll_stunden,
-					\'0\' AS lehre_grobplanung,
-					bf.oe_kurzbz
-				  FROM lehre.tbl_lehreinheitmitarbeiter lm
-				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
-				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
-				  JOIN public.tbl_studiengang s USING(studiengang_kz)
-				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
-			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
-				  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
-				 WHERE l.studiensemester_kurzbz = ?
-				   AND s.studiengang_kz = ?
-			   	   AND m.fixangestellt = TRUE
-				   AND m.personalnummer > 0
-				   AND b.aktiv = TRUE
-				   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
-				   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
-				   AND bf.funktion_kurzbz = \'oezuordnung\'
-			      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
-			      ORDER BY lm.mitarbeiter_uid
-			', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
-
-			// If error occurred while retrieving course employee from database then return the error
-			if (isError($courseEmployeesResult)) return $courseEmployeesResult;
-
-			// If employees are present for this course
-			if (hasData($courseEmployeesResult))
+			// If the sync of the lectors is required
+			if ($lehrgaenge_lectors === 'true')
 			{
-				// For each employee
-				foreach (getData($courseEmployeesResult) as $courseEmployee)
+				// Loads employees for this course, study semester and their organization unit
+				$courseEmployeesResult = $dbModel->execReadOnlyQuery('
+					SELECT lm.mitarbeiter_uid,
+						b.person_id,
+						(SUM(lm.semesterstunden) * 2) AS planned_work,
+						(SUM(lm.semesterstunden) * 2) AS commited_work,
+						\'0\' AS ma_soll_stunden,
+						\'0\' AS lehre_grobplanung,
+						bf.oe_kurzbz
+					  FROM lehre.tbl_lehreinheitmitarbeiter lm
+					  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+					  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+					  JOIN public.tbl_studiengang s USING(studiengang_kz)
+					  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+				  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+					  JOIN public.tbl_benutzerfunktion bf ON(bf.uid = m.mitarbeiter_uid)
+					 WHERE l.studiensemester_kurzbz = ?
+					   AND s.studiengang_kz = ?
+				   	   AND m.fixangestellt = TRUE
+					   AND m.personalnummer > 0
+					   AND b.aktiv = TRUE
+					   AND (bf.datum_von IS NULL OR bf.datum_von <= ?)
+					   AND (bf.datum_bis IS NULL OR bf.datum_bis >= ?)
+					   AND bf.funktion_kurzbz = \'oezuordnung\'
+				      GROUP BY lm.mitarbeiter_uid, b.person_id, bf.oe_kurzbz
+				      ORDER BY lm.mitarbeiter_uid
+				', array($studySemester, $course->studiengang_kz, $studySemesterEndDate, $studySemesterStartDate));
+
+				// If error occurred while retrieving course employee from database then return the error
+				if (isError($courseEmployeesResult)) return $courseEmployeesResult;
+
+				// If employees are present for this course
+				if (hasData($courseEmployeesResult))
 				{
-					// Add the employee to this project
-					$addEmployeeResult = $this->_addEmployeeToProject(
-						$courseEmployee,
-						$projectObjectId,
-						$projectObjectId,
-						$studySemesterStartDateTS,
-						$studySemesterEndDateTS
-					);
-
-					// If an error occurred then return it
-					if (isError($addEmployeeResult)) return $addEmployeeResult;
-
-					// If the employee was successfully added to this project
-					// and it is _not_ an alredy existing employee in this project
-					// and if config entry that enables the purchase orders is true
-					if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
-						&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+					// For each employee
+					foreach (getData($courseEmployeesResult) as $courseEmployee)
 					{
-						$purchaseOrder = $this->_purchaseOrderLG(
+						// Add the employee to this project
+						$addEmployeeResult = $this->_addEmployeeToProject(
 							$courseEmployee,
-							$course,
-							$studySemesterStartDate,
-							$studySemesterEndDate,
-							$projectId,
-							$projectName
+							$projectObjectId,
+							$projectObjectId,
+							$studySemesterStartDateTS,
+							$studySemesterEndDateTS
 						);
 
-						// If error occurred then return the error
-						if (isError($purchaseOrder)) return $purchaseOrder;
+						// If an error occurred then return it
+						if (isError($addEmployeeResult)) return $addEmployeeResult;
+
+						// If the employee was successfully added to this project
+						// and it is _not_ an alredy existing employee in this project
+						// and if config entry that enables the purchase orders is true
+						if (getCode($addEmployeeResult) != self::PARTECIPANT_PROJ_EXISTS_ERROR
+							&& $this->_ci->config->item(self::PROJECT_MANAGE_PURCHASE_ORDER_ENABLED) === true)
+						{
+							$purchaseOrder = $this->_purchaseOrderLG(
+								$courseEmployee,
+								$course,
+								$studySemesterStartDate,
+								$studySemesterEndDate,
+								$projectId,
+								$projectName
+							);
+
+							// If error occurred then return the error
+							if (isError($purchaseOrder)) return $purchaseOrder;
+						}
 					}
 				}
 			}
@@ -2986,7 +3051,8 @@ class SyncProjectsLib
 	private function _syncGmbhCustomProject(
 		$studySemester,
 		$studySemesterStartDateTS,
-		$studySemesterEndDateTS
+		$studySemesterEndDateTS,
+		$lehrgaenge_lectors
 	)
 	{
 		// Project person responsible
@@ -3000,7 +3066,7 @@ class SyncProjectsLib
 		$customResult = $dbModel->execReadOnlyQuery('
 			SELECT UPPER(s0.typ || s0.kurzbz) AS project_id,
 				UPPER(s0.typ || s0.kurzbz) AS name,
-				200000 AS unit_responsible,
+				\'200000\' AS unit_responsible,
 				s0.studiengang_kz
 			  FROM public.tbl_studiengang s0
 			 WHERE s0.studiengang_kz IN ?
@@ -3097,48 +3163,52 @@ class SyncProjectsLib
 				return $setActiveResult;
 			}
 
-			// Loads employees for this custom project
-			$customEmployeesResult = $dbModel->execReadOnlyQuery('
-				SELECT lm.mitarbeiter_uid,
-					b.person_id,
-					(SUM(lm.semesterstunden) * 1.5) AS planned_work,
-					(SUM(lm.semesterstunden) * 1.5) AS commited_work,
-					\'0\' AS ma_soll_stunden,
-					\'0\' AS lehre_grobplanung
-				  FROM lehre.tbl_lehreinheitmitarbeiter lm
-				  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
-				  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
-				  JOIN public.tbl_studiengang s USING(studiengang_kz)
-				  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
-			  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
-				 WHERE l.studiensemester_kurzbz = ?
-				   AND s.studiengang_kz = ?
-			   	   AND m.fixangestellt = TRUE
-				   AND m.personalnummer > 0
-			      GROUP BY lm.mitarbeiter_uid, b.person_id
-			      ORDER BY lm.mitarbeiter_uid
-			', array($studySemester, $customProject->studiengang_kz));
-
-			// If error occurred while retrieving csutom project employee from database then return the error
-			if (isError($customEmployeesResult)) return $customEmployeesResult;
-
-			// If employees are present for this custom project
-			if (hasData($customEmployeesResult))
+			// If the sync of the lectors is required
+			if ($lehrgaenge_lectors === 'true')
 			{
-				// For each employee
-				foreach (getData($customEmployeesResult) as $customEmployee)
-				{
-					// Add the employee to this project
-					$addEmployeeResult = $this->_addEmployeeToProject(
-						$customEmployee,
-						$projectObjectId,
-						$projectObjectId,
-						$studySemesterStartDateTS,
-						$studySemesterEndDateTS
-					);
+				// Loads employees for this custom project
+				$customEmployeesResult = $dbModel->execReadOnlyQuery('
+					SELECT lm.mitarbeiter_uid,
+						b.person_id,
+						(SUM(lm.semesterstunden) * 1.5) AS planned_work,
+						(SUM(lm.semesterstunden) * 1.5) AS commited_work,
+						\'0\' AS ma_soll_stunden,
+						\'0\' AS lehre_grobplanung
+					  FROM lehre.tbl_lehreinheitmitarbeiter lm
+					  JOIN lehre.tbl_lehreinheit l USING(lehreinheit_id)
+					  JOIN lehre.tbl_lehrveranstaltung lv USING(lehrveranstaltung_id)
+					  JOIN public.tbl_studiengang s USING(studiengang_kz)
+					  JOIN public.tbl_benutzer b ON(b.uid = lm.mitarbeiter_uid)
+				  	  JOIN public.tbl_mitarbeiter m USING(mitarbeiter_uid)
+					 WHERE l.studiensemester_kurzbz = ?
+					   AND s.studiengang_kz = ?
+				   	   AND m.fixangestellt = TRUE
+					   AND m.personalnummer > 0
+				      GROUP BY lm.mitarbeiter_uid, b.person_id
+				      ORDER BY lm.mitarbeiter_uid
+				', array($studySemester, $customProject->studiengang_kz));
 
-					// If an error occurred then return it
-					if (isError($addEmployeeResult)) return $addEmployeeResult;
+				// If error occurred while retrieving csutom project employee from database then return the error
+				if (isError($customEmployeesResult)) return $customEmployeesResult;
+
+				// If employees are present for this custom project
+				if (hasData($customEmployeesResult))
+				{
+					// For each employee
+					foreach (getData($customEmployeesResult) as $customEmployee)
+					{
+						// Add the employee to this project
+						$addEmployeeResult = $this->_addEmployeeToProject(
+							$customEmployee,
+							$projectObjectId,
+							$projectObjectId,
+							$studySemesterStartDateTS,
+							$studySemesterEndDateTS
+						);
+
+						// If an error occurred then return it
+						if (isError($addEmployeeResult)) return $addEmployeeResult;
+					}
 				}
 			}
 		}
@@ -3236,7 +3306,7 @@ class SyncProjectsLib
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_SERVICE_TIME_BASED_NOT_VALID
 							&& getCode($addEmployeeToTaskResult) != self::PROJECT_TASK_NOT_ENABLED)
 						{
-							$addEmployeeToTaskResult->retval = 'Add employee to a task: '.$addEmployeeToTaskResult->retval;
+							$addEmployeeToTaskResult->retval = 'Add employee to a task: sapeeid:'.$sapEeid.' serviceid: '.$sapServiceId.' '.$addEmployeeToTaskResult->retval;
 							return $addEmployeeToTaskResult; // return the error
 						}
 						else // if non blocking error then log it
@@ -3257,6 +3327,92 @@ class SyncProjectsLib
 		return success('Employee successfully added to this project', getCode($addEmployeeResult));
 	}
 
+	private function getProjectEmployees($projectsResult)
+	{
+		if (hasData($projectsResult))
+		{
+			foreach (getData($projectsResult) as $project)
+			{
+				$this->_ci->ProjectsEmployeesModel->addDistinct('sync.tbl_projects_employees.project_task_id');
+				$this->_ci->ProjectsEmployeesModel->addSelect('sync.tbl_projects_employees.project_task_id');
+				$this->_ci->ProjectsEmployeesModel->addJoin('sync.tbl_sap_projects_timesheets', 'project_task_id');
+				$result = $this->_ci->ProjectsEmployeesModel->loadWhere(
+					array(
+						'project_id' => $project->ProjectID,
+						'deleted' => false
+					)
+				);
+
+				if (hasData($result))
+				{
+					$needToDelete = array_column(getData($result), 'project_task_id');
+					$deleteResult = $this->_ci->ProjectsEmployeesModel->deleteByProjectTaskId($needToDelete);
+					if (isError($deleteResult)) return $deleteResult;
+				}
+
+				$projectTasks = $project->ProjectTask;
+
+				foreach ($projectTasks as $projectTask)
+				{
+
+					$projectTaskAlreadySynced = $this->_ci->SAPProjectsTimesheetsModel->loadWhere(
+						array(
+							'project_id' => $project->ProjectID,
+							'project_task_id' => $projectTask->TaskID
+						)
+					);
+
+					if (hasData($projectTaskAlreadySynced))
+					{
+						foreach ($projectTask->ProjectTaskService as $projectTaskService)
+						{
+
+							if (isEmptyString($projectTaskService->AssignedEmployeeID))
+							{
+								$mitarbeiter_uid = $this->_ci->config->item(self::PROJECT_EMPLOYEE_SERVICE_MAPPING);
+							}
+							else
+							{
+								$mitarbeiter_uid = $this->_ci->SAPMitarbeiterModel->loadWhere(
+									array(
+										'sap_eeid' => $projectTaskService->AssignedEmployeeID
+									)
+								);
+
+								if (isError($mitarbeiter_uid)) return $mitarbeiter_uid;
+
+								if (!hasData($mitarbeiter_uid))
+								{
+									if ($this->_ci->config->item(self::PROJECT_WARNINGS_ENABLED) === true)
+									{
+										$this->_ci->LogLibSAP->logWarningDB('No employee found for ProjectTask: '.$projectTask->TaskID . ' employee:' . $projectTaskService->AssignedEmployeeID);
+									}
+									continue;
+								}
+								$mitarbeiter_uid = getData($mitarbeiter_uid)[0]->mitarbeiter_uid;
+							}
+
+							$insertResult = $this->_ci->ProjectsEmployeesModel->insert(
+								array(
+									'mitarbeiter_uid' => $mitarbeiter_uid,
+									'project_task_id' => $projectTask->ID,
+									'planstunden' => $projectTaskService->PlannedWorkQuantity
+								)
+							);
+							if (isError($insertResult)) return $insertResult;
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			return success('No projects are present on SAP ByD');
+		}
+
+		return success('All project employees have been imported successfully');
+	}
+
 	/**
 	 * Checks if the given error is the Data Services Request URI not found
 	 */
@@ -3267,4 +3423,3 @@ class SyncProjectsLib
 			|| substr(getError($error), 0, strlen(self::DE_DSRU_ERROR)) == self::DE_DSRU_ERROR;
 	}
 }
-

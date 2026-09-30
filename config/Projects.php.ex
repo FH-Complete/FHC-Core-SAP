@@ -105,3 +105,11 @@ $config['project_purchase_order_shipto_location_gmbh'] = '200000';
 
 // Purchase order recipient party
 $config['project_purchase_order_recipient_party'] = 'GABRIELE';
+
+//Type codes for projects relevant to project employee synchronization
+$config['project_employee_sync_list_type_codes'] = array(
+
+);
+
+//Mapping of services for projects where no specific employee is assigned
+$config['project_employee_service_mapping'] = '';

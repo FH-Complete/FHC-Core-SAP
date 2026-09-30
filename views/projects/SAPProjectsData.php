@@ -31,6 +31,8 @@ $qry = '
 	AND         ((deleted = FALSE) OR (deleted = TRUE AND projects_timesheets_project_id IS NOT NULL))
 	-- Filter out Intercompany (ICP) and Objektverwendung (OV) projects
 	AND         (project_id NOT LIKE \'ICP%\' AND project_id NOT LIKE \'OV%\')
+	-- bei unverknuepften nur aktive OEs anzeigen
+	AND (oe.aktiv=true or projects_timesheets_project_id is not null)
 	ORDER BY 	projects_timesheets_project_id, project_id
 ';
 
@@ -59,30 +61,26 @@ $tableWidgetArray = array(
 		height: "350px",
 		layout: "fitColumns",
 		persistantLayout: false,
-		headerFilterPlaceholder: " ",
 		selectable: 1,
 		selectablePersistence: false,
-		initialHeaderFilter:[
+		 initialHeaderFilter:[
             {field:"status", value:"3"} // set default status filter to "Released"
         ],
         initialSort:[
-		    {column:"isSynced", dir:"asc"} // start with false
+		    {column:"isSynced", dir:"desc"} // start with false
 	    ],
 		tableWidgetHeader: false,
-		rowSelected: function(row){
-			rowSelected_onSAPProject(row);
-		},
-		rowDeselected:function(row) {
-			rowDeselected_onSAPProject(row);
+		columnDefaults:{
+			headerFilterPlaceholder: " ",
 		}
 	}',
 	'datasetRepFieldsDefs' => '{
-		isSynced: {headerFilter:"input", align:"center", editor:false, formatter:"tickCross", width: 80},
+		isSynced: {headerFilter:"input", hozAlign:"center", editor:false, formatter:"tickCross", width: 80},
 		status: {
-			headerFilter: "select",
-			headerFilterParams: getSAPProjectStatusbezeichnung,
+			headerFilter:"list",
+			headerFilterParams:{ values:getSAPProjectStatusbezeichnung()},
 			formatter:"lookup",
-			formatterParams: getSAPProjectStatusbezeichnung
+            formatterParams: getSAPProjectStatusbezeichnung
 		},
 		projects_timesheet_id: {visible: false},
 		start_date: {headerFilter: "input", mutator: mut_formatStringDate},

@@ -36,17 +36,14 @@ class Invoices extends FHC_Controller
 		$this->load->library('AuthLib');
 		// Loads the PermissionLib
 		$this->load->library('PermissionLib');
-
-		// Loads the SyncPaymentsLib library
-		$this->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
-		
 		$this->load->library('PhrasesLib');
 		$this->loadPhrases(
 			array(
-				'infocenter',
-				'bewerbung',
+				'infocenter'
 			)
 		);
+		// Loads the SyncPaymentsLib library
+		$this->load->library('extensions/FHC-Core-SAP/SyncPaymentsLib');
 	}
 
 	// -----------------------------------------------------------------------------------------------------------------
@@ -57,7 +54,7 @@ class Invoices extends FHC_Controller
 	 */
 	public function index()
 	{
-		$this->load->view('extensions/FHC-Core-SAP/cis/invoices.php');
+		$this->load->view('extensions/FHC-Core-SAP/bewerbung/invoices.php');
 	}
 
 	/**

@@ -13,6 +13,18 @@ class SAPSalesOrder_model extends DB_Model
 		$this->hasSequence = false;
 	}
 
+	public function isBuchungAllowedToChange($buchungsnr, $buchungsnr_verweis = '')
+	{
+		$this->db->where('buchungsnr', $buchungsnr);
+
+		if ($buchungsnr_verweis)
+			$this->db->or_where('buchungsnr', $buchungsnr_verweis);
+
+		$count = $this->db->count_all_results($this->dbTable);
+		
+		return success(!$count);
+	}
+
 	public function getOpenPayments()
 	{
 		$qry = "SELECT

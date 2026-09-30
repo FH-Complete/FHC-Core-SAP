@@ -154,5 +154,61 @@ class ManageServices extends JQW_Controller
 	{
 		var_dump($this->syncserviceslib->getServiceById(urldecode($id)));
 	}
+	
+	/**
+	 * Should run only once
+	 */
+	public function setEmployeeOnService()
+	{
+		$this->logInfo('Start data synchronization with SAP ByD: setEmployeeOnService');
+		
+		// Gets the oldest job
+		$oldestJob = $this->getOldestJob(SyncServicesLib::SAP_UPDATE_EMPLOYEE_SERVICE);
+		if (isError($oldestJob))
+		{
+			$this->logError(getCode($oldestJob).': '.getError($oldestJob), SyncServicesLib::SAP_UPDATE_EMPLOYEE_SERVICE);
+		}
+		elseif (hasData($oldestJob)) // if there jobs to work
+		{
+			// Update jobs properties
+			$this->updateJobs(
+				getData($oldestJob), // Jobs to be updated
+				array(JobsQueueLib::PROPERTY_START_TIME), // Job properties to be updated
+				array(date('Y-m-d H:i:s')) // Job properties new values
+			);
+			$updateResult = $this->updateJobsQueue(SyncServicesLib::SAP_UPDATE_EMPLOYEE_SERVICE, getData($oldestJob));
+			
+			// If an error occurred then log it
+			if (isError($updateResult))
+			{
+				$this->logError(getError($updateResult));
+			}
+			else // works the jobs
+			{
+				// Create/update users on SAP side
+				$syncResult = $this->syncserviceslib->setEmployeeOnService(mergeUsersPersonIdArray(getData($oldestJob)));
+				
+				// Log result
+				if (isError($syncResult))
+				{
+					$this->logError(getCode($syncResult).': '.getError($syncResult));
+				}
+				else
+				{
+					$this->logInfo(getData($syncResult));
+				}
+				
+				// Update jobs properties values
+				$this->updateJobs(
+					getData($oldestJob), // Jobs to be updated
+					array(JobsQueueLib::PROPERTY_STATUS, JobsQueueLib::PROPERTY_END_TIME), // Job properties to be updated
+					array(JobsQueueLib::STATUS_DONE, date('Y-m-d H:i:s')) // Job properties new values
+				);
+				$this->updateJobsQueue(SyncServicesLib::SAP_UPDATE_EMPLOYEE_SERVICE, getData($oldestJob));
+			}
+		}
+		
+		$this->logInfo('End data synchronization with SAP ByD: update');
+	}
 }
 

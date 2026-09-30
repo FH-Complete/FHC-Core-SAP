@@ -36,11 +36,13 @@ class SyncEmps extends Auth_Controller
 	public function syncEmp()
 	{
 		$empID = $this->_ci->input->post('emp_id');
+		$onlyStammdaten = $this->_ci->input->post('stammdaten') === "true";
+		$testlauf = $this->_ci->input->post('testlauf') === "true";
 
 		if (empty($empID))
 			$this->terminateWithJsonError('Bitte einen Mitarbeiter angeben');
 
-		$syncStatus = $this->_ci->syncemployeeslib->sync($empID);
+		$syncStatus = $this->_ci->syncemployeeslib->sync($empID, $onlyStammdaten, $testlauf);
 
 		$this->outputJson($syncStatus);
 
