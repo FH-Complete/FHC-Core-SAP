@@ -7,8 +7,8 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
  */
 class ODATAClientLib
 {
-
 	const CURL_SSLVERSION_MAX_TLSv1_2 = 393216; // Curl constant that set the maximum used TLS version
+	const ODATA_ENABLE_CURLOPT_SSLVERSION = 'odata_enable_curlopt_sslversion';
 
 	const HTTP_GET_METHOD = 'GET'; // http get method name
 	const HTTP_POST_METHOD = 'POST'; // http post method name
@@ -353,12 +353,14 @@ class ODATAClientLib
 	 */
 	private function _callGET($uri)
 	{
-		return \Httpful\Request::get($uri)
+		$httpfulRequest = \Httpful\Request::get($uri)
 			->expectsJson() // dangerous expectations
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
-			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
-			->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
-			->send();
+			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD]);
+
+		$this->_setCurlOptions($httpfulRequest);
+
+		return $httpfulRequest->send();
 	}
 
 	/**
@@ -371,13 +373,15 @@ class ODATAClientLib
 		$header = array();
 
 		// HTTP GET call without any parameter
-		$response = \Httpful\Request::get($uri)
+		$httpfulRequest = \Httpful\Request::get($uri)
 			->expectsJson() // dangerous expectations
 			->addHeader(self::TOKEN_HEADER_FETCH_NAME, self::TOKEN_HEADER_FETCH_VALUE) // token with option to fetch
 			->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
-			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
-			->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
-			->send();
+			->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD]);
+
+		$this->_setCurlOptions($httpfulRequest);
+
+		$response = $httpfulRequest->send();
 
 		// Checks if the header is present and the needed data are present
 		if (isset($response->headers) && is_object($response->headers) && method_exists($response->headers, 'toArray'))
@@ -411,16 +415,18 @@ class ODATAClientLib
 		// If the header data are present then perform the call...
 		if (($header = $this->_getHeader($uri)) != null)
 		{
-			return \Httpful\Request::post($uri)
+			$httpfulRequest = \Httpful\Request::post($uri)
 				->expectsJson() // dangerous expectations
 				->addHeader(self::TOKEN_HEADER_SEND_NAME, $header[self::TOKEN_HEADER_FETCH_NAME]) // token
 				->addHeader(self::COOKIE_HEADER_SEND_NAME, $header[self::COOKIE_HEADER_FETCH_NAME]) // session cookie value
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
-				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
-				->sendsJson() // content type json
-				->send();
+				->sendsJson(); // content type json
+
+			$this->_setCurlOptions($httpfulRequest);
+
+			return $httpfulRequest->send();
 		}
 		else // ...otherwise return a null value
 		{
@@ -436,7 +442,7 @@ class ODATAClientLib
 		// If the header data are present then perform the call...
 		if (($header = $this->_getHeader($uri)) != null)
 		{
-			return \Httpful\Request::post($uri)
+			$httpfulRequest = \Httpful\Request::post($uri)
 				->expectsJson() // dangerous expectations
 				->addHeader(self::MERGE_HEADER_NAME, self::MERGE_HEADER_VALUE) // merge option
 				->addHeader(self::TOKEN_HEADER_SEND_NAME, $header[self::TOKEN_HEADER_FETCH_NAME]) // token
@@ -444,9 +450,11 @@ class ODATAClientLib
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
-				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
-				->sendsJson() // content type json
-				->send();
+				->sendsJson(); // content type json
+
+			$this->_setCurlOptions($httpfulRequest);
+
+			return $httpfulRequest->send();
 		}
 		else // ...otherwise return a null value
 		{
@@ -462,7 +470,7 @@ class ODATAClientLib
 		// If the header data are present then perform the call...
 		if (($header = $this->_getHeader($uri)) != null)
 		{
-			return \Httpful\Request::post($uri)
+			$httpfulRequest = \Httpful\Request::post($uri)
 				->expectsJson() // dangerous expectations
 				->addHeader(self::PATCH_HEADER_NAME, self::PATCH_HEADER_VALUE) // merge option
 				->addHeader(self::TOKEN_HEADER_SEND_NAME, $header[self::TOKEN_HEADER_FETCH_NAME]) // token
@@ -470,9 +478,11 @@ class ODATAClientLib
 				->addHeader(self::ACCEPT_HEADER_NAME, self::ACCEPT_HEADER_VALUE) // not so common but required
 				->body($this->_callParametersArray) // post parameters
 				->authenticateWith($this->_getConnectionByAPISetName()[self::USERNAME], $this->_getConnectionByAPISetName()[self::PASSWORD])
-				->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2)
-				->sendsJson() // content type json
-				->send();
+				->sendsJson(); // content type json
+
+			$this->_setCurlOptions($httpfulRequest);
+
+			return $httpfulRequest->send();
 		}
 		else // ...otherwise return a null value
 		{
@@ -626,6 +636,15 @@ class ODATAClientLib
 	private function _getConnectionByAPISetName()
 	{
 		return $this->_connectionsArray[$this->_apiSetName];
+	}
+
+	/**
+	 * Sets the curl options if enabled
+	 */
+	private function _setCurlOptions($httpfulRequest)
+	{
+		if ($this->_ci->config->item(self::ODATA_ENABLE_CURLOPT_SSLVERSION) === true)
+			$httpfulRequest->addOnCurlOption(CURLOPT_SSLVERSION, self::CURL_SSLVERSION_MAX_TLSv1_2);
 	}
 }
 

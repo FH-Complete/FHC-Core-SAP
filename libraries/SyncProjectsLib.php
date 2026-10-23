@@ -3323,8 +3323,7 @@ class SyncProjectsLib
 		}
 
 		// If here then everything is fine
-		// NOTE: it returns even the code of the latest attempt to add the employee to the project
-		return success('Employee successfully added to this project', getCode($addEmployeeResult));
+		return success('Employee successfully added to this project');
 	}
 
 	private function getProjectEmployees($projectsResult)

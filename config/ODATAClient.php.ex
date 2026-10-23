@@ -2,6 +2,8 @@
 
 $config['odata_active_connection'] = 'DEFAULT'; // the used configuration set of the chosen connection
 
+$config['odata_enable_curlopt_sslversion'] = false;
+
 // Example of a configuration set. All parameters are required!
 $config['odata_connections'] = array(
 	'DEFAULT' => array(
